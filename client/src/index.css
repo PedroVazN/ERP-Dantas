@@ -1,0 +1,162 @@
+:root {
+  --bg: #f3f6fb;
+  --panel: #ffffff;
+  --panel-2: #f8faff;
+  --text: #1f2937;
+  --title: #0f172a;
+  --muted: #667085;
+  --border: #dde5f1;
+  --accent: #0f6fff;
+  --accent-2: #00a6ff;
+
+  --sidebar-bg: #102946;
+  --sidebar-border: #1f3f63;
+  --sidebar-text: #d8e3f1;
+  --sidebar-title: #ffffff;
+  --sidebar-muted: #9cb3cf;
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-active: rgba(0, 166, 255, 0.12);
+  --sidebar-active-border: rgba(0, 166, 255, 0.3);
+  --sidebar-icon-bg: rgba(255, 255, 255, 0.06);
+  --sidebar-icon-border: rgba(255, 255, 255, 0.09);
+
+  --promo-1: #e7f5ff;
+  --promo-2: #dbf7f5;
+  --kpi-glow: rgba(15, 111, 255, 0.12);
+  --shadow-soft: rgba(16, 24, 40, 0.08);
+  --shadow-strong: rgba(0, 0, 0, 0.25);
+
+  font-family: Inter, "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+:root[data-theme="escuro"] {
+  --bg: #060d17;
+  --panel: #101a28;
+  --panel-2: #0f223a;
+  --text: #dae5f7;
+  --title: #f5f8ff;
+  --muted: #90a1bb;
+  --border: #243a5a;
+  --accent: #4d8dff;
+  --accent-2: #22d3ee;
+
+  --sidebar-bg: #081424;
+  --sidebar-border: #16304a;
+  --sidebar-text: #bbd0e8;
+  --sidebar-title: #f3f7ff;
+  --sidebar-muted: #86a2c5;
+  --sidebar-hover: rgba(255, 255, 255, 0.05);
+  --sidebar-active: rgba(34, 211, 238, 0.1);
+  --sidebar-active-border: rgba(34, 211, 238, 0.35);
+  --sidebar-icon-bg: rgba(255, 255, 255, 0.04);
+  --sidebar-icon-border: rgba(255, 255, 255, 0.09);
+
+  --promo-1: #10263f;
+  --promo-2: #143457;
+  --kpi-glow: rgba(77, 141, 255, 0.15);
+  --shadow-soft: rgba(0, 0, 0, 0.28);
+  --shadow-strong: rgba(0, 0, 0, 0.45);
+}
+
+:root[data-theme="oceano"] {
+  --bg: #ecfdff;
+  --panel: #f4fdff;
+  --panel-2: #e7faff;
+  --text: #134e5e;
+  --title: #0a3c49;
+  --muted: #347b90;
+  --border: #bde8f4;
+  --accent: #0ea5e9;
+  --accent-2: #14b8a6;
+
+  --sidebar-bg: #0a4f6b;
+  --sidebar-border: #0c6488;
+  --sidebar-text: #d4f5ff;
+  --sidebar-title: #ffffff;
+  --sidebar-muted: #b0e6f7;
+  --sidebar-hover: rgba(255, 255, 255, 0.08);
+  --sidebar-active: rgba(20, 184, 166, 0.2);
+  --sidebar-active-border: rgba(20, 184, 166, 0.45);
+  --sidebar-icon-bg: rgba(255, 255, 255, 0.08);
+  --sidebar-icon-border: rgba(255, 255, 255, 0.15);
+
+  --promo-1: #def7ff;
+  --promo-2: #dcfce7;
+  --kpi-glow: rgba(14, 165, 233, 0.16);
+  --shadow-soft: rgba(2, 132, 199, 0.12);
+  --shadow-strong: rgba(2, 132, 199, 0.22);
+}
+
+:root[data-theme="sabonete"] {
+  --bg: #eefaf6;
+  --panel: #f8fffd;
+  --panel-2: #e8f7f2;
+  --text: #0b3f47;
+  --title: #034159;
+  --muted: #2f6f73;
+  --border: #b9e7d6;
+  --accent: #02735e;
+  --accent-2: #038c3e;
+
+  --sidebar-bg: #034159;
+  --sidebar-border: #025951;
+  --sidebar-text: #d9fff0;
+  --sidebar-title: #ffffff;
+  --sidebar-muted: #9fe7c7;
+  --sidebar-hover: rgba(12, 242, 93, 0.08);
+  --sidebar-active: rgba(12, 242, 93, 0.16);
+  --sidebar-active-border: rgba(12, 242, 93, 0.32);
+  --sidebar-icon-bg: rgba(12, 242, 93, 0.12);
+  --sidebar-icon-border: rgba(12, 242, 93, 0.22);
+
+  --promo-1: #def9ef;
+  --promo-2: #d4ffe2;
+  --kpi-glow: rgba(2, 140, 62, 0.16);
+  --shadow-soft: rgba(3, 65, 89, 0.12);
+  --shadow-strong: rgba(3, 65, 89, 0.24);
+}
+
+:root[data-theme="rosa"] {
+  --bg: #f8f1fb;
+  --panel: #fff9ff;
+  --panel-2: #f5e9f8;
+  --text: #372041;
+  --title: #1b0a26;
+  --muted: #72547b;
+  --border: #e3cbe8;
+  --accent: #b775bf;
+  --accent-2: #d29cd9;
+
+  --sidebar-bg: #1b0a26;
+  --sidebar-border: #3a184d;
+  --sidebar-text: #eddcf3;
+  --sidebar-title: #ffffff;
+  --sidebar-muted: #cfa8da;
+  --sidebar-hover: rgba(216, 167, 217, 0.14);
+  --sidebar-active: rgba(216, 167, 217, 0.2);
+  --sidebar-active-border: rgba(216, 167, 217, 0.34);
+  --sidebar-icon-bg: rgba(216, 167, 217, 0.16);
+  --sidebar-icon-border: rgba(216, 167, 217, 0.24);
+
+  --promo-1: #f4e3f6;
+  --promo-2: #efd7f3;
+  --kpi-glow: rgba(183, 117, 191, 0.16);
+  --shadow-soft: rgba(82, 26, 94, 0.12);
+  --shadow-strong: rgba(27, 10, 38, 0.34);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#root {
+  min-height: 100vh;
+}
