@@ -52,6 +52,11 @@ const themeOptions: Array<{ value: Theme; label: string; description: string }> 
     label: "Rosa",
     description: "Tema sofisticado em tons rosados e roxo profundo.",
   },
+  {
+    value: "neutro",
+    label: "Neutro",
+    description: "Paleta suave e elegante para uma experiencia clean e profissional.",
+  },
 ];
 
 const formatBRL = (value: number) =>
@@ -961,7 +966,7 @@ function App() {
             <section className="table-card">
               <h3>Tema da interface</h3>
               <p className="theme-helper">
-                Escolha um dos 5 temas elegantes e aplique imediatamente no seu ERP.
+                Escolha um dos 6 temas elegantes e aplique imediatamente no seu ERP.
               </p>
               <div className="theme-cards">
                 {themeOptions.map((option) => (

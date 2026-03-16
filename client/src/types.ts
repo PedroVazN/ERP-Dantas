@@ -1,4 +1,4 @@
-export type Theme = "claro" | "escuro" | "oceano" | "sabonete" | "rosa";
+export type Theme = "claro" | "escuro" | "oceano" | "sabonete" | "rosa" | "neutro";
 
 export type AuthUser = {
   id: string;

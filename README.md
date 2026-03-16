@@ -16,7 +16,7 @@ ERP moderno completo para operacao comercial de sabonetes, com frontend React + 
 - Modulo de compras (entrada automatica no estoque)
 - Modulo financeiro (despesas e contas a pagar)
 - Configuracao de tema persistida por usuario
-- 5 temas visuais selecionaveis: `claro`, `escuro`, `oceano`, `sabonete` e `rosa`
+- 6 temas visuais selecionaveis: `claro`, `escuro`, `oceano`, `sabonete`, `rosa` e `neutro`
 
 ## Arquitetura
 

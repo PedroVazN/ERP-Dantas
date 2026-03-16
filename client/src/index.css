@@ -147,6 +147,35 @@
   --shadow-strong: rgba(27, 10, 38, 0.34);
 }
 
+:root[data-theme="neutro"] {
+  --bg: #f7f3ea;
+  --panel: #fdfbf6;
+  --panel-2: #f4eee2;
+  --text: #4a443a;
+  --title: #5b5348;
+  --muted: #807667;
+  --border: #d8cfbf;
+  --accent: #b8b68f;
+  --accent-2: #d0c0a7;
+
+  --sidebar-bg: #8f8b63;
+  --sidebar-border: #a4a07a;
+  --sidebar-text: #f2efdc;
+  --sidebar-title: #ffffff;
+  --sidebar-muted: #e8e2c5;
+  --sidebar-hover: rgba(235, 230, 210, 0.14);
+  --sidebar-active: rgba(235, 230, 210, 0.22);
+  --sidebar-active-border: rgba(235, 230, 210, 0.34);
+  --sidebar-icon-bg: rgba(235, 230, 210, 0.2);
+  --sidebar-icon-border: rgba(235, 230, 210, 0.28);
+
+  --promo-1: #ebe6d2;
+  --promo-2: #dbd3c6;
+  --kpi-glow: rgba(208, 192, 167, 0.28);
+  --shadow-soft: rgba(118, 106, 86, 0.14);
+  --shadow-strong: rgba(93, 86, 72, 0.24);
+}
+
 * {
   box-sizing: border-box;
 }

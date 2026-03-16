@@ -471,6 +471,10 @@ button {
   background: linear-gradient(135deg, #1b0a26 0%, #b775bf 55%, #d8a7d9 100%);
 }
 
+.theme-preview.neutro {
+  background: linear-gradient(135deg, #b8b68f 0%, #ebe6d2 55%, #d0c0a7 100%);
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

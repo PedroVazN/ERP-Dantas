@@ -453,7 +453,7 @@ app.get("/api/settings", async (_req, res) => {
 
 app.put("/api/settings/theme", async (req, res) => {
   const { theme } = req.body as {
-    theme?: "claro" | "escuro" | "oceano" | "sabonete" | "rosa";
+    theme?: "claro" | "escuro" | "oceano" | "sabonete" | "rosa" | "neutro";
   };
   if (!theme) {
     return res.status(400).json({ message: "Tema é obrigatório." });

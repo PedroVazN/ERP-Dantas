@@ -120,7 +120,7 @@ const settingSchema = new mongoose.Schema(
     taxRate: { type: Number, default: 0 },
     theme: {
       type: String,
-      enum: ["claro", "escuro", "oceano", "sabonete", "rosa"],
+      enum: ["claro", "escuro", "oceano", "sabonete", "rosa", "neutro"],
       default: "claro",
     },
   },
