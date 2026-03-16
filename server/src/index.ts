@@ -38,6 +38,9 @@ const explicitAllowedOrigins = [
 const allowVercelPreviews = (process.env.ALLOW_VERCEL_PREVIEWS || "true").toLowerCase() === "true";
 const purchaseApprovalThreshold = Number(process.env.PURCHASE_APPROVAL_THRESHOLD || 1500);
 const expenseApprovalThreshold = Number(process.env.EXPENSE_APPROVAL_THRESHOLD || 800);
+const abacateApiUrl = (process.env.ABACATEPAY_API_URL || "https://api.abacatepay.com/v1").replace(/\/$/, "");
+const abacateApiKey = process.env.ABACATEPAY_API_KEY?.trim();
+const abacatePixReceiverKey = process.env.ABACATEPAY_PIX_KEY?.trim();
 let dbConnected = false;
 let connectPromise: Promise<typeof mongoose> | null = null;
 
@@ -206,6 +209,139 @@ function generateInvoicePayload(businessId: string, saleId: string, status: "EMI
     issuedAt: now,
     xmlUrl: `/api/invoices/${number}.xml`,
   };
+}
+
+function normalizeAbacatePayload(raw: unknown) {
+  const payload = (raw as { data?: Record<string, unknown> } | null)?.data || (raw as Record<string, unknown>);
+  return {
+    id: String(payload?.id || payload?.externalId || ""),
+    status: String(payload?.status || "PENDING"),
+    brCode: String(payload?.brCode || payload?.pixCopyPaste || ""),
+    brCodeBase64: String(payload?.brCodeBase64 || payload?.qrCodeImage || ""),
+    expiresAt: String(payload?.expiresAt || ""),
+  };
+}
+
+function isPaidPixStatus(status: string) {
+  const normalized = status.trim().toUpperCase();
+  return normalized === "PAID" || normalized === "CONFIRMED" || normalized === "APPROVED";
+}
+
+async function abacateRequest(path: string, options: RequestInit) {
+  if (!abacateApiKey) {
+    throw new Error("Defina ABACATEPAY_API_KEY no backend para habilitar PIX na hora.");
+  }
+  const response = await fetch(`${abacateApiUrl}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${abacateApiKey}`,
+      ...(options.headers || {}),
+    },
+  });
+
+  const raw = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message =
+      (raw as { error?: string; message?: string })?.message ||
+      (raw as { error?: string; message?: string })?.error ||
+      "Falha ao comunicar com Abacate Pay.";
+    throw new Error(message);
+  }
+  return raw;
+}
+
+async function createAbacatePixCharge(params: {
+  amountInCents: number;
+  description: string;
+  metadata?: Record<string, string>;
+}) {
+  try {
+    const result = await abacateRequest("/pixQrCode/create", {
+      method: "POST",
+      body: JSON.stringify({
+        amount: params.amountInCents,
+        expiresIn: 1800,
+        description: params.description.slice(0, 37),
+        metadata: params.metadata,
+      }),
+    });
+    return normalizeAbacatePayload(result);
+  } catch {
+    const result = await abacateRequest("/transparents/create", {
+      method: "POST",
+      body: JSON.stringify({
+        method: "PIX",
+        data: {
+          amount: params.amountInCents,
+          description: params.description.slice(0, 37),
+          expiresIn: 1800,
+          metadata: params.metadata,
+        },
+      }),
+    });
+    return normalizeAbacatePayload(result);
+  }
+}
+
+async function checkAbacatePixCharge(chargeId: string) {
+  try {
+    const result = await abacateRequest(`/pixQrCode/check?id=${encodeURIComponent(chargeId)}`, {
+      method: "GET",
+    });
+    return normalizeAbacatePayload(result);
+  } catch {
+    const result = await abacateRequest(`/transparents/check?id=${encodeURIComponent(chargeId)}`, {
+      method: "GET",
+    });
+    return normalizeAbacatePayload(result);
+  }
+}
+
+async function normalizeSaleItemsAndApplyStock(
+  businessId: string,
+  items: SaleItemInput[]
+): Promise<
+  {
+    product: Types.ObjectId;
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+  }[]
+> {
+  const normalizedItems: {
+    product: Types.ObjectId;
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+  }[] = [];
+
+  for (const item of items) {
+    if (!isValidObjectId(item.product)) {
+      throw new Error("Produto inválido na venda.");
+    }
+    const product = await ProductModel.findOne({ _id: item.product, businessId });
+    if (!product) {
+      throw new Error("Produto da venda não encontrado.");
+    }
+    if (item.quantity > product.stock) {
+      throw new Error(`Estoque insuficiente para ${product.name}. Disponível: ${product.stock}.`);
+    }
+    product.stock -= item.quantity;
+    await product.save();
+
+    normalizedItems.push({
+      product: product._id as Types.ObjectId,
+      name: product.name,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice || product.price,
+      total: (item.unitPrice || product.price) * item.quantity,
+    });
+  }
+
+  return normalizedItems;
 }
 
 async function applyPurchaseStock(
@@ -391,40 +527,21 @@ app.post("/api/sales", async (req, res) => {
     return res.status(400).json({ message: "Informe ao menos um item da venda." });
   }
 
-  const normalizedItems: {
+  let normalizedItems: {
     product: Types.ObjectId;
     name: string;
     quantity: number;
     unitPrice: number;
     total: number;
   }[] = [];
-
-  for (const item of items) {
-    if (!isValidObjectId(item.product)) {
-      return res.status(400).json({ message: "Produto inválido na venda." });
+  try {
+    normalizedItems = await normalizeSaleItemsAndApplyStock(businessId, items);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Falha ao lançar venda.";
+    if (message.includes("não encontrado")) {
+      return res.status(404).json({ message });
     }
-
-    const product = await ProductModel.findOne({ _id: item.product, businessId });
-    if (!product) {
-      return res.status(404).json({ message: "Produto da venda não encontrado." });
-    }
-
-    if (item.quantity > product.stock) {
-      return res.status(400).json({
-        message: `Estoque insuficiente para ${product.name}. Disponível: ${product.stock}.`,
-      });
-    }
-
-    product.stock -= item.quantity;
-    await product.save();
-
-    normalizedItems.push({
-      product: product._id as Types.ObjectId,
-      name: product.name,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice || product.price,
-      total: (item.unitPrice || product.price) * item.quantity,
-    });
+    return res.status(400).json({ message });
   }
 
   const totalAmount = normalizedItems.reduce((sum, item) => sum + item.total, 0);
@@ -451,6 +568,165 @@ app.post("/api/sales", async (req, res) => {
   }
 
   res.status(201).json(sale);
+});
+
+app.post("/api/sales/pix/checkout", async (req, res) => {
+  if (blockWriteInGeneralScope(req, res)) {
+    return;
+  }
+
+  const { businessId } = getScopeContext(req);
+  const { productId, quantity, amount } = req.body as {
+    productId?: string;
+    quantity?: number;
+    amount?: number;
+  };
+
+  if (!productId || !isValidObjectId(productId)) {
+    return res.status(400).json({ message: "Produto inválido para checkout PIX." });
+  }
+  const finalQuantity = Math.max(1, Number(quantity || 1));
+  const product = await ProductModel.findOne({ _id: productId, businessId });
+  if (!product) {
+    return res.status(404).json({ message: "Produto não encontrado." });
+  }
+  if (finalQuantity > product.stock) {
+    return res.status(400).json({
+      message: `Estoque insuficiente para ${product.name}. Disponível: ${product.stock}.`,
+    });
+  }
+
+  const calculatedAmount = Number(amount && amount > 0 ? amount : product.price * finalQuantity);
+  const amountInCents = Math.round(calculatedAmount * 100);
+  if (amountInCents <= 0) {
+    return res.status(400).json({ message: "Valor da cobrança PIX inválido." });
+  }
+
+  const pixCharge = await createAbacatePixCharge({
+    amountInCents,
+    description: `Venda E-Sentinel ${product.name}`,
+    metadata: {
+      businessId,
+      productId: String(product._id),
+      quantity: String(finalQuantity),
+      receiverKey: abacatePixReceiverKey || "",
+    },
+  });
+
+  if (!pixCharge.id || !pixCharge.brCode) {
+    return res.status(502).json({ message: "Não foi possível gerar QR Code PIX na Abacate Pay." });
+  }
+
+  res.status(201).json({
+    checkoutId: pixCharge.id,
+    status: pixCharge.status,
+    amount: calculatedAmount,
+    brCode: pixCharge.brCode,
+    qrCodeBase64: pixCharge.brCodeBase64,
+    expiresAt: pixCharge.expiresAt,
+    receiverKey: abacatePixReceiverKey || "",
+    product: {
+      id: String(product._id),
+      name: product.name,
+      quantity: finalQuantity,
+      unitPrice: product.price,
+    },
+  });
+});
+
+app.get("/api/sales/pix/checkout/:checkoutId/status", async (req, res) => {
+  const pixCharge = await checkAbacatePixCharge(req.params.checkoutId);
+  res.json({
+    checkoutId: req.params.checkoutId,
+    status: pixCharge.status,
+    paid: isPaidPixStatus(pixCharge.status),
+    expiresAt: pixCharge.expiresAt,
+    qrCodeBase64: pixCharge.brCodeBase64,
+    brCode: pixCharge.brCode,
+  });
+});
+
+app.patch("/api/sales/pix/checkout/:checkoutId/confirm", async (req, res) => {
+  if (blockWriteInGeneralScope(req, res)) {
+    return;
+  }
+
+  const { businessId } = getScopeContext(req);
+  const checkoutId = req.params.checkoutId;
+  const { productId, quantity, amount } = req.body as {
+    productId?: string;
+    quantity?: number;
+    amount?: number;
+  };
+
+  if (!productId || !isValidObjectId(productId)) {
+    return res.status(400).json({ message: "Produto inválido para confirmação PIX." });
+  }
+
+  const existingSale = await SaleModel.findOne({
+    businessId,
+    "paymentReference.provider": "ABACATE_PAY",
+    "paymentReference.chargeId": checkoutId,
+  });
+  if (existingSale) {
+    return res.json(existingSale);
+  }
+
+  const pixCharge = await checkAbacatePixCharge(checkoutId);
+  if (!isPaidPixStatus(pixCharge.status)) {
+    return res.status(409).json({
+      message: "Pagamento PIX ainda não foi confirmado.",
+      status: pixCharge.status,
+    });
+  }
+
+  const product = await ProductModel.findOne({ _id: productId, businessId });
+  if (!product) {
+    return res.status(404).json({ message: "Produto não encontrado." });
+  }
+  const finalQuantity = Math.max(1, Number(quantity || 1));
+
+  let normalizedItems: {
+    product: Types.ObjectId;
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+  }[] = [];
+  try {
+    normalizedItems = await normalizeSaleItemsAndApplyStock(businessId, [
+      {
+        product: product._id as Types.ObjectId,
+        quantity: finalQuantity,
+        unitPrice: Number(amount && amount > 0 ? amount / finalQuantity : product.price),
+      },
+    ]);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Falha ao concluir venda PIX.";
+    return res.status(400).json({ message });
+  }
+
+  const totalAmount = normalizedItems.reduce((sum, item) => sum + item.total, 0);
+  const sale = await SaleModel.create({
+    businessId,
+    items: normalizedItems,
+    paymentMethod: "PIX",
+    status: "PAGO",
+    billingStatus: "FATURADO",
+    invoice: generateInvoicePayload(businessId, new Types.ObjectId().toString(), "EMITIDA"),
+    paymentReference: {
+      provider: "ABACATE_PAY",
+      chargeId: checkoutId,
+      status: pixCharge.status,
+      paidAt: new Date(),
+    },
+    totalAmount,
+    createdBy: "Checkout PIX",
+  });
+  sale.invoice = generateInvoicePayload(businessId, String(sale._id), "EMITIDA");
+  await sale.save();
+
+  res.json(sale);
 });
 
 app.get("/api/purchases", async (req, res) => {

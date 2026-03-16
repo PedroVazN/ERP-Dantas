@@ -9,6 +9,8 @@ import type {
   Dashboard,
   Expense,
   LoginResponse,
+  PixCheckout,
+  PixCheckoutStatus,
   Product,
   Purchase,
   Sale,
@@ -108,6 +110,14 @@ function App() {
     quantity: 1,
     paymentMethod: "PIX",
   });
+  const [instantPixForm, setInstantPixForm] = useState({
+    productId: "",
+    quantity: 1,
+    amount: 0,
+  });
+  const [pixCheckout, setPixCheckout] = useState<PixCheckout | null>(null);
+  const [pixCheckoutStatus, setPixCheckoutStatus] = useState("");
+  const [pixCheckoutLoading, setPixCheckoutLoading] = useState(false);
   const [purchaseForm, setPurchaseForm] = useState({
     supplier: "",
     productId: "",
@@ -166,6 +176,10 @@ function App() {
     if (!biInsights?.costByCategory.length) return 1;
     return Math.max(...biInsights.costByCategory.map((item) => item.total), 1);
   }, [biInsights]);
+  const instantPixProduct = useMemo(
+    () => products.find((item) => item._id === instantPixForm.productId) || null,
+    [instantPixForm.productId, products]
+  );
 
   function scopedPath(path: string) {
     if (!workspaceId) {
@@ -296,6 +310,14 @@ function App() {
   }, [workspaceId]);
 
   useEffect(() => {
+    if (!pixCheckout) return;
+    const intervalId = window.setInterval(() => {
+      void refreshPixCheckoutStatus();
+    }, 7000);
+    return () => window.clearInterval(intervalId);
+  }, [pixCheckout?.checkoutId]);
+
+  useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
 
@@ -400,6 +422,87 @@ function App() {
     });
     setSaleForm({ productId: "", quantity: 1, paymentMethod: "PIX" });
     await loadAllData();
+  }
+
+  async function startPixCheckout(event: FormEvent) {
+    event.preventDefault();
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Para vender, selecione um ERP especifico.");
+      return;
+    }
+    if (!instantPixForm.productId) {
+      setError("Selecione um produto para gerar o PIX.");
+      return;
+    }
+    try {
+      setPixCheckoutLoading(true);
+      setPixCheckoutStatus("");
+      const payload = await api.post<PixCheckout>(scopedPath("/sales/pix/checkout"), {
+        productId: instantPixForm.productId,
+        quantity: Number(instantPixForm.quantity),
+        amount: instantPixForm.amount > 0 ? Number(instantPixForm.amount) : undefined,
+      });
+      setPixCheckout(payload);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao gerar checkout PIX.";
+      setError(message);
+    } finally {
+      setPixCheckoutLoading(false);
+    }
+  }
+
+  async function refreshPixCheckoutStatus() {
+    if (!pixCheckout) return;
+    try {
+      const status = await api.get<PixCheckoutStatus>(
+        scopedPath(`/sales/pix/checkout/${encodeURIComponent(pixCheckout.checkoutId)}/status`)
+      );
+      setPixCheckoutStatus(status.status);
+      if (status.qrCodeBase64 || status.brCode) {
+        setPixCheckout((prev) =>
+          prev
+            ? {
+                ...prev,
+                qrCodeBase64: status.qrCodeBase64 || prev.qrCodeBase64,
+                brCode: status.brCode || prev.brCode,
+                status: status.status,
+                expiresAt: status.expiresAt || prev.expiresAt,
+              }
+            : prev
+        );
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao consultar status do PIX.";
+      setError(message);
+    }
+  }
+
+  async function confirmPixCheckoutSale() {
+    if (!pixCheckout) return;
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para concluir.");
+      return;
+    }
+    try {
+      setPixCheckoutLoading(true);
+      await api.patch<Sale>(
+        scopedPath(`/sales/pix/checkout/${encodeURIComponent(pixCheckout.checkoutId)}/confirm`),
+        {
+          productId: pixCheckout.product.id,
+          quantity: pixCheckout.product.quantity,
+          amount: pixCheckout.amount,
+        }
+      );
+      setPixCheckout(null);
+      setPixCheckoutStatus("PAID");
+      setInstantPixForm({ productId: "", quantity: 1, amount: 0 });
+      await loadAllData();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Pagamento ainda não confirmado.";
+      setError(message);
+    } finally {
+      setPixCheckoutLoading(false);
+    }
   }
 
   async function submitPurchase(event: FormEvent) {
@@ -1028,39 +1131,127 @@ function App() {
 
         {!loading && activeModule === "vendas" && (
           <section className="module-grid animated">
-            <form className="form-card" onSubmit={submitSale}>
-              <h3>Registrar venda</h3>
-              <select
-                value={saleForm.productId}
-                onChange={(event) => setSaleForm({ ...saleForm, productId: event.target.value })}
-                required
-              >
-                <option value="">Selecione o produto</option>
-                {products.map((item) => (
-                  <option key={item._id} value={item._id}>
-                    {item.name} ({item.stock} un.)
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                min={1}
-                placeholder="Quantidade"
-                value={saleForm.quantity}
-                onChange={(event) => setSaleForm({ ...saleForm, quantity: Number(event.target.value) })}
-                required
-              />
-              <select
-                value={saleForm.paymentMethod}
-                onChange={(event) => setSaleForm({ ...saleForm, paymentMethod: event.target.value })}
-              >
-                <option value="PIX">PIX</option>
-                <option value="DINHEIRO">Dinheiro</option>
-                <option value="CARTAO">Cartão</option>
-                <option value="BOLETO">Boleto</option>
-              </select>
-              <button type="submit">Lançar venda</button>
-            </form>
+            <div className="stack-cards">
+              <form className="form-card" onSubmit={submitSale}>
+                <h3>Registrar venda</h3>
+                <select
+                  value={saleForm.productId}
+                  onChange={(event) => setSaleForm({ ...saleForm, productId: event.target.value })}
+                  required
+                >
+                  <option value="">Selecione o produto</option>
+                  {products.map((item) => (
+                    <option key={item._id} value={item._id}>
+                      {item.name} ({item.stock} un.)
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="Quantidade"
+                  value={saleForm.quantity}
+                  onChange={(event) => setSaleForm({ ...saleForm, quantity: Number(event.target.value) })}
+                  required
+                />
+                <select
+                  value={saleForm.paymentMethod}
+                  onChange={(event) => setSaleForm({ ...saleForm, paymentMethod: event.target.value })}
+                >
+                  <option value="PIX">PIX</option>
+                  <option value="DINHEIRO">Dinheiro</option>
+                  <option value="CARTAO">Cartão</option>
+                  <option value="BOLETO">Boleto</option>
+                </select>
+                <button type="submit">Lançar venda</button>
+              </form>
+
+              <form className="form-card" onSubmit={startPixCheckout}>
+                <h3>Venda na hora (PIX)</h3>
+                <select
+                  value={instantPixForm.productId}
+                  onChange={(event) => setInstantPixForm({ ...instantPixForm, productId: event.target.value })}
+                  required
+                >
+                  <option value="">Selecione o produto</option>
+                  {products.map((item) => (
+                    <option key={item._id} value={item._id}>
+                      {item.name} ({item.stock} un.)
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="Quantidade"
+                  value={instantPixForm.quantity}
+                  onChange={(event) =>
+                    setInstantPixForm({ ...instantPixForm, quantity: Math.max(1, Number(event.target.value) || 1) })
+                  }
+                  required
+                />
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder={
+                    instantPixProduct
+                      ? `Valor sugerido ${formatBRL(instantPixProduct.price * instantPixForm.quantity)}`
+                      : "Valor da venda (opcional)"
+                  }
+                  value={instantPixForm.amount || ""}
+                  onChange={(event) =>
+                    setInstantPixForm({ ...instantPixForm, amount: Number(event.target.value) || 0 })
+                  }
+                />
+                <button type="submit" disabled={pixCheckoutLoading}>
+                  {pixCheckoutLoading ? "Gerando QR..." : "Gerar QR Code PIX"}
+                </button>
+
+                {pixCheckout ? (
+                  <div className="pix-checkout-box">
+                    <strong>Pagamento instantâneo</strong>
+                    <small>
+                      Checkout {pixCheckout.checkoutId} | Status: {pixCheckoutStatus || pixCheckout.status}
+                    </small>
+                    <small>Valor: {formatBRL(pixCheckout.amount)}</small>
+                    <img
+                      className="pix-qr-image"
+                      src={`data:image/png;base64,${pixCheckout.qrCodeBase64.replace(/^data:image\/png;base64,/, "")}`}
+                      alt="QR Code PIX"
+                    />
+                    <textarea
+                      readOnly
+                      value={pixCheckout.brCode}
+                      rows={4}
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                    <div className="table-actions">
+                      <button
+                        type="button"
+                        className="ghost-btn"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(pixCheckout.brCode);
+                        }}
+                      >
+                        Copiar código PIX
+                      </button>
+                      <button type="button" className="ghost-btn" onClick={refreshPixCheckoutStatus}>
+                        Atualizar status
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost-btn"
+                        onClick={confirmPixCheckoutSale}
+                        disabled={pixCheckoutLoading}
+                      >
+                        Confirmar pagamento
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </form>
+            </div>
             <section className="table-card">
               <h3>Vendas recentes</h3>
               <table>

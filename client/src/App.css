@@ -291,6 +291,12 @@
   gap: 16px;
 }
 
+.stack-cards {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
 .user-grid {
   grid-template-columns: 420px 1fr;
 }
@@ -549,6 +555,7 @@
 
 input,
 select,
+textarea,
 button {
   font: inherit;
   border-radius: 10px;
@@ -686,6 +693,33 @@ th {
 .table-actions .ghost-btn {
   padding: 6px 9px;
   font-size: 12px;
+}
+
+.pix-checkout-box {
+  margin-top: 8px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  background: var(--panel-2);
+}
+
+.pix-checkout-box strong {
+  color: var(--title);
+}
+
+.pix-checkout-box small {
+  color: var(--muted);
+}
+
+.pix-qr-image {
+  width: 180px;
+  height: 180px;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
 }
 
 .error {

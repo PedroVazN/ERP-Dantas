@@ -53,6 +53,12 @@ export type Sale = {
     issuedAt?: string;
     xmlUrl?: string;
   };
+  paymentReference?: {
+    provider?: string;
+    chargeId?: string;
+    status?: string;
+    paidAt?: string;
+  };
 };
 
 export type Purchase = {
@@ -152,4 +158,29 @@ export type Settings = {
   theme: Theme;
   currency: string;
   taxRate: number;
+};
+
+export type PixCheckout = {
+  checkoutId: string;
+  status: string;
+  amount: number;
+  brCode: string;
+  qrCodeBase64: string;
+  expiresAt?: string;
+  receiverKey?: string;
+  product: {
+    id: string;
+    name: string;
+    quantity: number;
+    unitPrice: number;
+  };
+};
+
+export type PixCheckoutStatus = {
+  checkoutId: string;
+  status: string;
+  paid: boolean;
+  expiresAt?: string;
+  qrCodeBase64?: string;
+  brCode?: string;
 };
