@@ -38,9 +38,10 @@ const explicitAllowedOrigins = [
 const allowVercelPreviews = (process.env.ALLOW_VERCEL_PREVIEWS || "true").toLowerCase() === "true";
 const purchaseApprovalThreshold = Number(process.env.PURCHASE_APPROVAL_THRESHOLD || 1500);
 const expenseApprovalThreshold = Number(process.env.EXPENSE_APPROVAL_THRESHOLD || 800);
-const abacateApiUrl = (process.env.ABACATEPAY_API_URL || "https://api.abacatepay.com/v1").replace(/\/$/, "");
-const abacateApiKey = process.env.ABACATEPAY_API_KEY?.trim();
-const abacatePixReceiverKey = process.env.ABACATEPAY_PIX_KEY?.trim();
+const whatsappApiUrl = (process.env.WHATSAPP_API_URL || "https://graph.facebook.com/v20.0").replace(/\/$/, "");
+const whatsappPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
+const whatsappAccessToken = process.env.WHATSAPP_ACCESS_TOKEN?.trim();
+const whatsappNotifyTo = process.env.WHATSAPP_NOTIFY_TO?.trim();
 let dbConnected = false;
 let connectPromise: Promise<typeof mongoose> | null = null;
 
@@ -211,90 +212,62 @@ function generateInvoicePayload(businessId: string, saleId: string, status: "EMI
   };
 }
 
-function normalizeAbacatePayload(raw: unknown) {
-  const payload = (raw as { data?: Record<string, unknown> } | null)?.data || (raw as Record<string, unknown>);
-  return {
-    id: String(payload?.id || payload?.externalId || ""),
-    status: String(payload?.status || "PENDING"),
-    brCode: String(payload?.brCode || payload?.pixCopyPaste || ""),
-    brCodeBase64: String(payload?.brCodeBase64 || payload?.qrCodeImage || ""),
-    expiresAt: String(payload?.expiresAt || ""),
-  };
-}
-
-function isPaidPixStatus(status: string) {
-  const normalized = status.trim().toUpperCase();
-  return normalized === "PAID" || normalized === "CONFIRMED" || normalized === "APPROVED";
-}
-
-async function abacateRequest(path: string, options: RequestInit) {
-  if (!abacateApiKey) {
-    throw new Error("Defina ABACATEPAY_API_KEY no backend para habilitar PIX na hora.");
+function normalizeWhatsAppPhone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) {
+    throw new Error("Informe um telefone válido para WhatsApp.");
   }
-  const response = await fetch(`${abacateApiUrl}${path}`, {
-    ...options,
+  if (digits.startsWith("55")) {
+    return digits;
+  }
+  return `55${digits}`;
+}
+
+async function sendWhatsAppTextMessage(toPhone: string, body: string) {
+  if (!whatsappPhoneNumberId || !whatsappAccessToken) {
+    throw new Error("Defina WHATSAPP_PHONE_NUMBER_ID e WHATSAPP_ACCESS_TOKEN no backend.");
+  }
+
+  const response = await fetch(`${whatsappApiUrl}/${whatsappPhoneNumberId}/messages`, {
+    method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${abacateApiKey}`,
-      ...(options.headers || {}),
+      Authorization: `Bearer ${whatsappAccessToken}`,
     },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: normalizeWhatsAppPhone(toPhone),
+      type: "text",
+      text: {
+        preview_url: false,
+        body,
+      },
+    }),
   });
 
   const raw = await response.json().catch(() => ({}));
   if (!response.ok) {
     const message =
-      (raw as { error?: string; message?: string })?.message ||
-      (raw as { error?: string; message?: string })?.error ||
-      "Falha ao comunicar com Abacate Pay.";
+      (raw as { error?: { message?: string } })?.error?.message ||
+      "Falha ao enviar mensagem pelo WhatsApp Business.";
     throw new Error(message);
   }
   return raw;
 }
 
-async function createAbacatePixCharge(params: {
-  amountInCents: number;
-  description: string;
-  metadata?: Record<string, string>;
-}) {
-  try {
-    const result = await abacateRequest("/pixQrCode/create", {
-      method: "POST",
-      body: JSON.stringify({
-        amount: params.amountInCents,
-        expiresIn: 1800,
-        description: params.description.slice(0, 37),
-        metadata: params.metadata,
-      }),
-    });
-    return normalizeAbacatePayload(result);
-  } catch {
-    const result = await abacateRequest("/transparents/create", {
-      method: "POST",
-      body: JSON.stringify({
-        method: "PIX",
-        data: {
-          amount: params.amountInCents,
-          description: params.description.slice(0, 37),
-          expiresIn: 1800,
-          metadata: params.metadata,
-        },
-      }),
-    });
-    return normalizeAbacatePayload(result);
-  }
+function isWhatsAppConfigured() {
+  return Boolean(whatsappPhoneNumberId && whatsappAccessToken);
 }
 
-async function checkAbacatePixCharge(chargeId: string) {
+async function notifySystemWhatsApp(body: string) {
+  if (!whatsappNotifyTo || !isWhatsAppConfigured()) {
+    return;
+  }
   try {
-    const result = await abacateRequest(`/pixQrCode/check?id=${encodeURIComponent(chargeId)}`, {
-      method: "GET",
-    });
-    return normalizeAbacatePayload(result);
-  } catch {
-    const result = await abacateRequest(`/transparents/check?id=${encodeURIComponent(chargeId)}`, {
-      method: "GET",
-    });
-    return normalizeAbacatePayload(result);
+    await sendWhatsAppTextMessage(whatsappNotifyTo, body);
+  } catch (error) {
+    console.error("Falha ao enviar notificação operacional no WhatsApp:", error);
   }
 }
 
@@ -570,163 +543,64 @@ app.post("/api/sales", async (req, res) => {
   res.status(201).json(sale);
 });
 
-app.post("/api/sales/pix/checkout", async (req, res) => {
-  if (blockWriteInGeneralScope(req, res)) {
-    return;
-  }
-
-  const { businessId } = getScopeContext(req);
-  const { productId, quantity, amount } = req.body as {
-    productId?: string;
-    quantity?: number;
-    amount?: number;
-  };
-
-  if (!productId || !isValidObjectId(productId)) {
-    return res.status(400).json({ message: "Produto inválido para checkout PIX." });
-  }
-  const finalQuantity = Math.max(1, Number(quantity || 1));
-  const product = await ProductModel.findOne({ _id: productId, businessId });
-  if (!product) {
-    return res.status(404).json({ message: "Produto não encontrado." });
-  }
-  if (finalQuantity > product.stock) {
-    return res.status(400).json({
-      message: `Estoque insuficiente para ${product.name}. Disponível: ${product.stock}.`,
-    });
-  }
-
-  const calculatedAmount = Number(amount && amount > 0 ? amount : product.price * finalQuantity);
-  const amountInCents = Math.round(calculatedAmount * 100);
-  if (amountInCents <= 0) {
-    return res.status(400).json({ message: "Valor da cobrança PIX inválido." });
-  }
-
-  const pixCharge = await createAbacatePixCharge({
-    amountInCents,
-    description: `Venda E-Sentinel ${product.name}`,
-    metadata: {
-      businessId,
-      productId: String(product._id),
-      quantity: String(finalQuantity),
-      receiverKey: abacatePixReceiverKey || "",
-    },
-  });
-
-  if (!pixCharge.id || !pixCharge.brCode) {
-    return res.status(502).json({ message: "Não foi possível gerar QR Code PIX na Abacate Pay." });
-  }
-
-  res.status(201).json({
-    checkoutId: pixCharge.id,
-    status: pixCharge.status,
-    amount: calculatedAmount,
-    brCode: pixCharge.brCode,
-    qrCodeBase64: pixCharge.brCodeBase64,
-    expiresAt: pixCharge.expiresAt,
-    receiverKey: abacatePixReceiverKey || "",
-    product: {
-      id: String(product._id),
-      name: product.name,
-      quantity: finalQuantity,
-      unitPrice: product.price,
-    },
-  });
-});
-
-app.get("/api/sales/pix/checkout/:checkoutId/status", async (req, res) => {
-  const pixCharge = await checkAbacatePixCharge(req.params.checkoutId);
+app.get("/api/integrations/whatsapp/status", async (_req, res) => {
   res.json({
-    checkoutId: req.params.checkoutId,
-    status: pixCharge.status,
-    paid: isPaidPixStatus(pixCharge.status),
-    expiresAt: pixCharge.expiresAt,
-    qrCodeBase64: pixCharge.brCodeBase64,
-    brCode: pixCharge.brCode,
+    configured: isWhatsAppConfigured(),
+    apiUrl: whatsappApiUrl,
+    phoneNumberIdConfigured: Boolean(whatsappPhoneNumberId),
+    accessTokenConfigured: Boolean(whatsappAccessToken),
+    notifyTo: whatsappNotifyTo || "",
   });
 });
 
-app.patch("/api/sales/pix/checkout/:checkoutId/confirm", async (req, res) => {
-  if (blockWriteInGeneralScope(req, res)) {
-    return;
+app.post("/api/integrations/whatsapp/send", async (req, res) => {
+  const { phone, message } = req.body as { phone?: string; message?: string };
+  if (!phone?.trim()) {
+    return res.status(400).json({ message: "Informe o telefone de destino." });
+  }
+  if (!message?.trim()) {
+    return res.status(400).json({ message: "Informe a mensagem para envio." });
   }
 
-  const { businessId } = getScopeContext(req);
-  const checkoutId = req.params.checkoutId;
-  const { productId, quantity, amount } = req.body as {
-    productId?: string;
-    quantity?: number;
-    amount?: number;
-  };
-
-  if (!productId || !isValidObjectId(productId)) {
-    return res.status(400).json({ message: "Produto inválido para confirmação PIX." });
-  }
-
-  const existingSale = await SaleModel.findOne({
-    businessId,
-    "paymentReference.provider": "ABACATE_PAY",
-    "paymentReference.chargeId": checkoutId,
+  const result = await sendWhatsAppTextMessage(phone, message.trim());
+  res.status(201).json({
+    sent: true,
+    phone: normalizeWhatsAppPhone(phone),
+    provider: "WHATSAPP_BUSINESS",
+    result,
   });
-  if (existingSale) {
-    return res.json(existingSale);
+});
+
+app.post("/api/integrations/whatsapp/sales/:id", async (req, res) => {
+  const sale = await SaleModel.findById(req.params.id);
+  if (!sale) {
+    return res.status(404).json({ message: "Venda não encontrada." });
+  }
+  const { phone, customerName } = req.body as { phone?: string; customerName?: string };
+  if (!phone?.trim()) {
+    return res.status(400).json({ message: "Informe o telefone de destino." });
   }
 
-  const pixCharge = await checkAbacatePixCharge(checkoutId);
-  if (!isPaidPixStatus(pixCharge.status)) {
-    return res.status(409).json({
-      message: "Pagamento PIX ainda não foi confirmado.",
-      status: pixCharge.status,
-    });
-  }
+  const invoiceNumber = sale.invoice?.number || "Pendente";
+  const status = sale.status || "PENDENTE";
+  const body = [
+    `Olá${customerName?.trim() ? `, ${customerName.trim()}` : ""}!`,
+    "Resumo da sua compra no E-Sentinel:",
+    `Valor: ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(sale.totalAmount)}`,
+    `Pagamento: ${sale.paymentMethod}`,
+    `Status: ${status}`,
+    `NF: ${invoiceNumber}`,
+    "",
+    "Obrigado pela preferência.",
+  ].join("\n");
 
-  const product = await ProductModel.findOne({ _id: productId, businessId });
-  if (!product) {
-    return res.status(404).json({ message: "Produto não encontrado." });
-  }
-  const finalQuantity = Math.max(1, Number(quantity || 1));
-
-  let normalizedItems: {
-    product: Types.ObjectId;
-    name: string;
-    quantity: number;
-    unitPrice: number;
-    total: number;
-  }[] = [];
-  try {
-    normalizedItems = await normalizeSaleItemsAndApplyStock(businessId, [
-      {
-        product: product._id as Types.ObjectId,
-        quantity: finalQuantity,
-        unitPrice: Number(amount && amount > 0 ? amount / finalQuantity : product.price),
-      },
-    ]);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Falha ao concluir venda PIX.";
-    return res.status(400).json({ message });
-  }
-
-  const totalAmount = normalizedItems.reduce((sum, item) => sum + item.total, 0);
-  const sale = await SaleModel.create({
-    businessId,
-    items: normalizedItems,
-    paymentMethod: "PIX",
-    status: "PAGO",
-    billingStatus: "FATURADO",
-    invoice: generateInvoicePayload(businessId, new Types.ObjectId().toString(), "EMITIDA"),
-    paymentReference: {
-      provider: "ABACATE_PAY",
-      chargeId: checkoutId,
-      status: pixCharge.status,
-      paidAt: new Date(),
-    },
-    totalAmount,
-    createdBy: "Checkout PIX",
+  const result = await sendWhatsAppTextMessage(phone, body);
+  res.status(201).json({
+    sent: true,
+    phone: normalizeWhatsAppPhone(phone),
+    provider: "WHATSAPP_BUSINESS",
+    result,
   });
-  sale.invoice = generateInvoicePayload(businessId, String(sale._id), "EMITIDA");
-  await sale.save();
-
-  res.json(sale);
 });
 
 app.get("/api/purchases", async (req, res) => {
@@ -787,6 +661,17 @@ app.post("/api/purchases", async (req, res) => {
     stockApplied: !needsApproval,
     totalAmount,
   });
+  if (needsApproval) {
+    await notifySystemWhatsApp(
+      [
+        "Atenção: nova compra aguardando aprovação",
+        `ERP: ${businessId}`,
+        `Fornecedor: ${supplier}`,
+        `Valor: ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalAmount)}`,
+        `ID: ${String(purchase._id)}`,
+      ].join("\n")
+    );
+  }
   res.status(201).json(purchase);
 });
 
@@ -814,6 +699,17 @@ app.post("/api/expenses", async (req, res) => {
       requestedAt: new Date(),
     },
   });
+  if (needsApproval) {
+    await notifySystemWhatsApp(
+      [
+        "Atenção: nova despesa aguardando aprovação",
+        `ERP: ${businessId}`,
+        `Descrição: ${String((req.body as { description?: string }).description || "Sem descrição")}`,
+        `Valor: ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(amount)}`,
+        `ID: ${String(expense._id)}`,
+      ].join("\n")
+    );
+  }
   res.status(201).json(expense);
 });
 
@@ -884,6 +780,15 @@ app.patch("/api/approvals/purchases/:id", async (req, res) => {
   }
 
   await purchase.save();
+  await notifySystemWhatsApp(
+    [
+      "Compra revisada no fluxo de aprovação",
+      `ERP: ${businessId}`,
+      `ID: ${String(purchase._id)}`,
+      `Status: ${purchase.status}`,
+      `Revisor: ${reviewedBy || "Gestor"}`,
+    ].join("\n")
+  );
   res.json(purchase);
 });
 
@@ -958,6 +863,15 @@ app.patch("/api/approvals/expenses/:id", async (req, res) => {
   }
 
   await expense.save();
+  await notifySystemWhatsApp(
+    [
+      "Despesa revisada no fluxo de aprovação",
+      `ERP: ${businessId}`,
+      `ID: ${String(expense._id)}`,
+      `Status: ${expense.status}`,
+      `Revisor: ${reviewedBy || "Gestor"}`,
+    ].join("\n")
+  );
   res.json(expense);
 });
 

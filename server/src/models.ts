@@ -70,12 +70,6 @@ const saleSchema = new mongoose.Schema(
       issuedAt: { type: Date },
       xmlUrl: { type: String, trim: true },
     },
-    paymentReference: {
-      provider: { type: String, trim: true },
-      chargeId: { type: String, trim: true },
-      status: { type: String, trim: true },
-      paidAt: { type: Date },
-    },
     totalAmount: { type: Number, required: true, min: 0 },
     saleDate: { type: Date, default: Date.now },
     createdBy: { type: String, default: "Sistema" },

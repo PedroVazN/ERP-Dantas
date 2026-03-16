@@ -9,13 +9,12 @@ import type {
   Dashboard,
   Expense,
   LoginResponse,
-  PixCheckout,
-  PixCheckoutStatus,
   Product,
   Purchase,
   Sale,
   Settings,
   Theme,
+  WhatsAppStatus,
 } from "./types";
 import "./App.css";
 
@@ -69,6 +68,7 @@ const formatPct = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(1)
 function App() {
   const [activeModule, setActiveModule] = useState<ModuleKey>("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [pixModalOpen, setPixModalOpen] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -110,14 +110,8 @@ function App() {
     quantity: 1,
     paymentMethod: "PIX",
   });
-  const [instantPixForm, setInstantPixForm] = useState({
-    productId: "",
-    quantity: 1,
-    amount: 0,
-  });
-  const [pixCheckout, setPixCheckout] = useState<PixCheckout | null>(null);
-  const [pixCheckoutStatus, setPixCheckoutStatus] = useState("");
-  const [pixCheckoutLoading, setPixCheckoutLoading] = useState(false);
+  const [whatsAppStatus, setWhatsAppStatus] = useState<WhatsAppStatus | null>(null);
+  const [whatsAppForm, setWhatsAppForm] = useState({ phone: "", message: "" });
   const [purchaseForm, setPurchaseForm] = useState({
     supplier: "",
     productId: "",
@@ -176,10 +170,6 @@ function App() {
     if (!biInsights?.costByCategory.length) return 1;
     return Math.max(...biInsights.costByCategory.map((item) => item.total), 1);
   }, [biInsights]);
-  const instantPixProduct = useMemo(
-    () => products.find((item) => item._id === instantPixForm.productId) || null,
-    [instantPixForm.productId, products]
-  );
 
   function scopedPath(path: string) {
     if (!workspaceId) {
@@ -310,12 +300,9 @@ function App() {
   }, [workspaceId]);
 
   useEffect(() => {
-    if (!pixCheckout) return;
-    const intervalId = window.setInterval(() => {
-      void refreshPixCheckoutStatus();
-    }, 7000);
-    return () => window.clearInterval(intervalId);
-  }, [pixCheckout?.checkoutId]);
+    if (!isAuthenticated || activeModule !== "usuario") return;
+    void loadWhatsAppStatus();
+  }, [activeModule, isAuthenticated]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -424,84 +411,32 @@ function App() {
     await loadAllData();
   }
 
-  async function startPixCheckout(event: FormEvent) {
+  async function loadWhatsAppStatus() {
+    try {
+      const status = await api.get<WhatsAppStatus>("/integrations/whatsapp/status");
+      setWhatsAppStatus(status);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao consultar status do WhatsApp.";
+      setError(message);
+    }
+  }
+
+  async function sendManualWhatsAppMessage(event: FormEvent) {
     event.preventDefault();
-    if (isGeneralWorkspace) {
-      setError("No ERP Geral voce visualiza consolidado. Para vender, selecione um ERP especifico.");
-      return;
-    }
-    if (!instantPixForm.productId) {
-      setError("Selecione um produto para gerar o PIX.");
+    if (!whatsAppForm.phone.trim() || !whatsAppForm.message.trim()) {
+      setError("Preencha telefone e mensagem para enviar no WhatsApp.");
       return;
     }
     try {
-      setPixCheckoutLoading(true);
-      setPixCheckoutStatus("");
-      const payload = await api.post<PixCheckout>(scopedPath("/sales/pix/checkout"), {
-        productId: instantPixForm.productId,
-        quantity: Number(instantPixForm.quantity),
-        amount: instantPixForm.amount > 0 ? Number(instantPixForm.amount) : undefined,
+      await api.post<{ sent: boolean; phone: string; provider: string }>("/integrations/whatsapp/send", {
+        phone: whatsAppForm.phone.trim(),
+        message: whatsAppForm.message.trim(),
       });
-      setPixCheckout(payload);
+      setWhatsAppForm((prev) => ({ ...prev, message: "" }));
+      await loadWhatsAppStatus();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erro ao gerar checkout PIX.";
+      const message = err instanceof Error ? err.message : "Erro ao enviar mensagem manual no WhatsApp.";
       setError(message);
-    } finally {
-      setPixCheckoutLoading(false);
-    }
-  }
-
-  async function refreshPixCheckoutStatus() {
-    if (!pixCheckout) return;
-    try {
-      const status = await api.get<PixCheckoutStatus>(
-        scopedPath(`/sales/pix/checkout/${encodeURIComponent(pixCheckout.checkoutId)}/status`)
-      );
-      setPixCheckoutStatus(status.status);
-      if (status.qrCodeBase64 || status.brCode) {
-        setPixCheckout((prev) =>
-          prev
-            ? {
-                ...prev,
-                qrCodeBase64: status.qrCodeBase64 || prev.qrCodeBase64,
-                brCode: status.brCode || prev.brCode,
-                status: status.status,
-                expiresAt: status.expiresAt || prev.expiresAt,
-              }
-            : prev
-        );
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Erro ao consultar status do PIX.";
-      setError(message);
-    }
-  }
-
-  async function confirmPixCheckoutSale() {
-    if (!pixCheckout) return;
-    if (isGeneralWorkspace) {
-      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para concluir.");
-      return;
-    }
-    try {
-      setPixCheckoutLoading(true);
-      await api.patch<Sale>(
-        scopedPath(`/sales/pix/checkout/${encodeURIComponent(pixCheckout.checkoutId)}/confirm`),
-        {
-          productId: pixCheckout.product.id,
-          quantity: pixCheckout.product.quantity,
-          amount: pixCheckout.amount,
-        }
-      );
-      setPixCheckout(null);
-      setPixCheckoutStatus("PAID");
-      setInstantPixForm({ productId: "", quantity: 1, amount: 0 });
-      await loadAllData();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Pagamento ainda não confirmado.";
-      setError(message);
-    } finally {
-      setPixCheckoutLoading(false);
     }
   }
 
@@ -1131,127 +1066,42 @@ function App() {
 
         {!loading && activeModule === "vendas" && (
           <section className="module-grid animated">
-            <div className="stack-cards">
-              <form className="form-card" onSubmit={submitSale}>
-                <h3>Registrar venda</h3>
-                <select
-                  value={saleForm.productId}
-                  onChange={(event) => setSaleForm({ ...saleForm, productId: event.target.value })}
-                  required
-                >
-                  <option value="">Selecione o produto</option>
-                  {products.map((item) => (
-                    <option key={item._id} value={item._id}>
-                      {item.name} ({item.stock} un.)
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  min={1}
-                  placeholder="Quantidade"
-                  value={saleForm.quantity}
-                  onChange={(event) => setSaleForm({ ...saleForm, quantity: Number(event.target.value) })}
-                  required
-                />
-                <select
-                  value={saleForm.paymentMethod}
-                  onChange={(event) => setSaleForm({ ...saleForm, paymentMethod: event.target.value })}
-                >
-                  <option value="PIX">PIX</option>
-                  <option value="DINHEIRO">Dinheiro</option>
-                  <option value="CARTAO">Cartão</option>
-                  <option value="BOLETO">Boleto</option>
-                </select>
-                <button type="submit">Lançar venda</button>
-              </form>
-
-              <form className="form-card" onSubmit={startPixCheckout}>
-                <h3>Venda na hora (PIX)</h3>
-                <select
-                  value={instantPixForm.productId}
-                  onChange={(event) => setInstantPixForm({ ...instantPixForm, productId: event.target.value })}
-                  required
-                >
-                  <option value="">Selecione o produto</option>
-                  {products.map((item) => (
-                    <option key={item._id} value={item._id}>
-                      {item.name} ({item.stock} un.)
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  min={1}
-                  placeholder="Quantidade"
-                  value={instantPixForm.quantity}
-                  onChange={(event) =>
-                    setInstantPixForm({ ...instantPixForm, quantity: Math.max(1, Number(event.target.value) || 1) })
-                  }
-                  required
-                />
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  placeholder={
-                    instantPixProduct
-                      ? `Valor sugerido ${formatBRL(instantPixProduct.price * instantPixForm.quantity)}`
-                      : "Valor da venda (opcional)"
-                  }
-                  value={instantPixForm.amount || ""}
-                  onChange={(event) =>
-                    setInstantPixForm({ ...instantPixForm, amount: Number(event.target.value) || 0 })
-                  }
-                />
-                <button type="submit" disabled={pixCheckoutLoading}>
-                  {pixCheckoutLoading ? "Gerando QR..." : "Gerar QR Code PIX"}
-                </button>
-
-                {pixCheckout ? (
-                  <div className="pix-checkout-box">
-                    <strong>Pagamento instantâneo</strong>
-                    <small>
-                      Checkout {pixCheckout.checkoutId} | Status: {pixCheckoutStatus || pixCheckout.status}
-                    </small>
-                    <small>Valor: {formatBRL(pixCheckout.amount)}</small>
-                    <img
-                      className="pix-qr-image"
-                      src={`data:image/png;base64,${pixCheckout.qrCodeBase64.replace(/^data:image\/png;base64,/, "")}`}
-                      alt="QR Code PIX"
-                    />
-                    <textarea
-                      readOnly
-                      value={pixCheckout.brCode}
-                      rows={4}
-                      onFocus={(event) => event.currentTarget.select()}
-                    />
-                    <div className="table-actions">
-                      <button
-                        type="button"
-                        className="ghost-btn"
-                        onClick={async () => {
-                          await navigator.clipboard.writeText(pixCheckout.brCode);
-                        }}
-                      >
-                        Copiar código PIX
-                      </button>
-                      <button type="button" className="ghost-btn" onClick={refreshPixCheckoutStatus}>
-                        Atualizar status
-                      </button>
-                      <button
-                        type="button"
-                        className="ghost-btn"
-                        onClick={confirmPixCheckoutSale}
-                        disabled={pixCheckoutLoading}
-                      >
-                        Confirmar pagamento
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-              </form>
-            </div>
+            <form className="form-card" onSubmit={submitSale}>
+              <h3>Registrar venda</h3>
+              <select
+                value={saleForm.productId}
+                onChange={(event) => setSaleForm({ ...saleForm, productId: event.target.value })}
+                required
+              >
+                <option value="">Selecione o produto</option>
+                {products.map((item) => (
+                  <option key={item._id} value={item._id}>
+                    {item.name} ({item.stock} un.)
+                  </option>
+                ))}
+              </select>
+              <input
+                type="number"
+                min={1}
+                placeholder="Quantidade"
+                value={saleForm.quantity}
+                onChange={(event) => setSaleForm({ ...saleForm, quantity: Number(event.target.value) })}
+                required
+              />
+              <select
+                value={saleForm.paymentMethod}
+                onChange={(event) => setSaleForm({ ...saleForm, paymentMethod: event.target.value })}
+              >
+                <option value="PIX">PIX</option>
+                <option value="DINHEIRO">Dinheiro</option>
+                <option value="CARTAO">Cartão</option>
+                <option value="BOLETO">Boleto</option>
+              </select>
+              <button type="submit">Lançar venda</button>
+              <button type="button" className="ghost-btn" onClick={() => setPixModalOpen(true)}>
+                Abrir PIX
+              </button>
+            </form>
             <section className="table-card">
               <h3>Vendas recentes</h3>
               <table>
@@ -1279,6 +1129,20 @@ function App() {
                 </tbody>
               </table>
             </section>
+
+            {pixModalOpen ? (
+              <div className="pix-modal-overlay" onClick={() => setPixModalOpen(false)}>
+                <div className="pix-modal" onClick={(event) => event.stopPropagation()}>
+                  <div className="pix-modal-header">
+                    <h3>Pagamento via PIX</h3>
+                    <button type="button" className="ghost-btn" onClick={() => setPixModalOpen(false)}>
+                      Fechar
+                    </button>
+                  </div>
+                  <img src="/pix.jpg" alt="QR Code PIX" className="pix-modal-image" />
+                </div>
+              </div>
+            ) : null}
           </section>
         )}
 
@@ -1515,6 +1379,45 @@ function App() {
                   </button>
                 ))}
               </div>
+            </section>
+
+            <section className="table-card whatsapp-card">
+              <h3>WhatsApp Business</h3>
+              <p className="theme-helper">
+                Integração nativa do sistema para notificações operacionais, envio manual e cobranças.
+              </p>
+              <div className="whatsapp-status">
+                <span>
+                  Status:{" "}
+                  <strong>{whatsAppStatus?.configured ? "Conectado" : "Não configurado"}</strong>
+                </span>
+                <span>
+                  Notificação interna: <strong>{whatsAppStatus?.notifyTo || "Não definido"}</strong>
+                </span>
+              </div>
+              <form className="whatsapp-form" onSubmit={sendManualWhatsAppMessage}>
+                <input
+                  placeholder="Telefone destino (DDD + número)"
+                  value={whatsAppForm.phone}
+                  onChange={(event) => setWhatsAppForm({ ...whatsAppForm, phone: event.target.value })}
+                  required
+                />
+                <textarea
+                  rows={4}
+                  placeholder="Mensagem para enviar via WhatsApp Business"
+                  value={whatsAppForm.message}
+                  onChange={(event) => setWhatsAppForm({ ...whatsAppForm, message: event.target.value })}
+                  required
+                />
+                <div className="table-actions">
+                  <button type="submit" className="ghost-btn">
+                    Enviar mensagem
+                  </button>
+                  <button type="button" className="ghost-btn" onClick={loadWhatsAppStatus}>
+                    Atualizar status
+                  </button>
+                </div>
+              </form>
             </section>
           </section>
         )}
