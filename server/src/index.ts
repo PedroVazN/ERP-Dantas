@@ -21,11 +21,13 @@ const port = Number(process.env.PORT || 4000);
 const mongoUri = process.env.MONGODB_URI;
 const adminEmail = process.env.ADMIN_EMAIL;
 const adminPassword = process.env.ADMIN_PASSWORD;
+const isVercel = process.env.VERCEL === "1";
 const dnsServers = (process.env.DNS_SERVERS || "8.8.8.8,1.1.1.1")
   .split(",")
   .map((item) => item.trim())
   .filter(Boolean);
 let dbConnected = false;
+let connectPromise: Promise<typeof mongoose> | null = null;
 
 if (!mongoUri) {
   throw new Error("Defina MONGODB_URI no arquivo .env");
@@ -90,6 +92,33 @@ function slugify(input: string) {
     .replace(/(^-|-$)/g, "");
 }
 
+async function ensureMongoConnection() {
+  if (mongoose.connection.readyState === 1) {
+    dbConnected = true;
+    return;
+  }
+
+  if (!connectPromise) {
+    connectPromise = mongoose
+      .connect(mongoUri!, {
+        serverSelectionTimeoutMS: 10000,
+        connectTimeoutMS: 10000,
+        family: 4,
+      })
+      .then((connection) => {
+        dbConnected = true;
+        return connection;
+      })
+      .catch((error) => {
+        dbConnected = false;
+        connectPromise = null;
+        throw error;
+      });
+  }
+
+  await connectPromise;
+}
+
 app.get("/api/health", (_req: Request, res: Response) => {
   res.json({
     status: "ok",
@@ -139,9 +168,16 @@ app.post("/api/auth/login", async (req, res) => {
   });
 });
 
-app.use("/api", (req, res, next) => {
-  if (req.path === "/health" || req.path === "/auth/login") {
+app.use("/api", async (req, res, next) => {
+  if (req.path === "/health") {
     return next();
+  }
+  if (!dbConnected) {
+    try {
+      await ensureMongoConnection();
+    } catch (_error) {
+      // O erro é tratado abaixo com retorno 503.
+    }
   }
   if (!dbConnected) {
     return res.status(503).json({
@@ -459,11 +495,7 @@ app.use((err: Error, _req: Request, res: Response, _next: express.NextFunction) 
 
 async function connectMongoWithRetry() {
   try {
-    await mongoose.connect(mongoUri!, {
-      serverSelectionTimeoutMS: 10000,
-      connectTimeoutMS: 10000,
-      family: 4,
-    });
+    await ensureMongoConnection();
     dbConnected = true;
     console.log("MongoDB conectado com sucesso.");
   } catch (error) {
@@ -482,8 +514,15 @@ mongoose.connection.on("disconnected", () => {
   setTimeout(connectMongoWithRetry, 10000);
 });
 
-app.listen(port, () => {
-  console.log(`API rodando em http://localhost:${port}`);
-});
+if (isVercel) {
+  void ensureMongoConnection().catch(() => {
+    console.error("Erro ao conectar no MongoDB durante cold start.");
+  });
+} else {
+  app.listen(port, () => {
+    console.log(`API rodando em http://localhost:${port}`);
+  });
+  void connectMongoWithRetry();
+}
 
-void connectMongoWithRetry();
+export default app;

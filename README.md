@@ -16,7 +16,7 @@ ERP moderno completo para operacao comercial de sabonetes, com frontend React + 
 - Modulo de compras (entrada automatica no estoque)
 - Modulo financeiro (despesas e contas a pagar)
 - Configuracao de tema persistida por usuario
-- 3 temas visuais selecionaveis: `claro`, `escuro` e `oceano`
+- 5 temas visuais selecionaveis: `claro`, `escuro`, `oceano`, `sabonete` e `rosa`
 
 ## Arquitetura
 
@@ -34,6 +34,9 @@ Copie `server/.env.example` para `server/.env` e configure:
 PORT=4000
 MONGODB_URI=sua_string_mongodb_atlas
 CLIENT_URL=http://localhost:5173
+DNS_SERVERS=8.8.8.8,1.1.1.1
+ADMIN_EMAIL=seu_admin@dominio.com
+ADMIN_PASSWORD=SUA_SENHA_FORTE_AQUI
 ```
 
 > Use a sua URI MongoDB Atlas no campo `MONGODB_URI`.
@@ -45,6 +48,27 @@ Copie `client/.env.example` para `client/.env`:
 ```env
 VITE_API_URL=http://localhost:4000/api
 ```
+
+## Deploy separado na Vercel
+
+### Backend (projeto `server`)
+
+- Defina no projeto da Vercel:
+  - `MONGODB_URI`
+  - `CLIENT_URL` (URL publica do frontend)
+  - `ADMIN_EMAIL`
+  - `ADMIN_PASSWORD`
+  - opcional: `DNS_SERVERS`
+- O backend ja esta preparado para serverless com:
+  - `server/vercel.json`
+  - entrada `server/api/index.ts`
+
+### Frontend (projeto `client`)
+
+- Defina no projeto da Vercel:
+  - `VITE_API_URL=https://seu-backend.vercel.app/api`
+- O frontend ja esta preparado para SPA na Vercel com:
+  - `client/vercel.json`
 
 ## Execucao
 
