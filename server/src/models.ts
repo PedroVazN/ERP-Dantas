@@ -115,7 +115,7 @@ const settingSchema = new mongoose.Schema(
     userName: { type: String, default: "Administrador" },
     userEmail: { type: String, default: "" },
     userRole: { type: String, default: "Gestor" },
-    companyName: { type: String, default: "ERP Dantas Sabonetes" },
+    companyName: { type: String, default: "E-Sentinel Sabonetes" },
     currency: { type: String, default: "BRL" },
     taxRate: { type: Number, default: 0 },
     theme: {

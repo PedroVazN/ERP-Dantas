@@ -1,5 +1,5 @@
 {
-  "name": "erp-dantas",
+  "name": "e-sentinel",
   "version": "1.0.0",
   "description": "ERP completo para vendas de sabonete",
   "main": "index.js",
@@ -10,16 +10,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/PedroVazN/ERP-Dantas.git"
+    "url": "git+https://github.com/PedroVazN/E-Sentinel.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/PedroVazN/ERP-Dantas/issues"
+    "url": "https://github.com/PedroVazN/E-Sentinel/issues"
   },
-  "homepage": "https://github.com/PedroVazN/ERP-Dantas#readme",
+  "homepage": "https://github.com/PedroVazN/E-Sentinel#readme",
   "devDependencies": {
     "concurrently": "^9.2.1"
   },

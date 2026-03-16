@@ -1,4 +1,4 @@
-# ERP Dantas - Sabonetes
+# E-Sentinel - Sabonetes
 
 ERP moderno completo para operacao comercial de sabonetes, com frontend React + TypeScript (Vite), backend Node + Express + TypeScript e banco MongoDB.
 
@@ -34,6 +34,8 @@ Copie `server/.env.example` para `server/.env` e configure:
 PORT=4000
 MONGODB_URI=sua_string_mongodb_atlas
 CLIENT_URL=http://localhost:5173
+CLIENT_URLS=http://localhost:5173,https://e-sentinel.vercel.app
+ALLOW_VERCEL_PREVIEWS=true
 DNS_SERVERS=8.8.8.8,1.1.1.1
 ADMIN_EMAIL=seu_admin@dominio.com
 ADMIN_PASSWORD=SUA_SENHA_FORTE_AQUI
@@ -55,7 +57,10 @@ VITE_API_URL=http://localhost:4000/api
 
 - Defina no projeto da Vercel:
   - `MONGODB_URI`
-  - `CLIENT_URL` (URL publica do frontend)
+  - `CLIENT_URL` (URL principal do frontend)
+  - `CLIENT_URLS` (origens permitidas separadas por virgula)
+    - exemplo: `https://e-sentinel.vercel.app,http://localhost:5173`
+  - `ALLOW_VERCEL_PREVIEWS` (`true` para permitir previews `*.vercel.app`)
   - `ADMIN_EMAIL`
   - `ADMIN_PASSWORD`
   - opcional: `DNS_SERVERS`

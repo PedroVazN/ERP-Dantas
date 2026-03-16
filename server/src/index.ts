@@ -26,6 +26,16 @@ const dnsServers = (process.env.DNS_SERVERS || "8.8.8.8,1.1.1.1")
   .split(",")
   .map((item) => item.trim())
   .filter(Boolean);
+const explicitAllowedOrigins = [
+  ...(process.env.CLIENT_URLS || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean),
+  process.env.CLIENT_URL?.trim() || "",
+]
+  .filter(Boolean)
+  .map((origin) => origin.replace(/\/$/, ""));
+const allowVercelPreviews = (process.env.ALLOW_VERCEL_PREVIEWS || "true").toLowerCase() === "true";
 let dbConnected = false;
 let connectPromise: Promise<typeof mongoose> | null = null;
 
@@ -44,7 +54,31 @@ if (dnsServers.length > 0) {
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "*",
+    origin: (origin, callback) => {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      const normalizedOrigin = origin.replace(/\/$/, "");
+      if (explicitAllowedOrigins.includes(normalizedOrigin)) {
+        return callback(null, true);
+      }
+
+      if (allowVercelPreviews) {
+        try {
+          const hostname = new URL(normalizedOrigin).hostname;
+          if (hostname.endsWith(".vercel.app")) {
+            return callback(null, true);
+          }
+        } catch {
+          // Ignora origem malformada e cai no bloqueio abaixo.
+        }
+      }
+
+      return callback(new Error("Origem nao permitida por CORS."));
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 app.use(express.json());
@@ -122,7 +156,7 @@ async function ensureMongoConnection() {
 app.get("/api/health", (_req: Request, res: Response) => {
   res.json({
     status: "ok",
-    service: "ERP Dantas API",
+    service: "E-Sentinel API",
     database: dbConnected ? "connected" : "disconnected",
   });
 });
@@ -451,7 +485,7 @@ app.put("/api/settings/profile", async (req, res) => {
       userName: userName.trim(),
       userEmail: userEmail.trim(),
       userRole: userRole?.trim() || "Gestor",
-      companyName: companyName?.trim() || "ERP Dantas Sabonetes",
+      companyName: companyName?.trim() || "E-Sentinel Sabonetes",
     },
     { upsert: true, new: true }
   );

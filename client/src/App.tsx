@@ -16,8 +16,8 @@ import type {
 } from "./types";
 import "./App.css";
 
-const SESSION_KEY = "erp_dantas_session";
-const BUSINESS_KEY = "erp_dantas_workspace";
+const SESSION_KEY = "e_sentinel_session";
+const BUSINESS_KEY = "e_sentinel_workspace";
 
 type ModuleKey =
   | "dashboard"
@@ -114,7 +114,7 @@ function App() {
     userName: "Administrador",
     userEmail: "",
     userRole: "Gestor",
-    companyName: "ERP Dantas Sabonetes",
+    companyName: "E-Sentinel Sabonetes",
   });
 
   const totalOpenReceivables = useMemo(
@@ -236,7 +236,7 @@ function App() {
       userName: settings.userName || "Administrador",
       userEmail: settings.userEmail || "",
       userRole: settings.userRole || "Gestor",
-      companyName: settings.companyName || "ERP Dantas Sabonetes",
+      companyName: settings.companyName || "E-Sentinel Sabonetes",
     });
   }, [settings]);
 
@@ -394,7 +394,7 @@ function App() {
           <div className="auth-brand">
             <div className="brand-mark">ED</div>
             <div>
-              <h1>ERP Dantas</h1>
+              <h1>E-Sentinel</h1>
               <p>Gestão moderna para operação de sabonetes</p>
             </div>
           </div>
@@ -479,7 +479,7 @@ function App() {
         <div className="brand">
           <div className="brand-mark">ED</div>
           <div>
-            <h1>ERP Dantas</h1>
+            <h1>E-Sentinel</h1>
             <p>
               {selectedBusiness?.name || settings?.companyName || "Gestão inteligente de sabonetes"}
             </p>
