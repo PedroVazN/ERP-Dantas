@@ -36,6 +36,8 @@ const explicitAllowedOrigins = [
   .filter(Boolean)
   .map((origin) => origin.replace(/\/$/, ""));
 const allowVercelPreviews = (process.env.ALLOW_VERCEL_PREVIEWS || "true").toLowerCase() === "true";
+const purchaseApprovalThreshold = Number(process.env.PURCHASE_APPROVAL_THRESHOLD || 1500);
+const expenseApprovalThreshold = Number(process.env.EXPENSE_APPROVAL_THRESHOLD || 800);
 let dbConnected = false;
 let connectPromise: Promise<typeof mongoose> | null = null;
 
@@ -186,6 +188,38 @@ function formatPeriodLabel(periodKey: string) {
     "Dez",
   ];
   return `${monthNames[Number(month) - 1]}/${year.slice(2)}`;
+}
+
+function generateInvoicePayload(businessId: string, saleId: string, status: "EMITIDA" | "PENDENTE") {
+  const now = new Date();
+  const seed = `${now.getTime()}`.slice(-8);
+  const number = `NF-${businessId.toUpperCase()}-${seed}`;
+  const key = `${businessId.replace(/[^a-z0-9]/gi, "").toUpperCase()}${saleId
+    .replace(/[^a-z0-9]/gi, "")
+    .toUpperCase()
+    .slice(0, 20)}${seed}`;
+
+  return {
+    number,
+    key,
+    status,
+    issuedAt: now,
+    xmlUrl: `/api/invoices/${number}.xml`,
+  };
+}
+
+async function applyPurchaseStock(
+  businessId: string,
+  items: Array<{ product?: Types.ObjectId; quantity: number; cost: number }>
+) {
+  for (const item of items) {
+    if (!item.product) continue;
+    const product = await ProductModel.findOne({ _id: item.product, businessId });
+    if (!product) continue;
+    product.stock += item.quantity;
+    product.cost = item.cost;
+    await product.save();
+  }
 }
 
 async function ensureMongoConnection() {
@@ -394,15 +428,27 @@ app.post("/api/sales", async (req, res) => {
   }
 
   const totalAmount = normalizedItems.reduce((sum, item) => sum + item.total, 0);
+  const saleStatus = status || "PAGO";
   const sale = await SaleModel.create({
     businessId,
     customer: customer && isValidObjectId(customer) ? customer : undefined,
     items: normalizedItems,
     paymentMethod: paymentMethod || "PIX",
-    status: status || "PAGO",
+    status: saleStatus,
+    billingStatus: saleStatus === "CANCELADO" ? "CANCELADO" : saleStatus === "PENDENTE" ? "PENDENTE" : "FATURADO",
+    invoice: generateInvoicePayload(businessId, new Types.ObjectId().toString(), saleStatus === "PAGO" ? "EMITIDA" : "PENDENTE"),
     totalAmount,
     createdBy: createdBy || "Admin",
   });
+
+  if (sale.invoice?.key) {
+    sale.invoice = generateInvoicePayload(
+      businessId,
+      String(sale._id),
+      saleStatus === "PAGO" ? "EMITIDA" : "PENDENTE"
+    );
+    await sale.save();
+  }
 
   res.status(201).json(sale);
 });
@@ -436,15 +482,6 @@ app.post("/api/purchases", async (req, res) => {
   }> = [];
 
   for (const item of items) {
-    if (item.product && isValidObjectId(item.product)) {
-      const product = await ProductModel.findOne({ _id: item.product, businessId });
-      if (product) {
-        product.stock += item.quantity;
-        product.cost = item.cost;
-        await product.save();
-      }
-    }
-
     normalizedItems.push({
       product: item.product && isValidObjectId(item.product) ? new Types.ObjectId(item.product) : undefined,
       description: item.description,
@@ -455,11 +492,23 @@ app.post("/api/purchases", async (req, res) => {
   }
 
   const totalAmount = normalizedItems.reduce((sum, item) => sum + item.total, 0);
+  const needsApproval = totalAmount >= purchaseApprovalThreshold;
+  if (!needsApproval) {
+    await applyPurchaseStock(businessId, normalizedItems);
+  }
+
   const purchase = await PurchaseModel.create({
     businessId,
     supplier,
     items: normalizedItems,
-    status: status || "RECEBIDA",
+    status: needsApproval ? "AGUARDANDO_APROVACAO" : status || "RECEBIDA",
+    approval: {
+      required: needsApproval,
+      status: needsApproval ? "PENDENTE" : "APROVADA",
+      requestedBy: "Sistema",
+      requestedAt: new Date(),
+    },
+    stockApplied: !needsApproval,
     totalAmount,
   });
   res.status(201).json(purchase);
@@ -475,8 +524,165 @@ app.post("/api/expenses", async (req, res) => {
     return;
   }
   const { businessId } = getScopeContext(req);
-  const expense = await ExpenseModel.create({ ...req.body, businessId });
+  const payload = req.body as { amount?: number; status?: string };
+  const amount = Number(payload.amount || 0);
+  const needsApproval = amount >= expenseApprovalThreshold;
+  const expense = await ExpenseModel.create({
+    ...req.body,
+    businessId,
+    status: needsApproval ? "AGUARDANDO_APROVACAO" : payload.status || "PENDENTE",
+    approval: {
+      required: needsApproval,
+      status: needsApproval ? "PENDENTE" : "APROVADA",
+      requestedBy: "Sistema",
+      requestedAt: new Date(),
+    },
+  });
   res.status(201).json(expense);
+});
+
+app.get("/api/approvals/purchases", async (req, res) => {
+  const pending = await PurchaseModel.find({
+    ...getBusinessFilter(req),
+    status: "AGUARDANDO_APROVACAO",
+  }).sort({ createdAt: -1 });
+  res.json(pending);
+});
+
+app.get("/api/approvals/expenses", async (req, res) => {
+  const pending = await ExpenseModel.find({
+    ...getBusinessFilter(req),
+    status: "AGUARDANDO_APROVACAO",
+  }).sort({ createdAt: -1 });
+  res.json(pending);
+});
+
+app.patch("/api/approvals/purchases/:id", async (req, res) => {
+  if (blockWriteInGeneralScope(req, res)) {
+    return;
+  }
+  const { businessId } = getScopeContext(req);
+  const { action, reason, reviewedBy } = req.body as {
+    action?: "aprovar" | "rejeitar";
+    reason?: string;
+    reviewedBy?: string;
+  };
+  if (!action || !["aprovar", "rejeitar"].includes(action)) {
+    return res.status(400).json({ message: "Acao invalida. Use aprovar ou rejeitar." });
+  }
+
+  const purchase = await PurchaseModel.findOne({ _id: req.params.id, businessId });
+  if (!purchase) {
+    return res.status(404).json({ message: "Compra nao encontrada." });
+  }
+  if (purchase.status !== "AGUARDANDO_APROVACAO") {
+    return res.status(400).json({ message: "Compra nao esta pendente de aprovacao." });
+  }
+
+  if (action === "aprovar") {
+    if (!purchase.stockApplied) {
+      await applyPurchaseStock(businessId, purchase.items as Array<{ product?: Types.ObjectId; quantity: number; cost: number }>);
+      purchase.stockApplied = true;
+    }
+    purchase.status = "RECEBIDA";
+    purchase.approval = {
+      required: true,
+      status: "APROVADA",
+      requestedBy: purchase.approval?.requestedBy || "Sistema",
+      requestedAt: purchase.approval?.requestedAt || purchase.createdAt || new Date(),
+      reviewedBy: reviewedBy || "Gestor",
+      reviewedAt: new Date(),
+      reason: reason?.trim() || "Aprovacao automatizada via fluxo de compras.",
+    };
+  } else {
+    purchase.status = "REJEITADA";
+    purchase.approval = {
+      required: true,
+      status: "REJEITADA",
+      requestedBy: purchase.approval?.requestedBy || "Sistema",
+      requestedAt: purchase.approval?.requestedAt || purchase.createdAt || new Date(),
+      reviewedBy: reviewedBy || "Gestor",
+      reviewedAt: new Date(),
+      reason: reason?.trim() || "Rejeicao registrada no fluxo de aprovacao.",
+    };
+  }
+
+  await purchase.save();
+  res.json(purchase);
+});
+
+app.patch("/api/approvals/expenses/:id", async (req, res) => {
+  if (blockWriteInGeneralScope(req, res)) {
+    return;
+  }
+  const { businessId } = getScopeContext(req);
+  const { action, reason, reviewedBy } = req.body as {
+    action?: "aprovar" | "rejeitar" | "pagar";
+    reason?: string;
+    reviewedBy?: string;
+  };
+  if (!action || !["aprovar", "rejeitar", "pagar"].includes(action)) {
+    return res.status(400).json({ message: "Acao invalida. Use aprovar, rejeitar ou pagar." });
+  }
+
+  const expense = await ExpenseModel.findOne({ _id: req.params.id, businessId });
+  if (!expense) {
+    return res.status(404).json({ message: "Despesa nao encontrada." });
+  }
+
+  if (action === "aprovar") {
+    if (expense.status !== "AGUARDANDO_APROVACAO") {
+      return res.status(400).json({ message: "Despesa nao esta aguardando aprovacao." });
+    }
+    expense.status = "PENDENTE";
+    expense.approval = {
+      required: true,
+      status: "APROVADA",
+      requestedBy: expense.approval?.requestedBy || "Sistema",
+      requestedAt: expense.approval?.requestedAt || expense.createdAt || new Date(),
+      reviewedBy: reviewedBy || "Gestor",
+      reviewedAt: new Date(),
+      reason: reason?.trim() || "Despesa aprovada para pagamento.",
+    };
+  }
+
+  if (action === "rejeitar") {
+    expense.status = "REJEITADO";
+    expense.approval = {
+      required: true,
+      status: "REJEITADA",
+      requestedBy: expense.approval?.requestedBy || "Sistema",
+      requestedAt: expense.approval?.requestedAt || expense.createdAt || new Date(),
+      reviewedBy: reviewedBy || "Gestor",
+      reviewedAt: new Date(),
+      reason: reason?.trim() || "Despesa rejeitada no fluxo de aprovacao.",
+    };
+  }
+
+  if (action === "pagar") {
+    if (expense.status === "AGUARDANDO_APROVACAO") {
+      return res.status(400).json({ message: "Aprove a despesa antes de pagar." });
+    }
+    if (expense.status === "REJEITADO") {
+      return res.status(400).json({ message: "Despesa rejeitada nao pode ser paga." });
+    }
+    expense.status = "PAGO";
+    expense.paymentDate = new Date();
+    if (!expense.approval?.required) {
+      expense.approval = {
+        required: false,
+        status: "APROVADA",
+        requestedBy: "Sistema",
+        requestedAt: expense.createdAt || new Date(),
+        reviewedBy: reviewedBy || "Sistema",
+        reviewedAt: new Date(),
+        reason: "Pagamento executado automaticamente.",
+      };
+    }
+  }
+
+  await expense.save();
+  res.json(expense);
 });
 
 app.get("/api/businesses", async (_req, res) => {
@@ -562,7 +768,7 @@ app.get("/api/dashboard", async (req, res) => {
       { $group: { _id: null, total: { $sum: "$totalAmount" } } },
     ]),
     ExpenseModel.aggregate([
-      { $match: { ...businessFilter, status: { $ne: "CANCELADO" } } },
+      { $match: { ...businessFilter, status: { $in: ["PAGO", "PENDENTE", "AGUARDANDO_APROVACAO"] } } },
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ]),
     ProductModel.find({ ...businessFilter, $expr: { $lte: ["$stock", "$minStock"] } })
@@ -626,14 +832,20 @@ app.get("/api/bi/insights", async (req, res) => {
       { $group: { _id: null, total: { $sum: "$totalAmount" } } },
     ]),
     ExpenseModel.aggregate([
-      { $match: { ...businessFilter, status: { $ne: "CANCELADO" }, dueDate: { $gte: monthStart, $lt: nextMonthStart } } },
+      {
+        $match: {
+          ...businessFilter,
+          status: { $in: ["PAGO", "PENDENTE", "AGUARDANDO_APROVACAO"] },
+          dueDate: { $gte: monthStart, $lt: nextMonthStart },
+        },
+      },
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ]),
     ExpenseModel.aggregate([
       {
         $match: {
           ...businessFilter,
-          status: { $ne: "CANCELADO" },
+          status: { $in: ["PAGO", "PENDENTE", "AGUARDANDO_APROVACAO"] },
           dueDate: { $gte: previousMonthStart, $lt: previousMonthEnd },
         },
       },
@@ -649,7 +861,13 @@ app.get("/api/bi/insights", async (req, res) => {
       },
     ]),
     ExpenseModel.aggregate([
-      { $match: { ...businessFilter, status: { $ne: "CANCELADO" }, dueDate: { $gte: new Date(now.getFullYear(), now.getMonth() - 5, 1) } } },
+      {
+        $match: {
+          ...businessFilter,
+          status: { $in: ["PAGO", "PENDENTE", "AGUARDANDO_APROVACAO"] },
+          dueDate: { $gte: new Date(now.getFullYear(), now.getMonth() - 5, 1) },
+        },
+      },
       {
         $group: {
           _id: { $dateToString: { format: "%Y-%m", date: "$dueDate" } },
@@ -671,7 +889,13 @@ app.get("/api/bi/insights", async (req, res) => {
       { $limit: 5 },
     ]),
     ExpenseModel.aggregate([
-      { $match: { ...businessFilter, status: { $ne: "CANCELADO" }, dueDate: { $gte: monthStart, $lt: nextMonthStart } } },
+      {
+        $match: {
+          ...businessFilter,
+          status: { $in: ["PAGO", "PENDENTE", "AGUARDANDO_APROVACAO"] },
+          dueDate: { $gte: monthStart, $lt: nextMonthStart },
+        },
+      },
       { $group: { _id: "$category", total: { $sum: "$amount" } } },
       { $sort: { total: -1 } },
       { $limit: 5 },

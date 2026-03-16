@@ -571,6 +571,11 @@ button {
   border-color: var(--border);
 }
 
+.ghost-btn.danger {
+  color: #ef4444;
+  border-color: color-mix(in srgb, #ef4444 40%, var(--border));
+}
+
 .theme-helper {
   margin: 0 0 12px;
   color: var(--muted);
@@ -658,6 +663,7 @@ td {
   text-align: left;
   padding: 11px 8px;
   border-bottom: 1px solid var(--border);
+  vertical-align: middle;
 }
 
 th {
@@ -669,6 +675,17 @@ th {
   text-align: center;
   color: var(--muted);
   padding: 20px;
+}
+
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.table-actions .ghost-btn {
+  padding: 6px 9px;
+  font-size: 12px;
 }
 
 .error {

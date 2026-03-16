@@ -45,14 +45,31 @@ export type Sale = {
   paymentMethod: string;
   status: string;
   createdAt: string;
+  billingStatus?: "PENDENTE" | "FATURADO" | "CANCELADO";
+  invoice?: {
+    number?: string;
+    key?: string;
+    status?: "EMITIDA" | "PENDENTE" | "CANCELADA";
+    issuedAt?: string;
+    xmlUrl?: string;
+  };
 };
 
 export type Purchase = {
   _id: string;
   supplier: string;
   totalAmount: number;
-  status: string;
+  status: "ABERTA" | "AGUARDANDO_APROVACAO" | "APROVADA" | "RECEBIDA" | "REJEITADA" | "CANCELADA";
   createdAt: string;
+  approval?: {
+    required?: boolean;
+    status?: "PENDENTE" | "APROVADA" | "REJEITADA";
+    requestedBy?: string;
+    requestedAt?: string;
+    reviewedBy?: string;
+    reviewedAt?: string;
+    reason?: string;
+  };
 };
 
 export type Expense = {
@@ -60,8 +77,18 @@ export type Expense = {
   description: string;
   category: string;
   amount: number;
-  status: "PAGO" | "PENDENTE";
+  status: "PAGO" | "PENDENTE" | "AGUARDANDO_APROVACAO" | "REJEITADO";
   dueDate: string;
+  paymentDate?: string;
+  approval?: {
+    required?: boolean;
+    status?: "PENDENTE" | "APROVADA" | "REJEITADA";
+    requestedBy?: string;
+    requestedAt?: string;
+    reviewedBy?: string;
+    reviewedAt?: string;
+    reason?: string;
+  };
 };
 
 export type Dashboard = {

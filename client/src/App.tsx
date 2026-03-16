@@ -145,6 +145,12 @@ function App() {
 
   const isGeneralWorkspace = workspaceId === "geral";
   const selectedBusiness = businesses.find((item) => item.businessId === workspaceId) || null;
+  const pendingApprovalsCount = useMemo(
+    () =>
+      purchases.filter((item) => item.status === "AGUARDANDO_APROVACAO").length +
+      expenses.filter((item) => item.status === "AGUARDANDO_APROVACAO").length,
+    [expenses, purchases]
+  );
   const maxTimeseriesValue = useMemo(() => {
     if (!biInsights?.timeseries.length) return 1;
     return Math.max(
@@ -415,7 +421,6 @@ function App() {
           cost: Number(purchaseForm.cost),
         },
       ],
-      status: "RECEBIDA",
     });
     setPurchaseForm({ supplier: "", productId: "", quantity: 1, cost: 0 });
     await loadAllData();
@@ -429,7 +434,6 @@ function App() {
     }
     await api.post<Expense>(scopedPath("/expenses"), {
       ...expenseForm,
-      status: "PENDENTE",
     });
     setExpenseForm({
       description: "",
@@ -444,6 +448,30 @@ function App() {
     event.preventDefault();
     const updated = await api.put<Settings>("/settings/profile", userForm);
     setSettings(updated);
+  }
+
+  async function reviewPurchase(purchaseId: string, action: "aprovar" | "rejeitar") {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para aprovar.");
+      return;
+    }
+    await api.patch<Purchase>(scopedPath(`/approvals/purchases/${purchaseId}`), {
+      action,
+      reviewedBy: currentUser?.name || "Gestor",
+    });
+    await loadAllData();
+  }
+
+  async function reviewExpense(expenseId: string, action: "aprovar" | "rejeitar" | "pagar") {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para aprovar.");
+      return;
+    }
+    await api.patch<Expense>(scopedPath(`/approvals/expenses/${expenseId}`), {
+      action,
+      reviewedBy: currentUser?.name || "Gestor",
+    });
+    await loadAllData();
   }
 
   if (authChecking) {
@@ -615,6 +643,9 @@ function App() {
                 ? "ERP Geral (consolidado)"
                 : `ERP Especial: ${selectedBusiness?.name || workspaceId}`}
             </p>
+            {!isGeneralWorkspace && pendingApprovalsCount > 0 ? (
+              <p>{pendingApprovalsCount} item(ns) aguardando aprovacao automatizada.</p>
+            ) : null}
           </div>
           <div className="header-actions">
             <button className="ghost-btn" onClick={loadAllData}>
@@ -1039,6 +1070,8 @@ function App() {
                     <th>Total</th>
                     <th>Pagamento</th>
                     <th>Status</th>
+                    <th>Faturamento</th>
+                    <th>NF-e</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1048,6 +1081,8 @@ function App() {
                       <td>{formatBRL(item.totalAmount)}</td>
                       <td>{item.paymentMethod}</td>
                       <td>{item.status}</td>
+                      <td>{item.billingStatus || "-"}</td>
+                      <td>{item.invoice?.number || "Gerando..."}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1105,6 +1140,8 @@ function App() {
                     <th>Fornecedor</th>
                     <th>Total</th>
                     <th>Status</th>
+                    <th>Aprovação</th>
+                    <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1114,6 +1151,29 @@ function App() {
                       <td>{item.supplier}</td>
                       <td>{formatBRL(item.totalAmount)}</td>
                       <td>{item.status}</td>
+                      <td>{item.approval?.status || "-"}</td>
+                      <td>
+                        {item.status === "AGUARDANDO_APROVACAO" ? (
+                          <div className="table-actions">
+                            <button
+                              type="button"
+                              className="ghost-btn"
+                              onClick={() => reviewPurchase(item._id, "aprovar")}
+                            >
+                              Aprovar
+                            </button>
+                            <button
+                              type="button"
+                              className="ghost-btn danger"
+                              onClick={() => reviewPurchase(item._id, "rejeitar")}
+                            >
+                              Rejeitar
+                            </button>
+                          </div>
+                        ) : (
+                          <span>-</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1164,6 +1224,8 @@ function App() {
                     <th>Vencimento</th>
                     <th>Valor</th>
                     <th>Status</th>
+                    <th>Aprovação</th>
+                    <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1174,6 +1236,38 @@ function App() {
                       <td>{new Date(item.dueDate).toLocaleDateString("pt-BR")}</td>
                       <td>{formatBRL(item.amount)}</td>
                       <td>{item.status}</td>
+                      <td>{item.approval?.status || "-"}</td>
+                      <td>
+                        <div className="table-actions">
+                          {item.status === "AGUARDANDO_APROVACAO" ? (
+                            <>
+                              <button
+                                type="button"
+                                className="ghost-btn"
+                                onClick={() => reviewExpense(item._id, "aprovar")}
+                              >
+                                Aprovar
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost-btn danger"
+                                onClick={() => reviewExpense(item._id, "rejeitar")}
+                              >
+                                Rejeitar
+                              </button>
+                            </>
+                          ) : null}
+                          {item.status === "PENDENTE" ? (
+                            <button
+                              type="button"
+                              className="ghost-btn"
+                              onClick={() => reviewExpense(item._id, "pagar")}
+                            >
+                              Marcar pago
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
