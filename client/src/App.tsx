@@ -66,6 +66,7 @@ const formatPct = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(1)
 
 function App() {
   const [activeModule, setActiveModule] = useState<ModuleKey>("dashboard");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -168,6 +169,11 @@ function App() {
       return `${path}?scope=geral`;
     }
     return `${path}?scope=negocio&businessId=${encodeURIComponent(workspaceId)}`;
+  }
+
+  function selectModule(module: ModuleKey) {
+    setActiveModule(module);
+    setMobileMenuOpen(false);
   }
 
   async function loadDashboardBi(silent = false) {
@@ -278,6 +284,10 @@ function App() {
     }, 15000);
     return () => window.clearInterval(intervalId);
   }, [activeModule, isAuthenticated, workspaceId]);
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [workspaceId]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -543,7 +553,7 @@ function App() {
             <button
               key={key}
               className={activeModule === key ? "nav-button active" : "nav-button"}
-              onClick={() => setActiveModule(key as ModuleKey)}
+              onClick={() => selectModule(key as ModuleKey)}
             >
               <span className="nav-icon">{meta.short}</span>
               <span>
@@ -556,13 +566,46 @@ function App() {
 
         <div className="theme-switch">
           <small>Personalize o visual no módulo de usuário.</small>
-          <button className="ghost-btn" onClick={() => setActiveModule("usuario")}>
+          <button className="ghost-btn" onClick={() => selectModule("usuario")}>
             Abrir preferências
           </button>
         </div>
       </aside>
 
       <main className="content">
+        <header className="mobile-topbar">
+          <div className="mobile-brand">
+            <div className="brand-mark">E-S</div>
+            <div>
+              <strong>E-Sentinel</strong>
+              <small>{moduleMeta[activeModule].label}</small>
+            </div>
+          </div>
+          <button className="ghost-btn mobile-menu-trigger" onClick={() => setMobileMenuOpen((prev) => !prev)}>
+            {mobileMenuOpen ? "Fechar menu" : "Abrir menu"}
+          </button>
+        </header>
+
+        {mobileMenuOpen ? (
+          <section className="mobile-menu-panel">
+            <nav className="menu mobile-menu-list">
+              {Object.entries(moduleMeta).map(([key, meta]) => (
+                <button
+                  key={key}
+                  className={activeModule === key ? "nav-button active" : "nav-button"}
+                  onClick={() => selectModule(key as ModuleKey)}
+                >
+                  <span className="nav-icon">{meta.short}</span>
+                  <span>
+                    <strong>{meta.label}</strong>
+                    <small>{meta.helper}</small>
+                  </span>
+                </button>
+              ))}
+            </nav>
+          </section>
+        ) : null}
+
         <header className="content-header">
           <div>
             <h2>{moduleMeta[activeModule].label}</h2>
@@ -580,7 +623,13 @@ function App() {
             <button className="ghost-btn" onClick={() => setWorkspaceId(null)}>
               Trocar ERP
             </button>
-            <button className="ghost-btn" onClick={handleLogout}>
+            <button
+              className="ghost-btn"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                handleLogout();
+              }}
+            >
               Sair ({currentUser?.name || "Usuário"})
             </button>
           </div>
@@ -638,15 +687,15 @@ function App() {
             </section>
 
             <section className="quick-grid animated">
-              <button className="quick-card" onClick={() => setActiveModule("vendas")}>
+              <button className="quick-card" onClick={() => selectModule("vendas")}>
                 <h4>Novo pedido</h4>
                 <p>Registrar venda rapidamente no caixa</p>
               </button>
-              <button className="quick-card" onClick={() => setActiveModule("produtos")}>
+              <button className="quick-card" onClick={() => selectModule("produtos")}>
                 <h4>Gerir estoque</h4>
                 <p>Atualizar catálogo e acompanhar mínimos</p>
               </button>
-              <button className="quick-card" onClick={() => setActiveModule("financeiro")}>
+              <button className="quick-card" onClick={() => selectModule("financeiro")}>
                 <h4>Fluxo financeiro</h4>
                 <p>Controlar despesas e contas futuras</p>
               </button>
@@ -819,7 +868,7 @@ function App() {
                 Expanda com fiscal, múltiplas lojas, permissões por perfil e painéis analíticos
                 avançados sem trocar de plataforma.
               </p>
-              <button className="ghost-btn" onClick={() => setActiveModule("clientes")}>
+              <button className="ghost-btn" onClick={() => selectModule("clientes")}>
                 Explorar módulos
               </button>
             </section>

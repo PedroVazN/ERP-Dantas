@@ -223,6 +223,38 @@
   background: var(--bg);
 }
 
+.mobile-topbar {
+  display: none;
+}
+
+.mobile-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-brand strong {
+  display: block;
+  color: var(--title);
+}
+
+.mobile-brand small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.mobile-menu-trigger {
+  white-space: nowrap;
+}
+
+.mobile-menu-panel {
+  display: none;
+}
+
+.mobile-menu-list {
+  gap: 6px;
+}
+
 .content-header {
   display: flex;
   justify-content: space-between;
@@ -686,6 +718,37 @@ th {
     grid-template-columns: 1fr;
   }
 
+  .sidebar {
+    display: none;
+  }
+
+  .content {
+    padding: 16px;
+  }
+
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px;
+    margin-bottom: 12px;
+    box-shadow: 0 8px 20px var(--shadow-soft);
+  }
+
+  .mobile-menu-panel {
+    display: block;
+    margin-bottom: 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 8px;
+    box-shadow: 0 8px 20px var(--shadow-soft);
+  }
+
   .module-grid,
   .quick-grid {
     grid-template-columns: 1fr;
@@ -698,6 +761,11 @@ th {
   .header-actions {
     flex-wrap: wrap;
     justify-content: flex-end;
+  }
+
+  .content-header {
+    align-items: flex-start;
+    gap: 10px;
   }
 
   .theme-cards {
