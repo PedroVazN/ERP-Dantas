@@ -73,6 +73,48 @@ export type Dashboard = {
   lowStock: Product[];
 };
 
+export type BiTimeseriesPoint = {
+  period: string;
+  label: string;
+  revenue: number;
+  expenses: number;
+  profit: number;
+};
+
+export type BiStockRisk = {
+  productId: string;
+  name: string;
+  stock: number;
+  minStock: number;
+  avgDailySold: number;
+  projectedDaysToStockout: number | null;
+};
+
+export type BiInsights = {
+  updatedAt: string;
+  kpis: {
+    revenue: number;
+    expenses: number;
+    profit: number;
+    margin: number;
+    salesCount: number;
+    averageTicket: number;
+    costRatio: number;
+    revenueGrowth: number;
+    profitGrowth: number;
+  };
+  timeseries: BiTimeseriesPoint[];
+  topProducts: Array<{ name: string; revenue: number; quantity: number }>;
+  costByCategory: Array<{ category: string; total: number }>;
+  forecast: {
+    nextRevenue: number;
+    nextExpenses: number;
+    nextProfit: number;
+    confidence: "baixa" | "media";
+    stockRisk: BiStockRisk[];
+  };
+};
+
 export type Settings = {
   _id: string;
   userId: string;

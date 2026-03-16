@@ -126,6 +126,68 @@ function slugify(input: string) {
     .replace(/(^-|-$)/g, "");
 }
 
+function monthBounds(date = new Date()) {
+  const start = new Date(date.getFullYear(), date.getMonth(), 1);
+  const end = new Date(date.getFullYear(), date.getMonth() + 1, 1);
+  return { start, end };
+}
+
+function safeGrowth(current: number, previous: number) {
+  if (!previous) {
+    return current > 0 ? 100 : 0;
+  }
+  return ((current - previous) / Math.abs(previous)) * 100;
+}
+
+function linearForecast(values: number[]) {
+  const filtered = values.filter((value) => Number.isFinite(value));
+  if (filtered.length < 2) {
+    return filtered[filtered.length - 1] || 0;
+  }
+
+  const n = filtered.length;
+  const xMean = (n + 1) / 2;
+  const yMean = filtered.reduce((sum, value) => sum + value, 0) / n;
+
+  let numerator = 0;
+  let denominator = 0;
+  for (let i = 0; i < n; i += 1) {
+    const x = i + 1;
+    numerator += (x - xMean) * (filtered[i] - yMean);
+    denominator += (x - xMean) ** 2;
+  }
+
+  const slope = denominator === 0 ? 0 : numerator / denominator;
+  const intercept = yMean - slope * xMean;
+  const forecast = intercept + slope * (n + 1);
+  return Math.max(0, forecast);
+}
+
+function formatPeriodKey(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+function formatPeriodLabel(periodKey: string) {
+  const [year, month] = periodKey.split("-");
+  const monthNames = [
+    "Jan",
+    "Fev",
+    "Mar",
+    "Abr",
+    "Mai",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Set",
+    "Out",
+    "Nov",
+    "Dez",
+  ];
+  return `${monthNames[Number(month) - 1]}/${year.slice(2)}`;
+}
+
 async function ensureMongoConnection() {
   if (mongoose.connection.readyState === 1) {
     dbConnected = true;
@@ -519,6 +581,210 @@ app.get("/api/dashboard", async (req, res) => {
     salesCount,
     purchaseCount,
     lowStock,
+  });
+});
+
+app.get("/api/bi/insights", async (req, res) => {
+  const businessFilter = getBusinessFilter(req);
+  const now = new Date();
+  const { start: monthStart, end: nextMonthStart } = monthBounds(now);
+  const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const { start: previousMonthStart, end: previousMonthEnd } = monthBounds(previousMonthDate);
+  const last30Start = new Date(now);
+  last30Start.setDate(now.getDate() - 30);
+
+  const monthlyPeriods: string[] = [];
+  for (let i = 5; i >= 0; i -= 1) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    monthlyPeriods.push(formatPeriodKey(date));
+  }
+
+  const [
+    currentRevenueAgg,
+    previousRevenueAgg,
+    currentExpenseAgg,
+    previousExpenseAgg,
+    monthlySalesAgg,
+    monthlyExpensesAgg,
+    topProductsAgg,
+    costByCategoryAgg,
+    currentSalesCount,
+    stockoutAgg,
+  ] = await Promise.all([
+    SaleModel.aggregate([
+      { $match: { ...businessFilter, status: { $ne: "CANCELADO" }, createdAt: { $gte: monthStart, $lt: nextMonthStart } } },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+    ]),
+    SaleModel.aggregate([
+      {
+        $match: {
+          ...businessFilter,
+          status: { $ne: "CANCELADO" },
+          createdAt: { $gte: previousMonthStart, $lt: previousMonthEnd },
+        },
+      },
+      { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+    ]),
+    ExpenseModel.aggregate([
+      { $match: { ...businessFilter, status: { $ne: "CANCELADO" }, dueDate: { $gte: monthStart, $lt: nextMonthStart } } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]),
+    ExpenseModel.aggregate([
+      {
+        $match: {
+          ...businessFilter,
+          status: { $ne: "CANCELADO" },
+          dueDate: { $gte: previousMonthStart, $lt: previousMonthEnd },
+        },
+      },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]),
+    SaleModel.aggregate([
+      { $match: { ...businessFilter, status: { $ne: "CANCELADO" }, createdAt: { $gte: new Date(now.getFullYear(), now.getMonth() - 5, 1) } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m", date: "$createdAt" } },
+          total: { $sum: "$totalAmount" },
+        },
+      },
+    ]),
+    ExpenseModel.aggregate([
+      { $match: { ...businessFilter, status: { $ne: "CANCELADO" }, dueDate: { $gte: new Date(now.getFullYear(), now.getMonth() - 5, 1) } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m", date: "$dueDate" } },
+          total: { $sum: "$amount" },
+        },
+      },
+    ]),
+    SaleModel.aggregate([
+      { $match: { ...businessFilter, status: { $ne: "CANCELADO" }, createdAt: { $gte: monthStart, $lt: nextMonthStart } } },
+      { $unwind: "$items" },
+      {
+        $group: {
+          _id: "$items.name",
+          revenue: { $sum: "$items.total" },
+          quantity: { $sum: "$items.quantity" },
+        },
+      },
+      { $sort: { revenue: -1 } },
+      { $limit: 5 },
+    ]),
+    ExpenseModel.aggregate([
+      { $match: { ...businessFilter, status: { $ne: "CANCELADO" }, dueDate: { $gte: monthStart, $lt: nextMonthStart } } },
+      { $group: { _id: "$category", total: { $sum: "$amount" } } },
+      { $sort: { total: -1 } },
+      { $limit: 5 },
+    ]),
+    SaleModel.countDocuments({ ...businessFilter, status: { $ne: "CANCELADO" }, createdAt: { $gte: monthStart, $lt: nextMonthStart } }),
+    SaleModel.aggregate([
+      { $match: { ...businessFilter, status: { $ne: "CANCELADO" }, createdAt: { $gte: last30Start } } },
+      { $unwind: "$items" },
+      {
+        $group: {
+          _id: "$items.product",
+          name: { $first: "$items.name" },
+          quantity30d: { $sum: "$items.quantity" },
+        },
+      },
+      { $sort: { quantity30d: -1 } },
+      { $limit: 10 },
+    ]),
+  ]);
+
+  const currentRevenue = currentRevenueAgg[0]?.total || 0;
+  const previousRevenue = previousRevenueAgg[0]?.total || 0;
+  const currentExpenses = currentExpenseAgg[0]?.total || 0;
+  const previousExpenses = previousExpenseAgg[0]?.total || 0;
+  const currentProfit = currentRevenue - currentExpenses;
+  const previousProfit = previousRevenue - previousExpenses;
+  const margin = currentRevenue > 0 ? (currentProfit / currentRevenue) * 100 : 0;
+  const avgTicket = currentSalesCount > 0 ? currentRevenue / currentSalesCount : 0;
+  const costRatio = currentRevenue > 0 ? (currentExpenses / currentRevenue) * 100 : 0;
+
+  const salesMap = new Map<string, number>();
+  monthlySalesAgg.forEach((row) => salesMap.set(row._id, row.total));
+  const expensesMap = new Map<string, number>();
+  monthlyExpensesAgg.forEach((row) => expensesMap.set(row._id, row.total));
+
+  const timeseries = monthlyPeriods.map((period) => {
+    const revenue = salesMap.get(period) || 0;
+    const expenses = expensesMap.get(period) || 0;
+    return {
+      period,
+      label: formatPeriodLabel(period),
+      revenue,
+      expenses,
+      profit: revenue - expenses,
+    };
+  });
+
+  const revenueTrend = timeseries.map((item) => item.revenue);
+  const expenseTrend = timeseries.map((item) => item.expenses);
+  const forecastRevenue = linearForecast(revenueTrend);
+  const forecastExpenses = linearForecast(expenseTrend);
+  const forecastProfit = forecastRevenue - forecastExpenses;
+
+  const productIds = stockoutAgg
+    .map((item) => item._id)
+    .filter((value) => value && isValidObjectId(value));
+  const productsInfo = await ProductModel.find({ ...businessFilter, _id: { $in: productIds } });
+  const productMap = new Map(productsInfo.map((product) => [String(product._id), product]));
+
+  const stockRisk = stockoutAgg
+    .map((item) => {
+      const product = productMap.get(String(item._id));
+      if (!product) return null;
+      const avgDailySold = (item.quantity30d || 0) / 30;
+      const projectedDaysToStockout = avgDailySold > 0 ? product.stock / avgDailySold : null;
+      return {
+        productId: String(product._id),
+        name: product.name,
+        stock: product.stock,
+        minStock: product.minStock,
+        avgDailySold: Number(avgDailySold.toFixed(2)),
+        projectedDaysToStockout:
+          projectedDaysToStockout === null ? null : Number(projectedDaysToStockout.toFixed(1)),
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .sort((a, b) => {
+      const valueA = a.projectedDaysToStockout ?? Number.POSITIVE_INFINITY;
+      const valueB = b.projectedDaysToStockout ?? Number.POSITIVE_INFINITY;
+      return valueA - valueB;
+    })
+    .slice(0, 5);
+
+  res.json({
+    updatedAt: now.toISOString(),
+    kpis: {
+      revenue: currentRevenue,
+      expenses: currentExpenses,
+      profit: currentProfit,
+      margin,
+      salesCount: currentSalesCount,
+      averageTicket: avgTicket,
+      costRatio,
+      revenueGrowth: safeGrowth(currentRevenue, previousRevenue),
+      profitGrowth: safeGrowth(currentProfit, previousProfit),
+    },
+    timeseries,
+    topProducts: topProductsAgg.map((row) => ({
+      name: row._id,
+      revenue: row.revenue,
+      quantity: row.quantity,
+    })),
+    costByCategory: costByCategoryAgg.map((row) => ({
+      category: row._id || "Sem categoria",
+      total: row.total,
+    })),
+    forecast: {
+      nextRevenue: forecastRevenue,
+      nextExpenses: forecastExpenses,
+      nextProfit: forecastProfit,
+      confidence: timeseries.length >= 5 ? "media" : "baixa",
+      stockRisk,
+    },
   });
 });
 

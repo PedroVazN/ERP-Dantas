@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { api } from "./api";
 import type {
   AuthUser,
+  BiInsights,
   Business,
   Customer,
   Dashboard,
@@ -61,6 +62,7 @@ const themeOptions: Array<{ value: Theme; label: string; description: string }> 
 
 const formatBRL = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+const formatPct = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
 
 function App() {
   const [activeModule, setActiveModule] = useState<ModuleKey>("dashboard");
@@ -76,6 +78,8 @@ function App() {
   const [error, setError] = useState("");
 
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
+  const [biInsights, setBiInsights] = useState<BiInsights | null>(null);
+  const [biRefreshing, setBiRefreshing] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
@@ -140,6 +144,21 @@ function App() {
 
   const isGeneralWorkspace = workspaceId === "geral";
   const selectedBusiness = businesses.find((item) => item.businessId === workspaceId) || null;
+  const maxTimeseriesValue = useMemo(() => {
+    if (!biInsights?.timeseries.length) return 1;
+    return Math.max(
+      ...biInsights.timeseries.flatMap((item) => [item.revenue, item.expenses, item.profit]),
+      1
+    );
+  }, [biInsights]);
+  const maxTopProductValue = useMemo(() => {
+    if (!biInsights?.topProducts.length) return 1;
+    return Math.max(...biInsights.topProducts.map((item) => item.revenue), 1);
+  }, [biInsights]);
+  const maxCostCategoryValue = useMemo(() => {
+    if (!biInsights?.costByCategory.length) return 1;
+    return Math.max(...biInsights.costByCategory.map((item) => item.total), 1);
+  }, [biInsights]);
 
   function scopedPath(path: string) {
     if (!workspaceId) {
@@ -151,6 +170,25 @@ function App() {
     return `${path}?scope=negocio&businessId=${encodeURIComponent(workspaceId)}`;
   }
 
+  async function loadDashboardBi(silent = false) {
+    if (!workspaceId) return;
+    try {
+      if (silent) {
+        setBiRefreshing(true);
+      }
+      const [dashboardData, biData] = await Promise.all([
+        api.get<Dashboard>(scopedPath("/dashboard")),
+        api.get<BiInsights>(scopedPath("/bi/insights")),
+      ]);
+      setDashboard(dashboardData);
+      setBiInsights(biData);
+    } finally {
+      if (silent) {
+        setBiRefreshing(false);
+      }
+    }
+  }
+
   async function loadAllData() {
     if (!workspaceId) {
       return;
@@ -158,9 +196,8 @@ function App() {
     try {
       setLoading(true);
       setError("");
-      const [dashboardData, customersData, productsData, salesData, purchasesData, expensesData, settingsData] =
+      const [customersData, productsData, salesData, purchasesData, expensesData, settingsData] =
         await Promise.all([
-          api.get<Dashboard>(scopedPath("/dashboard")),
           api.get<Customer[]>(scopedPath("/customers")),
           api.get<Product[]>(scopedPath("/products")),
           api.get<Sale[]>(scopedPath("/sales")),
@@ -169,7 +206,7 @@ function App() {
           api.get<Settings>("/settings"),
         ]);
 
-      setDashboard(dashboardData);
+      await loadDashboardBi(true);
       setCustomers(customersData);
       setProducts(productsData);
       setSales(salesData);
@@ -230,6 +267,17 @@ function App() {
     localStorage.setItem(BUSINESS_KEY, workspaceId);
     loadAllData();
   }, [isAuthenticated, workspaceId]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !workspaceId || activeModule !== "dashboard") return;
+    const intervalId = window.setInterval(() => {
+      void loadDashboardBi(true).catch((err) => {
+        const message = err instanceof Error ? err.message : "Erro ao atualizar BI";
+        setError(message);
+      });
+    }, 15000);
+    return () => window.clearInterval(intervalId);
+  }, [activeModule, isAuthenticated, workspaceId]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -541,7 +589,7 @@ function App() {
         {loading && <p className="feedback">Carregando dados...</p>}
         {error && <p className="error">{error}</p>}
 
-        {!loading && activeModule === "dashboard" && dashboard && (
+        {!loading && activeModule === "dashboard" && dashboard && biInsights && (
           <>
             <section className="kpi-grid">
               <article className="kpi-card animated delay-1">
@@ -566,6 +614,29 @@ function App() {
               </article>
             </section>
 
+            <section className="kpi-grid kpi-grid-bi">
+              <article className="kpi-card animated delay-1">
+                <h3>Margem líquida</h3>
+                <strong>{biInsights.kpis.margin.toFixed(1)}%</strong>
+                <span>Eficiência sobre faturamento do mês</span>
+              </article>
+              <article className="kpi-card animated delay-2">
+                <h3>Crescimento de vendas</h3>
+                <strong>{formatPct(biInsights.kpis.revenueGrowth)}</strong>
+                <span>Comparativo com o mês anterior</span>
+              </article>
+              <article className="kpi-card animated delay-3">
+                <h3>Crescimento do lucro</h3>
+                <strong>{formatPct(biInsights.kpis.profitGrowth)}</strong>
+                <span>Variação mensal do resultado</span>
+              </article>
+              <article className="kpi-card animated delay-4">
+                <h3>Ticket médio</h3>
+                <strong>{formatBRL(biInsights.kpis.averageTicket)}</strong>
+                <span>{biInsights.kpis.salesCount} vendas no mês corrente</span>
+              </article>
+            </section>
+
             <section className="quick-grid animated">
               <button className="quick-card" onClick={() => setActiveModule("vendas")}>
                 <h4>Novo pedido</h4>
@@ -579,6 +650,135 @@ function App() {
                 <h4>Fluxo financeiro</h4>
                 <p>Controlar despesas e contas futuras</p>
               </button>
+            </section>
+
+            <section className="module-grid animated bi-grid">
+              <article className="table-card">
+                <h3>Relatório visual: receita x custo x lucro (6 meses)</h3>
+                <p className="theme-helper">
+                  Atualização em tempo real a cada 15s{" "}
+                  {biRefreshing ? "(sincronizando...)" : `(última: ${new Date(biInsights.updatedAt).toLocaleTimeString("pt-BR")})`}
+                </p>
+                <div className="bi-series-list">
+                  {biInsights.timeseries.map((point) => (
+                    <div className="bi-series-row" key={point.period}>
+                      <div className="bi-series-head">
+                        <strong>{point.label}</strong>
+                        <span>{formatBRL(point.profit)}</span>
+                      </div>
+                      <div className="bi-series-bars">
+                        <div
+                          className="bi-bar revenue"
+                          style={{ width: `${(point.revenue / maxTimeseriesValue) * 100}%` }}
+                          title={`Receita: ${formatBRL(point.revenue)}`}
+                        />
+                        <div
+                          className="bi-bar expenses"
+                          style={{ width: `${(point.expenses / maxTimeseriesValue) * 100}%` }}
+                          title={`Custos: ${formatBRL(point.expenses)}`}
+                        />
+                        <div
+                          className="bi-bar profit"
+                          style={{ width: `${(Math.max(point.profit, 0) / maxTimeseriesValue) * 100}%` }}
+                          title={`Lucro: ${formatBRL(point.profit)}`}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </article>
+
+              <article className="table-card">
+                <h3>Top produtos por faturamento no mês</h3>
+                {biInsights.topProducts.length === 0 ? (
+                  <p className="empty">Sem vendas suficientes para análise neste período.</p>
+                ) : (
+                  <div className="bi-rank-list">
+                    {biInsights.topProducts.map((item) => (
+                      <div className="bi-rank-row" key={item.name}>
+                        <div>
+                          <strong>{item.name}</strong>
+                          <small>{item.quantity} unidades vendidas</small>
+                        </div>
+                        <div className="bi-rank-metric">
+                          <span>{formatBRL(item.revenue)}</span>
+                          <div
+                            className="bi-rank-meter"
+                            style={{ width: `${(item.revenue / maxTopProductValue) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </article>
+            </section>
+
+            <section className="module-grid animated bi-grid">
+              <article className="table-card">
+                <h3>Custos por categoria (mês atual)</h3>
+                {biInsights.costByCategory.length === 0 ? (
+                  <p className="empty">Nenhum custo lançado no mês atual.</p>
+                ) : (
+                  <div className="bi-rank-list">
+                    {biInsights.costByCategory.map((item) => (
+                      <div className="bi-rank-row" key={item.category}>
+                        <strong>{item.category}</strong>
+                        <div className="bi-rank-metric">
+                          <span>{formatBRL(item.total)}</span>
+                          <div
+                            className="bi-rank-meter expenses"
+                            style={{ width: `${(item.total / maxCostCategoryValue) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </article>
+
+              <article className="table-card">
+                <h3>Análise preditiva para decisão</h3>
+                <div className="prediction-grid">
+                  <div className="prediction-card">
+                    <span>Receita projetada</span>
+                    <strong>{formatBRL(biInsights.forecast.nextRevenue)}</strong>
+                  </div>
+                  <div className="prediction-card">
+                    <span>Custos projetados</span>
+                    <strong>{formatBRL(biInsights.forecast.nextExpenses)}</strong>
+                  </div>
+                  <div className="prediction-card">
+                    <span>Lucro projetado</span>
+                    <strong>{formatBRL(biInsights.forecast.nextProfit)}</strong>
+                  </div>
+                </div>
+                <p className="theme-helper">
+                  Confiança da projeção: <strong>{biInsights.forecast.confidence}</strong>. Baseada na tendência dos últimos meses.
+                </p>
+                <h4 className="bi-subtitle">Risco de ruptura de estoque</h4>
+                {biInsights.forecast.stockRisk.length === 0 ? (
+                  <p className="empty">Sem risco imediato detectado com base no giro recente.</p>
+                ) : (
+                  <div className="bi-risk-list">
+                    {biInsights.forecast.stockRisk.map((risk) => (
+                      <div className="bi-risk-row" key={risk.productId}>
+                        <div>
+                          <strong>{risk.name}</strong>
+                          <small>
+                            Estoque: {risk.stock} | Mínimo: {risk.minStock} | Giro diário: {risk.avgDailySold}
+                          </small>
+                        </div>
+                        <span>
+                          {risk.projectedDaysToStockout === null
+                            ? "Sem previsão"
+                            : `${risk.projectedDaysToStockout} dias`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </article>
             </section>
 
             <section className="table-card animated">
