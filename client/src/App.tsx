@@ -445,7 +445,7 @@ function App() {
       <div className="auth-layout">
         <section className="auth-panel">
           <div className="auth-brand">
-            <div className="brand-mark">ED</div>
+            <div className="brand-mark">E-S</div>
             <div>
               <h1>E-Sentinel</h1>
               <p>Gestão moderna para operação de sabonetes</p>
@@ -481,7 +481,7 @@ function App() {
       <div className="auth-layout">
         <section className="auth-panel workspace-panel">
           <div className="auth-brand">
-            <div className="brand-mark">ED</div>
+            <div className="brand-mark">E-S</div>
             <div>
               <h1>Selecione seu ERP</h1>
               <p>Escolha o ambiente geral ou um ERP especifico por negocio.</p>
@@ -530,7 +530,7 @@ function App() {
     <div className="erp-layout">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">ED</div>
+          <div className="brand-mark">E-S</div>
           <div>
             <h1>E-Sentinel</h1>
             <p>
