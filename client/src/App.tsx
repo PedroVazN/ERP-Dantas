@@ -8,6 +8,7 @@ import type {
   ChecklistItem,
   Customer,
   Dashboard,
+  EconomicIndicators,
   Expense,
   LoginResponse,
   Product,
@@ -92,6 +93,7 @@ function App() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
+  const [economicIndicators, setEconomicIndicators] = useState<EconomicIndicators | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
 
   const [theme, setTheme] = useState<Theme>("claro");
@@ -220,7 +222,16 @@ function App() {
     try {
       setLoading(true);
       setError("");
-      const [customersData, productsData, salesData, purchasesData, expensesData, checklistData, settingsData] =
+      const [
+        customersData,
+        productsData,
+        salesData,
+        purchasesData,
+        expensesData,
+        checklistData,
+        economicData,
+        settingsData,
+      ] =
         await Promise.all([
           api.get<Customer[]>(scopedPath("/customers")),
           api.get<Product[]>(scopedPath("/products")),
@@ -228,6 +239,7 @@ function App() {
           api.get<Purchase[]>(scopedPath("/purchases")),
           api.get<Expense[]>(scopedPath("/expenses")),
           api.get<ChecklistItem[]>(scopedPath("/checklist-items")),
+          api.get<EconomicIndicators>("/economic/indicators"),
           api.get<Settings>("/settings"),
         ]);
 
@@ -238,6 +250,7 @@ function App() {
       setPurchases(purchasesData);
       setExpenses(expensesData);
       setChecklistItems(checklistData);
+      setEconomicIndicators(economicData);
       setSettings(settingsData);
       setTheme(settingsData.theme || "claro");
     } catch (err) {
@@ -1301,97 +1314,141 @@ function App() {
         )}
 
         {!loading && activeModule === "financeiro" && (
-          <section className="module-grid animated">
-            <form className="form-card" onSubmit={submitExpense}>
-              <h3>Nova despesa</h3>
-              <input
-                placeholder="Descrição"
-                value={expenseForm.description}
-                onChange={(event) => setExpenseForm({ ...expenseForm, description: event.target.value })}
-                required
-              />
-              <input
-                placeholder="Categoria"
-                value={expenseForm.category}
-                onChange={(event) => setExpenseForm({ ...expenseForm, category: event.target.value })}
-                required
-              />
-              <input
-                type="number"
-                min={0}
-                placeholder="Valor"
-                value={expenseForm.amount}
-                onChange={(event) => setExpenseForm({ ...expenseForm, amount: Number(event.target.value) })}
-                required
-              />
-              <input
-                type="date"
-                value={expenseForm.dueDate}
-                onChange={(event) => setExpenseForm({ ...expenseForm, dueDate: event.target.value })}
-                required
-              />
-              <button type="submit">Lançar despesa</button>
-            </form>
-            <section className="table-card">
-              <h3>Contas a pagar</h3>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Descrição</th>
-                    <th>Categoria</th>
-                    <th>Vencimento</th>
-                    <th>Valor</th>
-                    <th>Status</th>
-                    <th>Aprovação</th>
-                    <th>Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {expenses.map((item) => (
-                    <tr key={item._id}>
-                      <td>{item.description}</td>
-                      <td>{item.category}</td>
-                      <td>{new Date(item.dueDate).toLocaleDateString("pt-BR")}</td>
-                      <td>{formatBRL(item.amount)}</td>
-                      <td>{item.status}</td>
-                      <td>{item.approval?.status || "-"}</td>
-                      <td>
-                        <div className="table-actions">
-                          {item.status === "AGUARDANDO_APROVACAO" ? (
-                            <>
+          <>
+            <section className="table-card animated economic-card">
+              <h3>Câmbio e indicadores econômicos</h3>
+              <p className="theme-helper">
+                Fonte: {economicIndicators?.exchange.source || "AwesomeAPI"} e{" "}
+                {economicIndicators?.indicators.source || "Banco Central (SGS)"}.
+              </p>
+              <div className="economic-grid">
+                <article className="economic-item">
+                  <strong>USD/BRL</strong>
+                  <span>
+                    {economicIndicators?.exchange.usdBrl
+                      ? formatBRL(economicIndicators.exchange.usdBrl)
+                      : "Indisponível"}
+                  </span>
+                </article>
+                <article className="economic-item">
+                  <strong>EUR/BRL</strong>
+                  <span>
+                    {economicIndicators?.exchange.eurBrl
+                      ? formatBRL(economicIndicators.exchange.eurBrl)
+                      : "Indisponível"}
+                  </span>
+                </article>
+                <article className="economic-item">
+                  <strong>SELIC (%)</strong>
+                  <span>
+                    {typeof economicIndicators?.indicators.selic === "number"
+                      ? `${economicIndicators.indicators.selic.toFixed(2)}%`
+                      : "Indisponível"}
+                  </span>
+                </article>
+                <article className="economic-item">
+                  <strong>IPCA (%)</strong>
+                  <span>
+                    {typeof economicIndicators?.indicators.ipca === "number"
+                      ? `${economicIndicators.indicators.ipca.toFixed(2)}%`
+                      : "Indisponível"}
+                  </span>
+                </article>
+              </div>
+            </section>
+
+            <section className="module-grid animated">
+              <form className="form-card" onSubmit={submitExpense}>
+                <h3>Nova despesa</h3>
+                <input
+                  placeholder="Descrição"
+                  value={expenseForm.description}
+                  onChange={(event) => setExpenseForm({ ...expenseForm, description: event.target.value })}
+                  required
+                />
+                <input
+                  placeholder="Categoria"
+                  value={expenseForm.category}
+                  onChange={(event) => setExpenseForm({ ...expenseForm, category: event.target.value })}
+                  required
+                />
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Valor"
+                  value={expenseForm.amount}
+                  onChange={(event) => setExpenseForm({ ...expenseForm, amount: Number(event.target.value) })}
+                  required
+                />
+                <input
+                  type="date"
+                  value={expenseForm.dueDate}
+                  onChange={(event) => setExpenseForm({ ...expenseForm, dueDate: event.target.value })}
+                  required
+                />
+                <button type="submit">Lançar despesa</button>
+              </form>
+              <section className="table-card">
+                <h3>Contas a pagar</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Descrição</th>
+                      <th>Categoria</th>
+                      <th>Vencimento</th>
+                      <th>Valor</th>
+                      <th>Status</th>
+                      <th>Aprovação</th>
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {expenses.map((item) => (
+                      <tr key={item._id}>
+                        <td>{item.description}</td>
+                        <td>{item.category}</td>
+                        <td>{new Date(item.dueDate).toLocaleDateString("pt-BR")}</td>
+                        <td>{formatBRL(item.amount)}</td>
+                        <td>{item.status}</td>
+                        <td>{item.approval?.status || "-"}</td>
+                        <td>
+                          <div className="table-actions">
+                            {item.status === "AGUARDANDO_APROVACAO" ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="ghost-btn"
+                                  onClick={() => reviewExpense(item._id, "aprovar")}
+                                >
+                                  Aprovar
+                                </button>
+                                <button
+                                  type="button"
+                                  className="ghost-btn danger"
+                                  onClick={() => reviewExpense(item._id, "rejeitar")}
+                                >
+                                  Rejeitar
+                                </button>
+                              </>
+                            ) : null}
+                            {item.status === "PENDENTE" ? (
                               <button
                                 type="button"
                                 className="ghost-btn"
-                                onClick={() => reviewExpense(item._id, "aprovar")}
+                                onClick={() => reviewExpense(item._id, "pagar")}
                               >
-                                Aprovar
+                                Marcar pago
                               </button>
-                              <button
-                                type="button"
-                                className="ghost-btn danger"
-                                onClick={() => reviewExpense(item._id, "rejeitar")}
-                              >
-                                Rejeitar
-                              </button>
-                            </>
-                          ) : null}
-                          {item.status === "PENDENTE" ? (
-                            <button
-                              type="button"
-                              className="ghost-btn"
-                              onClick={() => reviewExpense(item._id, "pagar")}
-                            >
-                              Marcar pago
-                            </button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
             </section>
-          </section>
+          </>
         )}
 
         {!loading && activeModule === "checklist" && (

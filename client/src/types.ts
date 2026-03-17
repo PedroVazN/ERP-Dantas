@@ -100,6 +100,20 @@ export type ChecklistItem = {
   createdAt: string;
 };
 
+export type EconomicIndicators = {
+  updatedAt: string;
+  exchange: {
+    usdBrl: number | null;
+    eurBrl: number | null;
+    source: string;
+  };
+  indicators: {
+    selic: number | null;
+    ipca: number | null;
+    source: string;
+  };
+};
+
 export type Dashboard = {
   revenue: number;
   expenses: number;

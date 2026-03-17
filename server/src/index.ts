@@ -195,6 +195,33 @@ function formatPeriodLabel(periodKey: string) {
   return `${monthNames[Number(month) - 1]}/${year.slice(2)}`;
 }
 
+async function fetchJsonWithTimeout<T>(url: string, timeoutMs = 8000): Promise<T> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`Falha ao consultar ${url}`);
+    }
+    return (await response.json()) as T;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function fetchSgsLatestValue(code: number) {
+  try {
+    const data = await fetchJsonWithTimeout<Array<{ valor: string }>>(
+      `https://api.bcb.gov.br/dados/serie/bcdata.sgs/${code}/dados/ultimos/1?formato=json`
+    );
+    const rawValue = data[0]?.valor;
+    if (!rawValue) return null;
+    return Number(rawValue.replace(",", "."));
+  } catch {
+    return null;
+  }
+}
+
 function generateInvoicePayload(businessId: string, saleId: string, status: "EMITIDA" | "PENDENTE") {
   const now = new Date();
   const seed = `${now.getTime()}`.slice(-8);
@@ -1024,6 +1051,38 @@ app.put("/api/settings/profile", async (req, res) => {
     { upsert: true, new: true }
   );
   res.json(settings);
+});
+
+app.get("/api/economic/indicators", async (_req, res) => {
+  let usdBrl: number | null = null;
+  let eurBrl: number | null = null;
+
+  try {
+    const fxData = await fetchJsonWithTimeout<{
+      USDBRL?: { bid?: string };
+      EURBRL?: { bid?: string };
+    }>("https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL");
+    usdBrl = fxData.USDBRL?.bid ? Number(fxData.USDBRL.bid) : null;
+    eurBrl = fxData.EURBRL?.bid ? Number(fxData.EURBRL.bid) : null;
+  } catch {
+    // Fica com null quando a API externa falhar.
+  }
+
+  const [selic, ipca] = await Promise.all([fetchSgsLatestValue(432), fetchSgsLatestValue(433)]);
+
+  res.json({
+    updatedAt: new Date().toISOString(),
+    exchange: {
+      usdBrl,
+      eurBrl,
+      source: "AwesomeAPI",
+    },
+    indicators: {
+      selic,
+      ipca,
+      source: "Banco Central (SGS)",
+    },
+  });
 });
 
 app.get("/api/dashboard", async (req, res) => {
