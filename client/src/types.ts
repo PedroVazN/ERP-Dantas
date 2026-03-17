@@ -91,6 +91,15 @@ export type Expense = {
   };
 };
 
+export type ChecklistItem = {
+  _id: string;
+  title: string;
+  notes?: string;
+  completed: boolean;
+  completedAt?: string;
+  createdAt: string;
+};
+
 export type Dashboard = {
   revenue: number;
   expenses: number;

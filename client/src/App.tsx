@@ -5,6 +5,7 @@ import type {
   AuthUser,
   BiInsights,
   Business,
+  ChecklistItem,
   Customer,
   Dashboard,
   Expense,
@@ -28,6 +29,7 @@ type ModuleKey =
   | "vendas"
   | "compras"
   | "financeiro"
+  | "checklist"
   | "usuario";
 
 const moduleMeta: Record<ModuleKey, { label: string; short: string; helper: string }> = {
@@ -37,6 +39,7 @@ const moduleMeta: Record<ModuleKey, { label: string; short: string; helper: stri
   vendas: { label: "Vendas", short: "VD", helper: "PDV e faturamento" },
   compras: { label: "Compras", short: "CP", helper: "Fornecedores e entradas" },
   financeiro: { label: "Financeiro", short: "FN", helper: "Contas e despesas" },
+  checklist: { label: "Checklist", short: "CK", helper: "Ideias e futuros implementos" },
   usuario: { label: "Usuário", short: "US", helper: "Perfil e preferências" },
 };
 
@@ -88,6 +91,7 @@ function App() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
 
   const [theme, setTheme] = useState<Theme>("claro");
@@ -123,6 +127,10 @@ function App() {
     category: "OPERACIONAL",
     amount: 0,
     dueDate: new Date().toISOString().slice(0, 10),
+  });
+  const [checklistForm, setChecklistForm] = useState({
+    title: "",
+    notes: "",
   });
   const [userForm, setUserForm] = useState({
     userName: "Administrador",
@@ -212,13 +220,14 @@ function App() {
     try {
       setLoading(true);
       setError("");
-      const [customersData, productsData, salesData, purchasesData, expensesData, settingsData] =
+      const [customersData, productsData, salesData, purchasesData, expensesData, checklistData, settingsData] =
         await Promise.all([
           api.get<Customer[]>(scopedPath("/customers")),
           api.get<Product[]>(scopedPath("/products")),
           api.get<Sale[]>(scopedPath("/sales")),
           api.get<Purchase[]>(scopedPath("/purchases")),
           api.get<Expense[]>(scopedPath("/expenses")),
+          api.get<ChecklistItem[]>(scopedPath("/checklist-items")),
           api.get<Settings>("/settings"),
         ]);
 
@@ -228,6 +237,7 @@ function App() {
       setSales(salesData);
       setPurchases(purchasesData);
       setExpenses(expensesData);
+      setChecklistItems(checklistData);
       setSettings(settingsData);
       setTheme(settingsData.theme || "claro");
     } catch (err) {
@@ -479,6 +489,59 @@ function App() {
       amount: 0,
       dueDate: new Date().toISOString().slice(0, 10),
     });
+    await loadAllData();
+  }
+
+  async function submitChecklistItem(event: FormEvent) {
+    event.preventDefault();
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para cadastrar ideias.");
+      return;
+    }
+    await api.post<ChecklistItem>(scopedPath("/checklist-items"), checklistForm);
+    setChecklistForm({ title: "", notes: "" });
+    await loadAllData();
+  }
+
+  async function toggleChecklistItem(item: ChecklistItem) {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar checklist.");
+      return;
+    }
+    await api.patch<ChecklistItem>(scopedPath(`/checklist-items/${item._id}`), {
+      completed: !item.completed,
+    });
+    await loadAllData();
+  }
+
+  async function editChecklistItem(item: ChecklistItem) {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar checklist.");
+      return;
+    }
+    const nextTitle = window.prompt("Editar título da ideia:", item.title);
+    if (nextTitle === null) return;
+    const nextNotes = window.prompt("Editar detalhes da ideia:", item.notes || "");
+    if (nextNotes === null) return;
+    if (!nextTitle.trim()) {
+      setError("O título da ideia não pode ficar vazio.");
+      return;
+    }
+    await api.patch<ChecklistItem>(scopedPath(`/checklist-items/${item._id}`), {
+      title: nextTitle.trim(),
+      notes: nextNotes.trim(),
+    });
+    await loadAllData();
+  }
+
+  async function deleteChecklistItem(item: ChecklistItem) {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar checklist.");
+      return;
+    }
+    const confirmDelete = window.confirm(`Deseja excluir a ideia "${item.title}"?`);
+    if (!confirmDelete) return;
+    await api.delete<{ deleted: boolean }>(scopedPath(`/checklist-items/${item._id}`));
     await loadAllData();
   }
 
@@ -1325,6 +1388,84 @@ function App() {
                       </td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </section>
+          </section>
+        )}
+
+        {!loading && activeModule === "checklist" && (
+          <section className="module-grid animated">
+            <form className="form-card" onSubmit={submitChecklistItem}>
+              <h3>Nova ideia de implementação</h3>
+              <input
+                placeholder="Título da ideia"
+                value={checklistForm.title}
+                onChange={(event) => setChecklistForm({ ...checklistForm, title: event.target.value })}
+                required
+              />
+              <textarea
+                rows={4}
+                placeholder="Detalhes da ideia (opcional)"
+                value={checklistForm.notes}
+                onChange={(event) => setChecklistForm({ ...checklistForm, notes: event.target.value })}
+              />
+              <button type="submit">Adicionar à checklist</button>
+            </form>
+            <section className="table-card">
+              <h3>Checklist de futuros implementos</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Ideia</th>
+                    <th>Detalhes</th>
+                    <th>Criada em</th>
+                    <th>Status</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {checklistItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="empty">
+                        Nenhuma ideia cadastrada ainda.
+                      </td>
+                    </tr>
+                  ) : (
+                    checklistItems.map((item) => (
+                      <tr key={item._id}>
+                        <td>{item.title}</td>
+                        <td>{item.notes || "-"}</td>
+                        <td>{new Date(item.createdAt).toLocaleDateString("pt-BR")}</td>
+                        <td>{item.completed ? "Concluída" : "Pendente"}</td>
+                        <td>
+                          <div className="table-actions">
+                            <button
+                              type="button"
+                              className="ghost-btn"
+                              onClick={() => toggleChecklistItem(item)}
+                            >
+                              {item.completed ? "Marcar pendente" : "Marcar concluída"}
+                            </button>
+                            <button
+                              type="button"
+                              className="ghost-btn"
+                              onClick={() => editChecklistItem(item)}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              className="ghost-btn danger"
+                              onClick={() => deleteChecklistItem(item)}
+                            >
+                              Excluir
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </section>

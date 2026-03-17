@@ -140,6 +140,17 @@ const expenseSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+const checklistItemSchema = new mongoose.Schema(
+  {
+    businessId: { type: String, default: "geral", index: true },
+    title: { type: String, required: true, trim: true },
+    notes: { type: String, trim: true, default: "" },
+    completed: { type: Boolean, default: false },
+    completedAt: { type: Date },
+  },
+  { timestamps: true }
+);
+
 const settingSchema = new mongoose.Schema(
   {
     userId: { type: String, required: true, default: "admin" },
@@ -174,6 +185,7 @@ export const ProductModel = mongoose.model("Product", productSchema);
 export const SaleModel = mongoose.model("Sale", saleSchema);
 export const PurchaseModel = mongoose.model("Purchase", purchaseSchema);
 export const ExpenseModel = mongoose.model("Expense", expenseSchema);
+export const ChecklistItemModel = mongoose.model("ChecklistItem", checklistItemSchema);
 export const SettingModel = mongoose.model("Setting", settingSchema);
 export const BusinessModel = mongoose.model("Business", businessSchema);
 
