@@ -454,22 +454,37 @@ function App() {
       return;
     }
     const product = products.find((item) => item._id === saleForm.productId);
-    if (!product) return;
+    if (!product) {
+      setError("Selecione um produto válido.");
+      return;
+    }
 
-    await api.post<Sale>(scopedPath("/sales"), {
-      items: [
-        {
-          product: product._id,
-          quantity: Number(saleForm.quantity),
-          unitPrice: product.price,
-        },
-      ],
-      paymentMethod: saleForm.paymentMethod,
-      status: "PAGO",
-      createdBy: "Admin",
-    });
-    setSaleForm({ productId: "", quantity: 1, paymentMethod: "PIX" });
-    await loadAllData();
+    const quantity = Number(saleForm.quantity);
+    if (quantity > product.stock) {
+      setError(`Estoque insuficiente para ${product.name}. Disponível: ${product.stock} unidades.`);
+      return;
+    }
+
+    try {
+      setError("");
+      await api.post<Sale>(scopedPath("/sales"), {
+        items: [
+          {
+            product: product._id,
+            quantity: quantity,
+            unitPrice: product.price,
+          },
+        ],
+        paymentMethod: saleForm.paymentMethod,
+        status: "PAGO",
+        createdBy: "Admin",
+      });
+      setSaleForm({ productId: "", quantity: 1, paymentMethod: "PIX" });
+      await loadAllData();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao lançar venda.";
+      setError(message);
+    }
   }
 
   async function loadWhatsAppStatus() {
