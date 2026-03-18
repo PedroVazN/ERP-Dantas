@@ -170,7 +170,11 @@ function App() {
       return [];
     }
     return products.filter((product) => {
-      const supplierId = typeof product.supplier === "string" ? product.supplier : product.supplier._id;
+      if (!product.supplier) {
+        return false;
+      }
+      const supplierId =
+        typeof product.supplier === "string" ? product.supplier : product.supplier?._id || "";
       return supplierId === purchaseForm.supplierId;
     });
   }, [products, purchaseForm.supplierId]);
