@@ -29,6 +29,7 @@ const productSchema = new mongoose.Schema(
     cost: { type: Number, required: true, min: 0 },
     stock: { type: Number, required: true, min: 0, default: 0 },
     minStock: { type: Number, required: true, min: 0, default: 10 },
+    supplier: { type: mongoose.Schema.Types.ObjectId, ref: "Supplier" },
     active: { type: Boolean, default: true },
   },
   { timestamps: true }
