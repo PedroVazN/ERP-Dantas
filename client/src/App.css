@@ -321,6 +321,24 @@
   align-content: start;
 }
 
+.form-field {
+  display: grid;
+  gap: 6px;
+}
+
+.form-field label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--title);
+}
+
+.field-help {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
 .form-card h3,
 .table-card h3,
 .promo-card h3 {

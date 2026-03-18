@@ -959,20 +959,28 @@ function App() {
           <h2>Acesse sua conta</h2>
           <p className="auth-subtitle">Ambiente seguro com visual executivo e alta produtividade.</p>
           <form className="auth-form" onSubmit={handleLogin}>
-            <input
-              type="email"
-              placeholder="E-mail"
-              value={loginForm.email}
-              onChange={(event) => setLoginForm({ ...loginForm, email: event.target.value })}
-              required
-            />
-            <input
-              type="password"
-              placeholder="Senha"
-              value={loginForm.password}
-              onChange={(event) => setLoginForm({ ...loginForm, password: event.target.value })}
-              required
-            />
+            <div className="form-field">
+              <label>E-mail</label>
+              <small className="field-help">Informe o e-mail cadastrado para acessar o ERP.</small>
+              <input
+                type="email"
+                placeholder="ex.: financeiro@empresa.com"
+                value={loginForm.email}
+                onChange={(event) => setLoginForm({ ...loginForm, email: event.target.value })}
+                required
+              />
+            </div>
+            <div className="form-field">
+              <label>Senha</label>
+              <small className="field-help">Sua senha de acesso (não compartilhe).</small>
+              <input
+                type="password"
+                placeholder="••••••••"
+                value={loginForm.password}
+                onChange={(event) => setLoginForm({ ...loginForm, password: event.target.value })}
+                required
+              />
+            </div>
             <button type="submit">Entrar no ERP</button>
           </form>
           {authError && <p className="error">{authError}</p>}
@@ -1013,12 +1021,16 @@ function App() {
           </div>
 
           <form className="auth-form" onSubmit={handleCreateBusiness}>
-            <input
-              placeholder="Nome do novo ERP especial"
-              value={businessForm.name}
-              onChange={(event) => setBusinessForm({ name: event.target.value })}
-              required
-            />
+            <div className="form-field">
+              <label>Novo ERP especial</label>
+              <small className="field-help">Crie um ambiente separado por negócio (ex.: “Loja Centro”).</small>
+              <input
+                placeholder="ex.: Loja Centro"
+                value={businessForm.name}
+                onChange={(event) => setBusinessForm({ name: event.target.value })}
+                required
+              />
+            </div>
             <button type="submit">Criar novo ERP especial</button>
           </form>
 
@@ -1377,22 +1389,34 @@ function App() {
           <section className="module-grid animated">
             <form className="form-card" onSubmit={submitCustomer}>
               <h3>Novo cliente</h3>
-              <input
-                placeholder="Nome"
-                value={customerForm.name}
-                onChange={(event) => setCustomerForm({ ...customerForm, name: event.target.value })}
-                required
-              />
-              <input
-                placeholder="E-mail"
-                value={customerForm.email}
-                onChange={(event) => setCustomerForm({ ...customerForm, email: event.target.value })}
-              />
-              <input
-                placeholder="Telefone"
-                value={customerForm.phone}
-                onChange={(event) => setCustomerForm({ ...customerForm, phone: event.target.value })}
-              />
+              <div className="form-field">
+                <label>Nome</label>
+                <small className="field-help">Como o cliente será identificado no sistema.</small>
+                <input
+                  placeholder="ex.: Maria Silva"
+                  value={customerForm.name}
+                  onChange={(event) => setCustomerForm({ ...customerForm, name: event.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-field">
+                <label>E-mail</label>
+                <small className="field-help">Opcional. Útil para envio de comprovantes e contato.</small>
+                <input
+                  placeholder="ex.: maria@email.com"
+                  value={customerForm.email}
+                  onChange={(event) => setCustomerForm({ ...customerForm, email: event.target.value })}
+                />
+              </div>
+              <div className="form-field">
+                <label>Telefone</label>
+                <small className="field-help">Opcional. Use DDD + número para contato/WhatsApp.</small>
+                <input
+                  placeholder="ex.: (11) 99999-9999"
+                  value={customerForm.phone}
+                  onChange={(event) => setCustomerForm({ ...customerForm, phone: event.target.value })}
+                />
+              </div>
               <button type="submit">Cadastrar</button>
             </form>
             <section className="table-card">
@@ -1436,67 +1460,109 @@ function App() {
           <section className="module-grid animated">
             <form className="form-card" onSubmit={submitProduct}>
               <h3>Novo produto</h3>
-              <input
-                placeholder="Nome"
-                value={productForm.name}
-                onChange={(event) => setProductForm({ ...productForm, name: event.target.value })}
-                required
-              />
-              <input
-                placeholder="SKU"
-                value={productForm.sku}
-                onChange={(event) => setProductForm({ ...productForm, sku: event.target.value })}
-                required
-              />
-              <input
-                placeholder="Código do produto"
-                value={productForm.productCode}
-                onChange={(event) => setProductForm({ ...productForm, productCode: event.target.value })}
-              />
-              <textarea
-                rows={3}
-                placeholder="Descrição do produto"
-                value={productForm.description}
-                onChange={(event) => setProductForm({ ...productForm, description: event.target.value })}
-              />
-              <select
-                value={productForm.supplierId}
-                onChange={(event) => setProductForm({ ...productForm, supplierId: event.target.value })}
-                required
-              >
-                <option value="">Selecione o fornecedor *</option>
-                {suppliers.filter((s) => s.status === "ATIVO").map((item) => (
-                  <option key={item._id} value={item._id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                placeholder="Preço de venda"
-                value={productForm.price}
-                onChange={(event) => setProductForm({ ...productForm, price: Number(event.target.value) })}
-                required
-              />
-              <input
-                type="number"
-                placeholder="Custo"
-                value={productForm.cost}
-                onChange={(event) => setProductForm({ ...productForm, cost: Number(event.target.value) })}
-                required
-              />
-              <input
-                type="number"
-                placeholder="Estoque inicial"
-                value={productForm.stock}
-                onChange={(event) => setProductForm({ ...productForm, stock: Number(event.target.value) })}
-              />
-              <input
-                type="number"
-                placeholder="Estoque mínimo"
-                value={productForm.minStock}
-                onChange={(event) => setProductForm({ ...productForm, minStock: Number(event.target.value) })}
-              />
+              <div className="form-field">
+                <label>Nome</label>
+                <small className="field-help">Nome do item no catálogo (ex.: “Sabonete Lavanda 90g”).</small>
+                <input
+                  placeholder="ex.: Sabonete Lavanda 90g"
+                  value={productForm.name}
+                  onChange={(event) => setProductForm({ ...productForm, name: event.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-field">
+                <label>SKU</label>
+                <small className="field-help">Identificador único do produto (não repita).</small>
+                <input
+                  placeholder="ex.: SAB-LAV-90"
+                  value={productForm.sku}
+                  onChange={(event) => setProductForm({ ...productForm, sku: event.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-field">
+                <label>Código do produto</label>
+                <small className="field-help">Opcional. Código interno/etiqueta.</small>
+                <input
+                  placeholder="ex.: 00123"
+                  value={productForm.productCode}
+                  onChange={(event) => setProductForm({ ...productForm, productCode: event.target.value })}
+                />
+              </div>
+              <div className="form-field">
+                <label>Descrição</label>
+                <small className="field-help">Opcional. Detalhes para consulta rápida e notas.</small>
+                <textarea
+                  rows={3}
+                  placeholder="ex.: Base vegetal, aroma lavanda, embalagem kraft..."
+                  value={productForm.description}
+                  onChange={(event) => setProductForm({ ...productForm, description: event.target.value })}
+                />
+              </div>
+              <div className="form-field">
+                <label>Fornecedor</label>
+                <small className="field-help">Quem fornece/produz este item (obrigatório).</small>
+                <select
+                  value={productForm.supplierId}
+                  onChange={(event) => setProductForm({ ...productForm, supplierId: event.target.value })}
+                  required
+                >
+                  <option value="">Selecione o fornecedor</option>
+                  {suppliers.filter((s) => s.status === "ATIVO").map((item) => (
+                    <option key={item._id} value={item._id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-field">
+                <label>Preço de venda</label>
+                <small className="field-help">Quanto você cobra do cliente (R$).</small>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="ex.: 12,90"
+                  value={productForm.price}
+                  onChange={(event) => setProductForm({ ...productForm, price: Number(event.target.value) })}
+                  required
+                />
+              </div>
+              <div className="form-field">
+                <label>Custo</label>
+                <small className="field-help">Quanto custa para produzir/comprar (R$).</small>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="ex.: 6,20"
+                  value={productForm.cost}
+                  onChange={(event) => setProductForm({ ...productForm, cost: Number(event.target.value) })}
+                  required
+                />
+              </div>
+              <div className="form-field">
+                <label>Estoque inicial</label>
+                <small className="field-help">Quantidade disponível agora (unidades).</small>
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="ex.: 100"
+                  value={productForm.stock}
+                  onChange={(event) => setProductForm({ ...productForm, stock: Number(event.target.value) })}
+                />
+              </div>
+              <div className="form-field">
+                <label>Estoque mínimo</label>
+                <small className="field-help">Alerta de reposição quando o estoque ficar abaixo deste número.</small>
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="ex.: 10"
+                  value={productForm.minStock}
+                  onChange={(event) => setProductForm({ ...productForm, minStock: Number(event.target.value) })}
+                />
+              </div>
               <button type="submit">Cadastrar produto</button>
             </form>
             <section className="table-card">
@@ -1546,35 +1612,47 @@ function App() {
           <section className="module-grid animated">
             <form className="form-card" onSubmit={submitSale}>
               <h3>Registrar venda</h3>
-              <select
-                value={saleForm.productId}
-                onChange={(event) => setSaleForm({ ...saleForm, productId: event.target.value })}
-                required
-              >
-                <option value="">Selecione o produto</option>
-                {products.map((item) => (
-                  <option key={item._id} value={item._id}>
-                    {item.name} ({item.stock} un.)
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                min={1}
-                placeholder="Quantidade"
-                value={saleForm.quantity}
-                onChange={(event) => setSaleForm({ ...saleForm, quantity: Number(event.target.value) })}
-                required
-              />
-              <select
-                value={saleForm.paymentMethod}
-                onChange={(event) => setSaleForm({ ...saleForm, paymentMethod: event.target.value })}
-              >
-                <option value="PIX">PIX</option>
-                <option value="DINHEIRO">Dinheiro</option>
-                <option value="CARTAO">Cartão</option>
-                <option value="BOLETO">Boleto</option>
-              </select>
+              <div className="form-field">
+                <label>Produto</label>
+                <small className="field-help">Selecione o item vendido (mostra estoque atual).</small>
+                <select
+                  value={saleForm.productId}
+                  onChange={(event) => setSaleForm({ ...saleForm, productId: event.target.value })}
+                  required
+                >
+                  <option value="">Selecione o produto</option>
+                  {products.map((item) => (
+                    <option key={item._id} value={item._id}>
+                      {item.name} ({item.stock} un.)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-field">
+                <label>Quantidade</label>
+                <small className="field-help">Unidades vendidas (não pode exceder o estoque).</small>
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="ex.: 2"
+                  value={saleForm.quantity}
+                  onChange={(event) => setSaleForm({ ...saleForm, quantity: Number(event.target.value) })}
+                  required
+                />
+              </div>
+              <div className="form-field">
+                <label>Forma de pagamento</label>
+                <small className="field-help">Como o cliente pagou (PIX, dinheiro, cartão, boleto).</small>
+                <select
+                  value={saleForm.paymentMethod}
+                  onChange={(event) => setSaleForm({ ...saleForm, paymentMethod: event.target.value })}
+                >
+                  <option value="PIX">PIX</option>
+                  <option value="DINHEIRO">Dinheiro</option>
+                  <option value="CARTAO">Cartão</option>
+                  <option value="BOLETO">Boleto</option>
+                </select>
+              </div>
               <button type="submit">Lançar venda</button>
               <button type="button" className="ghost-btn" onClick={() => setPixModalOpen(true)}>
                 Abrir PIX
@@ -1639,51 +1717,68 @@ function App() {
           <section className="module-grid animated">
             <form className="form-card" onSubmit={submitPurchase}>
               <h3>Registrar compra</h3>
-              <select
-                value={purchaseForm.supplierId}
-                onChange={(event) => {
-                  setPurchaseForm({ ...purchaseForm, supplierId: event.target.value, productId: "" });
-                }}
-                required
-              >
-                <option value="">Selecione o fornecedor</option>
-                {suppliers.filter((s) => s.status === "ATIVO").map((item) => (
-                  <option key={item._id} value={item._id}>
-                    {item.name}
+              <div className="form-field">
+                <label>Fornecedor</label>
+                <small className="field-help">De quem você está comprando (filtra os produtos vinculados).</small>
+                <select
+                  value={purchaseForm.supplierId}
+                  onChange={(event) => {
+                    setPurchaseForm({ ...purchaseForm, supplierId: event.target.value, productId: "" });
+                  }}
+                  required
+                >
+                  <option value="">Selecione o fornecedor</option>
+                  {suppliers.filter((s) => s.status === "ATIVO").map((item) => (
+                    <option key={item._id} value={item._id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-field">
+                <label>Produto</label>
+                <small className="field-help">Item que está entrando no estoque.</small>
+                <select
+                  value={purchaseForm.productId}
+                  onChange={(event) => setPurchaseForm({ ...purchaseForm, productId: event.target.value })}
+                  required
+                  disabled={!purchaseForm.supplierId}
+                >
+                  <option value="">
+                    {purchaseForm.supplierId ? "Selecione o produto" : "Selecione primeiro o fornecedor"}
                   </option>
-                ))}
-              </select>
-              <select
-                value={purchaseForm.productId}
-                onChange={(event) => setPurchaseForm({ ...purchaseForm, productId: event.target.value })}
-                required
-                disabled={!purchaseForm.supplierId}
-              >
-                <option value="">
-                  {purchaseForm.supplierId ? "Selecione o produto" : "Selecione primeiro o fornecedor"}
-                </option>
-                {filteredProductsBySupplier.map((item) => (
-                  <option key={item._id} value={item._id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                min={1}
-                placeholder="Quantidade"
-                value={purchaseForm.quantity}
-                onChange={(event) => setPurchaseForm({ ...purchaseForm, quantity: Number(event.target.value) })}
-                required
-              />
-              <input
-                type="number"
-                min={0}
-                placeholder="Custo unitário"
-                value={purchaseForm.cost}
-                onChange={(event) => setPurchaseForm({ ...purchaseForm, cost: Number(event.target.value) })}
-                required
-              />
+                  {filteredProductsBySupplier.map((item) => (
+                    <option key={item._id} value={item._id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-field">
+                <label>Quantidade</label>
+                <small className="field-help">Unidades compradas (serão somadas ao estoque).</small>
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="ex.: 50"
+                  value={purchaseForm.quantity}
+                  onChange={(event) => setPurchaseForm({ ...purchaseForm, quantity: Number(event.target.value) })}
+                  required
+                />
+              </div>
+              <div className="form-field">
+                <label>Custo unitário</label>
+                <small className="field-help">Valor por unidade (R$).</small>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="ex.: 4,80"
+                  value={purchaseForm.cost}
+                  onChange={(event) => setPurchaseForm({ ...purchaseForm, cost: Number(event.target.value) })}
+                  required
+                />
+              </div>
               <button type="submit">Lançar compra</button>
             </form>
             <section className="table-card">
@@ -1747,52 +1842,80 @@ function App() {
           <section className="module-grid animated">
             <form className="form-card" onSubmit={submitSupplier}>
               <h3>Novo fornecedor</h3>
-              <input
-                placeholder="Nome *"
-                value={supplierForm.name}
-                onChange={(event) => setSupplierForm({ ...supplierForm, name: event.target.value })}
-                required
-              />
-              <input
-                placeholder="CNPJ ou CPF (opcional)"
-                value={supplierForm.document}
-                onChange={(event) => setSupplierForm({ ...supplierForm, document: event.target.value })}
-              />
-              <input
-                placeholder="Contato (telefone) *"
-                value={supplierForm.contact}
-                onChange={(event) => setSupplierForm({ ...supplierForm, contact: event.target.value })}
-                required
-              />
-              <input
-                placeholder="Chave PIX"
-                value={supplierForm.pixKey}
-                onChange={(event) => setSupplierForm({ ...supplierForm, pixKey: event.target.value })}
-              />
-              <input
-                placeholder="Cidade"
-                value={supplierForm.city}
-                onChange={(event) => setSupplierForm({ ...supplierForm, city: event.target.value })}
-              />
-              <input
-                placeholder="Ramo de atuação"
-                value={supplierForm.businessArea}
-                onChange={(event) => setSupplierForm({ ...supplierForm, businessArea: event.target.value })}
-              />
-              <select
-                value={supplierForm.paymentCondition}
-                onChange={(event) =>
-                  setSupplierForm({
-                    ...supplierForm,
-                    paymentCondition: event.target.value as "BOLETO" | "PIX" | "DINHEIRO" | "CREDITO",
-                  })
-                }
-              >
-                <option value="BOLETO">Boleto</option>
-                <option value="PIX">PIX</option>
-                <option value="DINHEIRO">Dinheiro</option>
-                <option value="CREDITO">Crédito</option>
-              </select>
+              <div className="form-field">
+                <label>Nome</label>
+                <small className="field-help">Razão social ou nome do fornecedor.</small>
+                <input
+                  placeholder="ex.: Fornecedor ABC"
+                  value={supplierForm.name}
+                  onChange={(event) => setSupplierForm({ ...supplierForm, name: event.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-field">
+                <label>CNPJ/CPF</label>
+                <small className="field-help">Opcional. Ajuda em emissão e controle fiscal.</small>
+                <input
+                  placeholder="ex.: 12.345.678/0001-99"
+                  value={supplierForm.document}
+                  onChange={(event) => setSupplierForm({ ...supplierForm, document: event.target.value })}
+                />
+              </div>
+              <div className="form-field">
+                <label>Contato (telefone)</label>
+                <small className="field-help">Telefone principal (usado para comunicação).</small>
+                <input
+                  placeholder="ex.: (11) 98888-7777"
+                  value={supplierForm.contact}
+                  onChange={(event) => setSupplierForm({ ...supplierForm, contact: event.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-field">
+                <label>Chave PIX</label>
+                <small className="field-help">Opcional. Facilita pagamento via PIX.</small>
+                <input
+                  placeholder="ex.: chave@pix.com"
+                  value={supplierForm.pixKey}
+                  onChange={(event) => setSupplierForm({ ...supplierForm, pixKey: event.target.value })}
+                />
+              </div>
+              <div className="form-field">
+                <label>Cidade</label>
+                <small className="field-help">Opcional. Para logística e relatórios.</small>
+                <input
+                  placeholder="ex.: São Paulo"
+                  value={supplierForm.city}
+                  onChange={(event) => setSupplierForm({ ...supplierForm, city: event.target.value })}
+                />
+              </div>
+              <div className="form-field">
+                <label>Ramo de atuação</label>
+                <small className="field-help">Opcional. Ex.: embalagens, fragrâncias, insumos.</small>
+                <input
+                  placeholder="ex.: Insumos"
+                  value={supplierForm.businessArea}
+                  onChange={(event) => setSupplierForm({ ...supplierForm, businessArea: event.target.value })}
+                />
+              </div>
+              <div className="form-field">
+                <label>Condição de pagamento</label>
+                <small className="field-help">Forma mais comum de pagamento para este fornecedor.</small>
+                <select
+                  value={supplierForm.paymentCondition}
+                  onChange={(event) =>
+                    setSupplierForm({
+                      ...supplierForm,
+                      paymentCondition: event.target.value as "BOLETO" | "PIX" | "DINHEIRO" | "CREDITO",
+                    })
+                  }
+                >
+                  <option value="BOLETO">Boleto</option>
+                  <option value="PIX">PIX</option>
+                  <option value="DINHEIRO">Dinheiro</option>
+                  <option value="CREDITO">Crédito</option>
+                </select>
+              </div>
               <button type="submit">Cadastrar fornecedor</button>
             </form>
             <section className="table-card">
@@ -1893,32 +2016,49 @@ function App() {
             <section className="module-grid animated">
               <form className="form-card" onSubmit={submitExpense}>
                 <h3>Nova despesa</h3>
-                <input
-                  placeholder="Descrição"
-                  value={expenseForm.description}
-                  onChange={(event) => setExpenseForm({ ...expenseForm, description: event.target.value })}
-                  required
-                />
-                <input
-                  placeholder="Categoria"
-                  value={expenseForm.category}
-                  onChange={(event) => setExpenseForm({ ...expenseForm, category: event.target.value })}
-                  required
-                />
-                <input
-                  type="number"
-                  min={0}
-                  placeholder="Valor"
-                  value={expenseForm.amount}
-                  onChange={(event) => setExpenseForm({ ...expenseForm, amount: Number(event.target.value) })}
-                  required
-                />
-                <input
-                  type="date"
-                  value={expenseForm.dueDate}
-                  onChange={(event) => setExpenseForm({ ...expenseForm, dueDate: event.target.value })}
-                  required
-                />
+                <div className="form-field">
+                  <label>Descrição</label>
+                  <small className="field-help">O que é esta despesa (ex.: “Aluguel”, “Embalagens”).</small>
+                  <input
+                    placeholder="ex.: Aluguel"
+                    value={expenseForm.description}
+                    onChange={(event) => setExpenseForm({ ...expenseForm, description: event.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Categoria</label>
+                  <small className="field-help">Tipo da despesa para relatórios (ex.: operacional, marketing).</small>
+                  <input
+                    placeholder="ex.: OPERACIONAL"
+                    value={expenseForm.category}
+                    onChange={(event) => setExpenseForm({ ...expenseForm, category: event.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Valor</label>
+                  <small className="field-help">Quanto será pago (R$).</small>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder="ex.: 350,00"
+                    value={expenseForm.amount}
+                    onChange={(event) => setExpenseForm({ ...expenseForm, amount: Number(event.target.value) })}
+                    required
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Vencimento</label>
+                  <small className="field-help">Data limite para pagamento.</small>
+                  <input
+                    type="date"
+                    value={expenseForm.dueDate}
+                    onChange={(event) => setExpenseForm({ ...expenseForm, dueDate: event.target.value })}
+                    required
+                  />
+                </div>
                 <button type="submit">Lançar despesa</button>
               </form>
               <section className="table-card">
@@ -1994,18 +2134,26 @@ function App() {
           <section className="module-grid animated">
             <form className="form-card" onSubmit={submitChecklistItem}>
               <h3>Nova ideia de implementação</h3>
-              <input
-                placeholder="Título da ideia"
-                value={checklistForm.title}
-                onChange={(event) => setChecklistForm({ ...checklistForm, title: event.target.value })}
-                required
-              />
-              <textarea
-                rows={4}
-                placeholder="Detalhes da ideia (opcional)"
-                value={checklistForm.notes}
-                onChange={(event) => setChecklistForm({ ...checklistForm, notes: event.target.value })}
-              />
+              <div className="form-field">
+                <label>Título</label>
+                <small className="field-help">Nome curto da melhoria/funcionalidade desejada.</small>
+                <input
+                  placeholder="ex.: Emitir NF-e automática"
+                  value={checklistForm.title}
+                  onChange={(event) => setChecklistForm({ ...checklistForm, title: event.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-field">
+                <label>Detalhes</label>
+                <small className="field-help">Opcional. Contexto, regras e observações.</small>
+                <textarea
+                  rows={4}
+                  placeholder="Descreva o que precisa, quando usar, regras de negócio..."
+                  value={checklistForm.notes}
+                  onChange={(event) => setChecklistForm({ ...checklistForm, notes: event.target.value })}
+                />
+              </div>
               <button type="submit">Adicionar à checklist</button>
             </form>
             <section className="table-card">
@@ -2072,29 +2220,45 @@ function App() {
           <section className="module-grid animated user-grid">
             <form className="form-card" onSubmit={submitUserProfile}>
               <h3>Gestão do usuário</h3>
-              <input
-                placeholder="Nome do usuário"
-                value={userForm.userName}
-                onChange={(event) => setUserForm({ ...userForm, userName: event.target.value })}
-                required
-              />
-              <input
-                type="email"
-                placeholder="E-mail"
-                value={userForm.userEmail}
-                onChange={(event) => setUserForm({ ...userForm, userEmail: event.target.value })}
-                required
-              />
-              <input
-                placeholder="Cargo"
-                value={userForm.userRole}
-                onChange={(event) => setUserForm({ ...userForm, userRole: event.target.value })}
-              />
-              <input
-                placeholder="Nome da empresa"
-                value={userForm.companyName}
-                onChange={(event) => setUserForm({ ...userForm, companyName: event.target.value })}
-              />
+              <div className="form-field">
+                <label>Nome do usuário</label>
+                <small className="field-help">Como você quer aparecer no sistema e nas aprovações.</small>
+                <input
+                  placeholder="ex.: Administrador"
+                  value={userForm.userName}
+                  onChange={(event) => setUserForm({ ...userForm, userName: event.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-field">
+                <label>E-mail</label>
+                <small className="field-help">E-mail do responsável (usado em comunicação/relatórios).</small>
+                <input
+                  type="email"
+                  placeholder="ex.: admin@empresa.com"
+                  value={userForm.userEmail}
+                  onChange={(event) => setUserForm({ ...userForm, userEmail: event.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-field">
+                <label>Cargo</label>
+                <small className="field-help">Seu papel (ex.: Gestor, Financeiro).</small>
+                <input
+                  placeholder="ex.: Gestor"
+                  value={userForm.userRole}
+                  onChange={(event) => setUserForm({ ...userForm, userRole: event.target.value })}
+                />
+              </div>
+              <div className="form-field">
+                <label>Nome da empresa</label>
+                <small className="field-help">Nome exibido no cabeçalho e no módulo do usuário.</small>
+                <input
+                  placeholder="ex.: E-Sentinel Sabonetes"
+                  value={userForm.companyName}
+                  onChange={(event) => setUserForm({ ...userForm, companyName: event.target.value })}
+                />
+              </div>
               <button type="submit">Salvar perfil</button>
             </form>
 
@@ -2133,19 +2297,27 @@ function App() {
                 </span>
               </div>
               <form className="whatsapp-form" onSubmit={sendManualWhatsAppMessage}>
-                <input
-                  placeholder="Telefone destino (DDD + número)"
-                  value={whatsAppForm.phone}
-                  onChange={(event) => setWhatsAppForm({ ...whatsAppForm, phone: event.target.value })}
-                  required
-                />
-                <textarea
-                  rows={4}
-                  placeholder="Mensagem para enviar via WhatsApp Business"
-                  value={whatsAppForm.message}
-                  onChange={(event) => setWhatsAppForm({ ...whatsAppForm, message: event.target.value })}
-                  required
-                />
+                <div className="form-field">
+                  <label>Telefone de destino</label>
+                  <small className="field-help">DDD + número. Ex.: 11999999999.</small>
+                  <input
+                    placeholder="ex.: 11999999999"
+                    value={whatsAppForm.phone}
+                    onChange={(event) => setWhatsAppForm({ ...whatsAppForm, phone: event.target.value })}
+                    required
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Mensagem</label>
+                  <small className="field-help">Texto que será enviado pelo WhatsApp Business.</small>
+                  <textarea
+                    rows={4}
+                    placeholder="Digite sua mensagem..."
+                    value={whatsAppForm.message}
+                    onChange={(event) => setWhatsAppForm({ ...whatsAppForm, message: event.target.value })}
+                    required
+                  />
+                </div>
                 <div className="table-actions">
                   <button type="submit" className="ghost-btn">
                     Enviar mensagem
