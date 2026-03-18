@@ -339,6 +339,13 @@
   color: var(--muted);
 }
 
+.form-field input,
+.form-field select,
+.form-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .form-card h3,
 .table-card h3,
 .promo-card h3 {
