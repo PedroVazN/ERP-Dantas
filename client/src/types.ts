@@ -27,6 +27,19 @@ export type Customer = {
   status: "ATIVO" | "INATIVO";
 };
 
+export type Supplier = {
+  _id: string;
+  name: string;
+  document?: string; // CNPJ ou CPF (opcional)
+  contact: string; // Telefone
+  pixKey?: string; // Chave PIX
+  city?: string; // Cidade
+  businessArea?: string; // Ramo de atuação
+  paymentCondition: "BOLETO" | "PIX" | "DINHEIRO" | "CREDITO"; // Condição de pagamento
+  status: "ATIVO" | "INATIVO";
+  createdAt: string;
+};
+
 export type Product = {
   _id: string;
   name: string;

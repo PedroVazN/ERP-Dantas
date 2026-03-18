@@ -178,6 +178,29 @@ const businessSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+const supplierSchema = new mongoose.Schema(
+  {
+    businessId: { type: String, default: "geral", index: true },
+    name: { type: String, required: true, trim: true },
+    document: { type: String, trim: true }, // CNPJ ou CPF (opcional)
+    contact: { type: String, required: true, trim: true }, // Telefone
+    pixKey: { type: String, trim: true }, // Chave PIX
+    city: { type: String, trim: true }, // Cidade
+    businessArea: { type: String, trim: true }, // Ramo de atuação
+    paymentCondition: {
+      type: String,
+      enum: ["BOLETO", "PIX", "DINHEIRO", "CREDITO"],
+      default: "PIX",
+    }, // Condição de pagamento
+    status: {
+      type: String,
+      enum: ["ATIVO", "INATIVO"],
+      default: "ATIVO",
+    },
+  },
+  { timestamps: true }
+);
+
 settingSchema.index({ userId: 1 }, { unique: true });
 
 export const CustomerModel = mongoose.model("Customer", customerSchema);
@@ -188,6 +211,7 @@ export const ExpenseModel = mongoose.model("Expense", expenseSchema);
 export const ChecklistItemModel = mongoose.model("ChecklistItem", checklistItemSchema);
 export const SettingModel = mongoose.model("Setting", settingSchema);
 export const BusinessModel = mongoose.model("Business", businessSchema);
+export const SupplierModel = mongoose.model("Supplier", supplierSchema);
 
 export type SaleItemInput = {
   product: Types.ObjectId;
@@ -197,3 +221,4 @@ export type SaleItemInput = {
 
 export type Customer = InferSchemaType<typeof customerSchema>;
 export type Product = InferSchemaType<typeof productSchema>;
+export type Supplier = InferSchemaType<typeof supplierSchema>;

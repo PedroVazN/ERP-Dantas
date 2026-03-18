@@ -13,6 +13,7 @@ import {
   SaleItemInput,
   SaleModel,
   SettingModel,
+  SupplierModel,
 } from "./models";
 
 dotenv.config();
@@ -502,6 +503,20 @@ app.patch("/api/products/:id/stock", async (req, res) => {
     return res.status(404).json({ message: "Produto não encontrado." });
   }
   res.json(product);
+});
+
+app.get("/api/suppliers", async (req, res) => {
+  const suppliers = await SupplierModel.find(getBusinessFilter(req)).sort({ createdAt: -1 });
+  res.json(suppliers);
+});
+
+app.post("/api/suppliers", async (req, res) => {
+  if (blockWriteInGeneralScope(req, res)) {
+    return;
+  }
+  const { businessId } = getScopeContext(req);
+  const supplier = await SupplierModel.create({ ...req.body, businessId });
+  res.status(201).json(supplier);
 });
 
 app.get("/api/sales", async (req, res) => {

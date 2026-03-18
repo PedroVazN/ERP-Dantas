@@ -15,6 +15,7 @@ import type {
   Purchase,
   Sale,
   Settings,
+  Supplier,
   Theme,
   WhatsAppStatus,
 } from "./types";
@@ -29,6 +30,7 @@ type ModuleKey =
   | "produtos"
   | "vendas"
   | "compras"
+  | "fornecedores"
   | "financeiro"
   | "checklist"
   | "usuario";
@@ -39,6 +41,7 @@ const moduleMeta: Record<ModuleKey, { label: string; short: string; helper: stri
   produtos: { label: "Produtos", short: "PR", helper: "Catálogo e estoque" },
   vendas: { label: "Vendas", short: "VD", helper: "PDV e faturamento" },
   compras: { label: "Compras", short: "CP", helper: "Fornecedores e entradas" },
+  fornecedores: { label: "Fornecedores", short: "FR", helper: "Cadastro de fornecedores" },
   financeiro: { label: "Financeiro", short: "FN", helper: "Contas e despesas" },
   checklist: { label: "Checklist", short: "CK", helper: "Ideias e futuros implementos" },
   usuario: { label: "Usuário", short: "US", helper: "Perfil e preferências" },
@@ -91,6 +94,7 @@ function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
   const [economicIndicators, setEconomicIndicators] = useState<EconomicIndicators | null>(null);
@@ -119,10 +123,19 @@ function App() {
   const [whatsAppStatus, setWhatsAppStatus] = useState<WhatsAppStatus | null>(null);
   const [whatsAppForm, setWhatsAppForm] = useState({ phone: "", message: "" });
   const [purchaseForm, setPurchaseForm] = useState({
-    supplier: "",
+    supplierId: "",
     productId: "",
     quantity: 1,
     cost: 0,
+  });
+  const [supplierForm, setSupplierForm] = useState({
+    name: "",
+    document: "",
+    contact: "",
+    pixKey: "",
+    city: "",
+    businessArea: "",
+    paymentCondition: "PIX" as "BOLETO" | "PIX" | "DINHEIRO" | "CREDITO",
   });
   const [expenseForm, setExpenseForm] = useState({
     description: "",
@@ -227,6 +240,7 @@ function App() {
         productsData,
         salesData,
         purchasesData,
+        suppliersData,
         expensesData,
         checklistData,
         economicData,
@@ -237,6 +251,7 @@ function App() {
           api.get<Product[]>(scopedPath("/products")),
           api.get<Sale[]>(scopedPath("/sales")),
           api.get<Purchase[]>(scopedPath("/purchases")),
+          api.get<Supplier[]>(scopedPath("/suppliers")),
           api.get<Expense[]>(scopedPath("/expenses")),
           api.get<ChecklistItem[]>(scopedPath("/checklist-items")),
           api.get<EconomicIndicators>("/economic/indicators"),
@@ -248,6 +263,7 @@ function App() {
       setProducts(productsData);
       setSales(salesData);
       setPurchases(purchasesData);
+      setSuppliers(suppliersData);
       setExpenses(expensesData);
       setChecklistItems(checklistData);
       setEconomicIndicators(economicData);
@@ -463,6 +479,28 @@ function App() {
     }
   }
 
+  async function submitSupplier(event: FormEvent) {
+    event.preventDefault();
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Para lancar, selecione um ERP especifico.");
+      return;
+    }
+    await api.post<Supplier>(scopedPath("/suppliers"), {
+      ...supplierForm,
+      status: "ATIVO",
+    });
+    setSupplierForm({
+      name: "",
+      document: "",
+      contact: "",
+      pixKey: "",
+      city: "",
+      businessArea: "",
+      paymentCondition: "PIX",
+    });
+    await loadAllData();
+  }
+
   async function submitPurchase(event: FormEvent) {
     event.preventDefault();
     if (isGeneralWorkspace) {
@@ -471,9 +509,14 @@ function App() {
     }
     const product = products.find((item) => item._id === purchaseForm.productId);
     if (!product) return;
+    const supplier = suppliers.find((item) => item._id === purchaseForm.supplierId);
+    if (!supplier) {
+      setError("Selecione um fornecedor cadastrado.");
+      return;
+    }
 
     await api.post<Purchase>(scopedPath("/purchases"), {
-      supplier: purchaseForm.supplier,
+      supplier: supplier.name,
       items: [
         {
           product: product._id,
@@ -483,7 +526,7 @@ function App() {
         },
       ],
     });
-    setPurchaseForm({ supplier: "", productId: "", quantity: 1, cost: 0 });
+    setPurchaseForm({ supplierId: "", productId: "", quantity: 1, cost: 0 });
     await loadAllData();
   }
 
@@ -1226,12 +1269,18 @@ function App() {
           <section className="module-grid animated">
             <form className="form-card" onSubmit={submitPurchase}>
               <h3>Registrar compra</h3>
-              <input
-                placeholder="Fornecedor"
-                value={purchaseForm.supplier}
-                onChange={(event) => setPurchaseForm({ ...purchaseForm, supplier: event.target.value })}
+              <select
+                value={purchaseForm.supplierId}
+                onChange={(event) => setPurchaseForm({ ...purchaseForm, supplierId: event.target.value })}
                 required
-              />
+              >
+                <option value="">Selecione o fornecedor</option>
+                {suppliers.filter((s) => s.status === "ATIVO").map((item) => (
+                  <option key={item._id} value={item._id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
               <select
                 value={purchaseForm.productId}
                 onChange={(event) => setPurchaseForm({ ...purchaseForm, productId: event.target.value })}
@@ -1307,6 +1356,98 @@ function App() {
                       </td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </section>
+          </section>
+        )}
+
+        {!loading && activeModule === "fornecedores" && (
+          <section className="module-grid animated">
+            <form className="form-card" onSubmit={submitSupplier}>
+              <h3>Novo fornecedor</h3>
+              <input
+                placeholder="Nome *"
+                value={supplierForm.name}
+                onChange={(event) => setSupplierForm({ ...supplierForm, name: event.target.value })}
+                required
+              />
+              <input
+                placeholder="CNPJ ou CPF (opcional)"
+                value={supplierForm.document}
+                onChange={(event) => setSupplierForm({ ...supplierForm, document: event.target.value })}
+              />
+              <input
+                placeholder="Contato (telefone) *"
+                value={supplierForm.contact}
+                onChange={(event) => setSupplierForm({ ...supplierForm, contact: event.target.value })}
+                required
+              />
+              <input
+                placeholder="Chave PIX"
+                value={supplierForm.pixKey}
+                onChange={(event) => setSupplierForm({ ...supplierForm, pixKey: event.target.value })}
+              />
+              <input
+                placeholder="Cidade"
+                value={supplierForm.city}
+                onChange={(event) => setSupplierForm({ ...supplierForm, city: event.target.value })}
+              />
+              <input
+                placeholder="Ramo de atuação"
+                value={supplierForm.businessArea}
+                onChange={(event) => setSupplierForm({ ...supplierForm, businessArea: event.target.value })}
+              />
+              <select
+                value={supplierForm.paymentCondition}
+                onChange={(event) =>
+                  setSupplierForm({
+                    ...supplierForm,
+                    paymentCondition: event.target.value as "BOLETO" | "PIX" | "DINHEIRO" | "CREDITO",
+                  })
+                }
+              >
+                <option value="BOLETO">Boleto</option>
+                <option value="PIX">PIX</option>
+                <option value="DINHEIRO">Dinheiro</option>
+                <option value="CREDITO">Crédito</option>
+              </select>
+              <button type="submit">Cadastrar fornecedor</button>
+            </form>
+            <section className="table-card">
+              <h3>Lista de fornecedores</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>CNPJ/CPF</th>
+                    <th>Contato</th>
+                    <th>Cidade</th>
+                    <th>Ramo</th>
+                    <th>Pagamento</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {suppliers.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="empty">
+                        Nenhum fornecedor cadastrado ainda.
+                      </td>
+                    </tr>
+                  ) : (
+                    suppliers.map((item) => (
+                      <tr key={item._id}>
+                        <td>{item.name}</td>
+                        <td>{item.document || "-"}</td>
+                        <td>{item.contact}</td>
+                        <td>{item.city || "-"}</td>
+                        <td>{item.businessArea || "-"}</td>
+                        <td>{item.paymentCondition}</td>
+                        <td>{item.status}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </section>
