@@ -457,7 +457,12 @@ app.use("/api", async (req, res, next) => {
 });
 
 app.get("/api/customers", async (req, res) => {
-  const customers = await CustomerModel.find(getBusinessFilter(req)).sort({ createdAt: -1 });
+  const includeInactive = String(req.query.includeInactive || "").toLowerCase() === "true";
+  const filter = {
+    ...getBusinessFilter(req),
+    ...(includeInactive ? {} : { status: "ATIVO" }),
+  };
+  const customers = await CustomerModel.find(filter).sort({ createdAt: -1 });
   res.json(customers);
 });
 
@@ -519,7 +524,12 @@ app.delete("/api/customers/:id", async (req, res) => {
 });
 
 app.get("/api/products", async (req, res) => {
-  const products = await ProductModel.find(getBusinessFilter(req)).populate("supplier", "name").sort({ createdAt: -1 });
+  const includeInactive = String(req.query.includeInactive || "").toLowerCase() === "true";
+  const filter = {
+    ...getBusinessFilter(req),
+    ...(includeInactive ? {} : { active: true }),
+  };
+  const products = await ProductModel.find(filter).populate("supplier", "name").sort({ createdAt: -1 });
   res.json(products);
 });
 
@@ -615,7 +625,12 @@ app.patch("/api/products/:id/stock", async (req, res) => {
 });
 
 app.get("/api/suppliers", async (req, res) => {
-  const suppliers = await SupplierModel.find(getBusinessFilter(req)).sort({ createdAt: -1 });
+  const includeInactive = String(req.query.includeInactive || "").toLowerCase() === "true";
+  const filter = {
+    ...getBusinessFilter(req),
+    ...(includeInactive ? {} : { status: "ATIVO" }),
+  };
+  const suppliers = await SupplierModel.find(filter).sort({ createdAt: -1 });
   res.json(suppliers);
 });
 
@@ -692,7 +707,12 @@ app.delete("/api/suppliers/:id", async (req, res) => {
 });
 
 app.get("/api/sales", async (req, res) => {
-  const sales = await SaleModel.find(getBusinessFilter(req))
+  const includeCancelled = String(req.query.includeCancelled || "").toLowerCase() === "true";
+  const filter = {
+    ...getBusinessFilter(req),
+    ...(includeCancelled ? {} : { status: { $ne: "CANCELADO" } }),
+  };
+  const sales = await SaleModel.find(filter)
     .populate("customer", "name")
     .sort({ createdAt: -1 });
   res.json(sales);
@@ -908,7 +928,12 @@ app.post("/api/integrations/whatsapp/sales/:id", async (req, res) => {
 });
 
 app.get("/api/purchases", async (req, res) => {
-  const purchases = await PurchaseModel.find(getBusinessFilter(req)).sort({ createdAt: -1 });
+  const includeCancelled = String(req.query.includeCancelled || "").toLowerCase() === "true";
+  const filter = {
+    ...getBusinessFilter(req),
+    ...(includeCancelled ? {} : { status: { $ne: "CANCELADA" } }),
+  };
+  const purchases = await PurchaseModel.find(filter).sort({ createdAt: -1 });
   res.json(purchases);
 });
 
@@ -1069,7 +1094,12 @@ app.delete("/api/purchases/:id", async (req, res) => {
 });
 
 app.get("/api/expenses", async (req, res) => {
-  const expenses = await ExpenseModel.find(getBusinessFilter(req)).sort({ dueDate: -1 });
+  const includeRejected = String(req.query.includeRejected || "").toLowerCase() === "true";
+  const filter = {
+    ...getBusinessFilter(req),
+    ...(includeRejected ? {} : { status: { $ne: "REJEITADO" } }),
+  };
+  const expenses = await ExpenseModel.find(filter).sort({ dueDate: -1 });
   res.json(expenses);
 });
 
