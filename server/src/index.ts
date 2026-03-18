@@ -470,6 +470,54 @@ app.post("/api/customers", async (req, res) => {
   res.status(201).json(customer);
 });
 
+app.patch("/api/customers/:id", async (req, res) => {
+  if (blockWriteInGeneralScope(req, res)) {
+    return;
+  }
+  const { businessId } = getScopeContext(req);
+  const { id } = req.params;
+  if (!isValidObjectId(id)) {
+    return res.status(400).json({ message: "ID inválido." });
+  }
+  const payload = req.body as Partial<{
+    name: string;
+    email: string;
+    phone: string;
+    status: "ATIVO" | "INATIVO";
+  }>;
+  const update: Record<string, unknown> = {};
+  if (typeof payload.name === "string") update.name = payload.name.trim();
+  if (typeof payload.email === "string") update.email = payload.email.trim();
+  if (typeof payload.phone === "string") update.phone = payload.phone.trim();
+  if (payload.status === "ATIVO" || payload.status === "INATIVO") update.status = payload.status;
+
+  const customer = await CustomerModel.findOneAndUpdate({ _id: id, businessId }, update, { new: true });
+  if (!customer) {
+    return res.status(404).json({ message: "Cliente não encontrado." });
+  }
+  res.json(customer);
+});
+
+app.delete("/api/customers/:id", async (req, res) => {
+  if (blockWriteInGeneralScope(req, res)) {
+    return;
+  }
+  const { businessId } = getScopeContext(req);
+  const { id } = req.params;
+  if (!isValidObjectId(id)) {
+    return res.status(400).json({ message: "ID inválido." });
+  }
+  const customer = await CustomerModel.findOneAndUpdate(
+    { _id: id, businessId },
+    { status: "INATIVO" },
+    { new: true }
+  );
+  if (!customer) {
+    return res.status(404).json({ message: "Cliente não encontrado." });
+  }
+  res.json({ deleted: true });
+});
+
 app.get("/api/products", async (req, res) => {
   const products = await ProductModel.find(getBusinessFilter(req)).populate("supplier", "name").sort({ createdAt: -1 });
   res.json(products);
@@ -482,6 +530,67 @@ app.post("/api/products", async (req, res) => {
   const { businessId } = getScopeContext(req);
   const product = await ProductModel.create({ ...req.body, businessId });
   res.status(201).json(product);
+});
+
+app.patch("/api/products/:id", async (req, res) => {
+  if (blockWriteInGeneralScope(req, res)) {
+    return;
+  }
+  const { businessId } = getScopeContext(req);
+  const { id } = req.params;
+  if (!isValidObjectId(id)) {
+    return res.status(400).json({ message: "ID inválido." });
+  }
+  const payload = req.body as Partial<{
+    name: string;
+    sku: string;
+    productCode: string;
+    description: string;
+    price: number;
+    cost: number;
+    stock: number;
+    minStock: number;
+    supplier: string;
+    active: boolean;
+  }>;
+  const update: Record<string, unknown> = {};
+  if (typeof payload.name === "string") update.name = payload.name.trim();
+  if (typeof payload.sku === "string") update.sku = payload.sku.trim();
+  if (typeof payload.productCode === "string") update.productCode = payload.productCode.trim();
+  if (typeof payload.description === "string") update.description = payload.description.trim();
+  if (typeof payload.price === "number" && payload.price >= 0) update.price = payload.price;
+  if (typeof payload.cost === "number" && payload.cost >= 0) update.cost = payload.cost;
+  if (typeof payload.stock === "number" && payload.stock >= 0) update.stock = payload.stock;
+  if (typeof payload.minStock === "number" && payload.minStock >= 0) update.minStock = payload.minStock;
+  if (typeof payload.supplier === "string" && isValidObjectId(payload.supplier)) {
+    update.supplier = new Types.ObjectId(payload.supplier);
+  }
+  if (typeof payload.active === "boolean") update.active = payload.active;
+
+  const product = await ProductModel.findOneAndUpdate({ _id: id, businessId }, update, { new: true }).populate(
+    "supplier",
+    "name"
+  );
+  if (!product) {
+    return res.status(404).json({ message: "Produto não encontrado." });
+  }
+  res.json(product);
+});
+
+app.delete("/api/products/:id", async (req, res) => {
+  if (blockWriteInGeneralScope(req, res)) {
+    return;
+  }
+  const { businessId } = getScopeContext(req);
+  const { id } = req.params;
+  if (!isValidObjectId(id)) {
+    return res.status(400).json({ message: "ID inválido." });
+  }
+  const product = await ProductModel.findOneAndUpdate({ _id: id, businessId }, { active: false }, { new: true });
+  if (!product) {
+    return res.status(404).json({ message: "Produto não encontrado." });
+  }
+  res.json({ deleted: true });
 });
 
 app.patch("/api/products/:id/stock", async (req, res) => {
@@ -517,6 +626,69 @@ app.post("/api/suppliers", async (req, res) => {
   const { businessId } = getScopeContext(req);
   const supplier = await SupplierModel.create({ ...req.body, businessId });
   res.status(201).json(supplier);
+});
+
+app.patch("/api/suppliers/:id", async (req, res) => {
+  if (blockWriteInGeneralScope(req, res)) {
+    return;
+  }
+  const { businessId } = getScopeContext(req);
+  const { id } = req.params;
+  if (!isValidObjectId(id)) {
+    return res.status(400).json({ message: "ID inválido." });
+  }
+  const payload = req.body as Partial<{
+    name: string;
+    document: string;
+    contact: string;
+    pixKey: string;
+    city: string;
+    businessArea: string;
+    paymentCondition: "BOLETO" | "PIX" | "DINHEIRO" | "CREDITO";
+    status: "ATIVO" | "INATIVO";
+  }>;
+  const update: Record<string, unknown> = {};
+  if (typeof payload.name === "string") update.name = payload.name.trim();
+  if (typeof payload.document === "string") update.document = payload.document.trim();
+  if (typeof payload.contact === "string") update.contact = payload.contact.trim();
+  if (typeof payload.pixKey === "string") update.pixKey = payload.pixKey.trim();
+  if (typeof payload.city === "string") update.city = payload.city.trim();
+  if (typeof payload.businessArea === "string") update.businessArea = payload.businessArea.trim();
+  if (
+    payload.paymentCondition === "BOLETO" ||
+    payload.paymentCondition === "PIX" ||
+    payload.paymentCondition === "DINHEIRO" ||
+    payload.paymentCondition === "CREDITO"
+  ) {
+    update.paymentCondition = payload.paymentCondition;
+  }
+  if (payload.status === "ATIVO" || payload.status === "INATIVO") update.status = payload.status;
+
+  const supplier = await SupplierModel.findOneAndUpdate({ _id: id, businessId }, update, { new: true });
+  if (!supplier) {
+    return res.status(404).json({ message: "Fornecedor não encontrado." });
+  }
+  res.json(supplier);
+});
+
+app.delete("/api/suppliers/:id", async (req, res) => {
+  if (blockWriteInGeneralScope(req, res)) {
+    return;
+  }
+  const { businessId } = getScopeContext(req);
+  const { id } = req.params;
+  if (!isValidObjectId(id)) {
+    return res.status(400).json({ message: "ID inválido." });
+  }
+  const supplier = await SupplierModel.findOneAndUpdate(
+    { _id: id, businessId },
+    { status: "INATIVO" },
+    { new: true }
+  );
+  if (!supplier) {
+    return res.status(404).json({ message: "Fornecedor não encontrado." });
+  }
+  res.json({ deleted: true });
 });
 
 app.get("/api/sales", async (req, res) => {
@@ -584,6 +756,95 @@ app.post("/api/sales", async (req, res) => {
   }
 
   res.status(201).json(sale);
+});
+
+app.patch("/api/sales/:id", async (req, res) => {
+  if (blockWriteInGeneralScope(req, res)) {
+    return;
+  }
+  const { businessId } = getScopeContext(req);
+  const { id } = req.params;
+  if (!isValidObjectId(id)) {
+    return res.status(400).json({ message: "ID inválido." });
+  }
+  const payload = req.body as Partial<{
+    status: "PAGO" | "PENDENTE" | "CANCELADO";
+    paymentMethod: "DINHEIRO" | "PIX" | "CARTAO" | "BOLETO" | "TRANSFERENCIA";
+  }>;
+  const sale = await SaleModel.findOne({ _id: id, businessId });
+  if (!sale) {
+    return res.status(404).json({ message: "Venda não encontrada." });
+  }
+  if (sale.status === "CANCELADO") {
+    return res.status(400).json({ message: "Venda cancelada não pode ser alterada." });
+  }
+
+  const nextStatus = payload.status;
+  const nextPayment =
+    payload.paymentMethod === "DINHEIRO" ||
+    payload.paymentMethod === "PIX" ||
+    payload.paymentMethod === "CARTAO" ||
+    payload.paymentMethod === "BOLETO" ||
+    payload.paymentMethod === "TRANSFERENCIA"
+      ? payload.paymentMethod
+      : undefined;
+
+  if (nextStatus === "CANCELADO") {
+    for (const item of sale.items || []) {
+      if (!item.product) continue;
+      await ProductModel.updateOne(
+        { _id: item.product, businessId },
+        { $inc: { stock: item.quantity } }
+      );
+    }
+    sale.status = "CANCELADO";
+    sale.billingStatus = "CANCELADO";
+    if (sale.invoice) {
+      sale.invoice.status = "CANCELADA";
+    }
+  } else if (nextStatus === "PAGO" || nextStatus === "PENDENTE") {
+    sale.status = nextStatus;
+    sale.billingStatus = nextStatus === "PENDENTE" ? "PENDENTE" : "FATURADO";
+  }
+
+  if (nextPayment) {
+    sale.paymentMethod = nextPayment;
+  }
+
+  await sale.save();
+  const populated = await SaleModel.findById(sale._id).populate("customer", "name");
+  res.json(populated);
+});
+
+app.delete("/api/sales/:id", async (req, res) => {
+  if (blockWriteInGeneralScope(req, res)) {
+    return;
+  }
+  const { businessId } = getScopeContext(req);
+  const { id } = req.params;
+  if (!isValidObjectId(id)) {
+    return res.status(400).json({ message: "ID inválido." });
+  }
+  const sale = await SaleModel.findOne({ _id: id, businessId });
+  if (!sale) {
+    return res.status(404).json({ message: "Venda não encontrada." });
+  }
+  if (sale.status !== "CANCELADO") {
+    for (const item of sale.items || []) {
+      if (!item.product) continue;
+      await ProductModel.updateOne(
+        { _id: item.product, businessId },
+        { $inc: { stock: item.quantity } }
+      );
+    }
+    sale.status = "CANCELADO";
+    sale.billingStatus = "CANCELADO";
+    if (sale.invoice) {
+      sale.invoice.status = "CANCELADA";
+    }
+    await sale.save();
+  }
+  res.json({ deleted: true });
 });
 
 app.get("/api/integrations/whatsapp/status", async (_req, res) => {
@@ -718,6 +979,95 @@ app.post("/api/purchases", async (req, res) => {
   res.status(201).json(purchase);
 });
 
+app.patch("/api/purchases/:id", async (req, res) => {
+  if (blockWriteInGeneralScope(req, res)) {
+    return;
+  }
+  const { businessId } = getScopeContext(req);
+  const { id } = req.params;
+  if (!isValidObjectId(id)) {
+    return res.status(400).json({ message: "ID inválido." });
+  }
+  const payload = req.body as Partial<{
+    status:
+      | "ABERTA"
+      | "AGUARDANDO_APROVACAO"
+      | "APROVADA"
+      | "RECEBIDA"
+      | "REJEITADA"
+      | "CANCELADA";
+  }>;
+  const purchase = await PurchaseModel.findOne({ _id: id, businessId });
+  if (!purchase) {
+    return res.status(404).json({ message: "Compra não encontrada." });
+  }
+  if (purchase.status === "CANCELADA") {
+    return res.status(400).json({ message: "Compra cancelada não pode ser alterada." });
+  }
+
+  const nextStatus = payload.status;
+  if (nextStatus === "CANCELADA") {
+    if (purchase.stockApplied) {
+      for (const item of purchase.items || []) {
+        if (!item.product) continue;
+        await ProductModel.updateOne(
+          { _id: item.product, businessId },
+          { $inc: { stock: -item.quantity } }
+        );
+      }
+      purchase.stockApplied = false;
+    }
+    purchase.status = "CANCELADA";
+    if (purchase.approval) {
+      purchase.approval.status = "REJEITADA";
+    }
+  } else if (
+    nextStatus === "ABERTA" ||
+    nextStatus === "AGUARDANDO_APROVACAO" ||
+    nextStatus === "APROVADA" ||
+    nextStatus === "RECEBIDA" ||
+    nextStatus === "REJEITADA"
+  ) {
+    purchase.status = nextStatus;
+  }
+
+  await purchase.save();
+  res.json(purchase);
+});
+
+app.delete("/api/purchases/:id", async (req, res) => {
+  if (blockWriteInGeneralScope(req, res)) {
+    return;
+  }
+  const { businessId } = getScopeContext(req);
+  const { id } = req.params;
+  if (!isValidObjectId(id)) {
+    return res.status(400).json({ message: "ID inválido." });
+  }
+  const purchase = await PurchaseModel.findOne({ _id: id, businessId });
+  if (!purchase) {
+    return res.status(404).json({ message: "Compra não encontrada." });
+  }
+  if (purchase.status !== "CANCELADA") {
+    if (purchase.stockApplied) {
+      for (const item of purchase.items || []) {
+        if (!item.product) continue;
+        await ProductModel.updateOne(
+          { _id: item.product, businessId },
+          { $inc: { stock: -item.quantity } }
+        );
+      }
+      purchase.stockApplied = false;
+    }
+    purchase.status = "CANCELADA";
+    if (purchase.approval) {
+      purchase.approval.status = "REJEITADA";
+    }
+    await purchase.save();
+  }
+  res.json({ deleted: true });
+});
+
 app.get("/api/expenses", async (req, res) => {
   const expenses = await ExpenseModel.find(getBusinessFilter(req)).sort({ dueDate: -1 });
   res.json(expenses);
@@ -754,6 +1104,58 @@ app.post("/api/expenses", async (req, res) => {
     );
   }
   res.status(201).json(expense);
+});
+
+app.patch("/api/expenses/:id", async (req, res) => {
+  if (blockWriteInGeneralScope(req, res)) {
+    return;
+  }
+  const { businessId } = getScopeContext(req);
+  const { id } = req.params;
+  if (!isValidObjectId(id)) {
+    return res.status(400).json({ message: "ID inválido." });
+  }
+  const payload = req.body as Partial<{
+    description: string;
+    category: string;
+    amount: number;
+    dueDate: string;
+    status: "PAGO" | "PENDENTE" | "AGUARDANDO_APROVACAO" | "REJEITADO";
+  }>;
+  const update: Record<string, unknown> = {};
+  if (typeof payload.description === "string") update.description = payload.description.trim();
+  if (typeof payload.category === "string") update.category = payload.category.trim();
+  if (typeof payload.amount === "number" && payload.amount >= 0) update.amount = payload.amount;
+  if (typeof payload.dueDate === "string" && payload.dueDate.trim()) update.dueDate = new Date(payload.dueDate);
+  if (payload.status === "PAGO" || payload.status === "PENDENTE" || payload.status === "AGUARDANDO_APROVACAO" || payload.status === "REJEITADO") {
+    update.status = payload.status;
+  }
+
+  const expense = await ExpenseModel.findOneAndUpdate({ _id: id, businessId }, update, { new: true });
+  if (!expense) {
+    return res.status(404).json({ message: "Despesa não encontrada." });
+  }
+  res.json(expense);
+});
+
+app.delete("/api/expenses/:id", async (req, res) => {
+  if (blockWriteInGeneralScope(req, res)) {
+    return;
+  }
+  const { businessId } = getScopeContext(req);
+  const { id } = req.params;
+  if (!isValidObjectId(id)) {
+    return res.status(400).json({ message: "ID inválido." });
+  }
+  const expense = await ExpenseModel.findOneAndUpdate(
+    { _id: id, businessId },
+    { status: "REJEITADO" },
+    { new: true }
+  );
+  if (!expense) {
+    return res.status(404).json({ message: "Despesa não encontrada." });
+  }
+  res.json({ deleted: true });
 });
 
 app.get("/api/checklist-items", async (req, res) => {

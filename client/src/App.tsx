@@ -638,6 +638,279 @@ function App() {
     await loadAllData();
   }
 
+  async function editCustomer(item: Customer) {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar clientes.");
+      return;
+    }
+    const nextName = window.prompt("Editar nome do cliente:", item.name);
+    if (nextName === null) return;
+    if (!nextName.trim()) {
+      setError("O nome do cliente não pode ficar vazio.");
+      return;
+    }
+    const nextEmail = window.prompt("Editar e-mail do cliente:", item.email || "") ?? null;
+    if (nextEmail === null) return;
+    const nextPhone = window.prompt("Editar telefone do cliente:", item.phone || "") ?? null;
+    if (nextPhone === null) return;
+    const nextStatus = window.prompt('Status (ATIVO/INATIVO):', item.status) ?? null;
+    if (nextStatus === null) return;
+    await api.patch<Customer>(scopedPath(`/customers/${item._id}`), {
+      name: nextName.trim(),
+      email: nextEmail.trim(),
+      phone: nextPhone.trim(),
+      status: nextStatus.trim().toUpperCase() === "INATIVO" ? "INATIVO" : "ATIVO",
+    });
+    await loadAllData();
+  }
+
+  async function deleteCustomer(item: Customer) {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar clientes.");
+      return;
+    }
+    const confirmDelete = window.confirm(`Deseja excluir/inativar o cliente "${item.name}"?`);
+    if (!confirmDelete) return;
+    await api.delete<{ deleted: boolean }>(scopedPath(`/customers/${item._id}`));
+    await loadAllData();
+  }
+
+  async function editProduct(item: Product) {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar produtos.");
+      return;
+    }
+    const nextName = window.prompt("Editar nome do produto:", item.name);
+    if (nextName === null) return;
+    if (!nextName.trim()) {
+      setError("O nome do produto não pode ficar vazio.");
+      return;
+    }
+    const nextSku = window.prompt("Editar SKU:", item.sku);
+    if (nextSku === null) return;
+    if (!nextSku.trim()) {
+      setError("O SKU não pode ficar vazio.");
+      return;
+    }
+    const nextCode = window.prompt("Editar código do produto:", item.productCode || "");
+    if (nextCode === null) return;
+    const nextDesc = window.prompt("Editar descrição:", item.description || "");
+    if (nextDesc === null) return;
+    const nextPriceRaw = window.prompt("Editar preço de venda:", String(item.price));
+    if (nextPriceRaw === null) return;
+    const nextCostRaw = window.prompt("Editar custo:", String(item.cost));
+    if (nextCostRaw === null) return;
+    const nextStockRaw = window.prompt("Editar estoque:", String(item.stock));
+    if (nextStockRaw === null) return;
+    const nextMinStockRaw = window.prompt("Editar estoque mínimo:", String(item.minStock));
+    if (nextMinStockRaw === null) return;
+    const currentSupplierId =
+      typeof item.supplier === "string" ? item.supplier : item.supplier?._id || "";
+    const nextSupplierId = window.prompt(
+      "Editar ID do fornecedor (cole o _id):",
+      currentSupplierId
+    );
+    if (nextSupplierId === null) return;
+    const nextActiveRaw = window.prompt("Ativo? (sim/nao):", item.active ? "sim" : "nao");
+    if (nextActiveRaw === null) return;
+
+    const nextPrice = Number(nextPriceRaw);
+    const nextCost = Number(nextCostRaw);
+    const nextStock = Number(nextStockRaw);
+    const nextMinStock = Number(nextMinStockRaw);
+    if (![nextPrice, nextCost, nextStock, nextMinStock].every((v) => Number.isFinite(v) && v >= 0)) {
+      setError("Preço/custo/estoque inválidos. Informe números >= 0.");
+      return;
+    }
+    const nextActive = nextActiveRaw.trim().toLowerCase().startsWith("s");
+
+    await api.patch<Product>(scopedPath(`/products/${item._id}`), {
+      name: nextName.trim(),
+      sku: nextSku.trim(),
+      productCode: nextCode.trim(),
+      description: nextDesc.trim(),
+      price: nextPrice,
+      cost: nextCost,
+      stock: nextStock,
+      minStock: nextMinStock,
+      supplier: nextSupplierId.trim(),
+      active: nextActive,
+    });
+    await loadAllData();
+  }
+
+  async function deleteProduct(item: Product) {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar produtos.");
+      return;
+    }
+    const confirmDelete = window.confirm(`Deseja excluir/inativar o produto "${item.name}"?`);
+    if (!confirmDelete) return;
+    await api.delete<{ deleted: boolean }>(scopedPath(`/products/${item._id}`));
+    await loadAllData();
+  }
+
+  async function editSupplier(item: Supplier) {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar fornecedores.");
+      return;
+    }
+    const nextName = window.prompt("Editar nome do fornecedor:", item.name);
+    if (nextName === null) return;
+    if (!nextName.trim()) {
+      setError("O nome do fornecedor não pode ficar vazio.");
+      return;
+    }
+    const nextDocument = window.prompt("Editar CNPJ/CPF:", item.document || "");
+    if (nextDocument === null) return;
+    const nextContact = window.prompt("Editar contato (telefone):", item.contact);
+    if (nextContact === null) return;
+    if (!nextContact.trim()) {
+      setError("O contato do fornecedor não pode ficar vazio.");
+      return;
+    }
+    const nextPix = window.prompt("Editar chave PIX:", item.pixKey || "");
+    if (nextPix === null) return;
+    const nextCity = window.prompt("Editar cidade:", item.city || "");
+    if (nextCity === null) return;
+    const nextArea = window.prompt("Editar ramo de atuação:", item.businessArea || "");
+    if (nextArea === null) return;
+    const nextPay = window.prompt("Pagamento (BOLETO/PIX/DINHEIRO/CREDITO):", item.paymentCondition);
+    if (nextPay === null) return;
+    const nextStatus = window.prompt("Status (ATIVO/INATIVO):", item.status);
+    if (nextStatus === null) return;
+    await api.patch<Supplier>(scopedPath(`/suppliers/${item._id}`), {
+      name: nextName.trim(),
+      document: nextDocument.trim(),
+      contact: nextContact.trim(),
+      pixKey: nextPix.trim(),
+      city: nextCity.trim(),
+      businessArea: nextArea.trim(),
+      paymentCondition: nextPay.trim().toUpperCase(),
+      status: nextStatus.trim().toUpperCase() === "INATIVO" ? "INATIVO" : "ATIVO",
+    });
+    await loadAllData();
+  }
+
+  async function deleteSupplier(item: Supplier) {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar fornecedores.");
+      return;
+    }
+    const confirmDelete = window.confirm(`Deseja excluir/inativar o fornecedor "${item.name}"?`);
+    if (!confirmDelete) return;
+    await api.delete<{ deleted: boolean }>(scopedPath(`/suppliers/${item._id}`));
+    await loadAllData();
+  }
+
+  async function editSale(item: Sale) {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar vendas.");
+      return;
+    }
+    const nextPayment = window.prompt("Editar pagamento (PIX/DINHEIRO/CARTAO/BOLETO):", item.paymentMethod);
+    if (nextPayment === null) return;
+    const nextStatus = window.prompt("Editar status (PAGO/PENDENTE/CANCELADO):", item.status);
+    if (nextStatus === null) return;
+    await api.patch<Sale>(scopedPath(`/sales/${item._id}`), {
+      paymentMethod: nextPayment.trim().toUpperCase(),
+      status: nextStatus.trim().toUpperCase(),
+    });
+    await loadAllData();
+  }
+
+  async function deleteSale(item: Sale) {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar vendas.");
+      return;
+    }
+    const confirmDelete = window.confirm(
+      `Deseja cancelar/excluir a venda de ${formatBRL(item.totalAmount)}? (O estoque será estornado)`
+    );
+    if (!confirmDelete) return;
+    await api.delete<{ deleted: boolean }>(scopedPath(`/sales/${item._id}`));
+    await loadAllData();
+  }
+
+  async function editPurchase(item: Purchase) {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar compras.");
+      return;
+    }
+    const nextStatus = window.prompt(
+      "Editar status (ABERTA/AGUARDANDO_APROVACAO/APROVADA/RECEBIDA/REJEITADA/CANCELADA):",
+      item.status
+    );
+    if (nextStatus === null) return;
+    await api.patch<Purchase>(scopedPath(`/purchases/${item._id}`), {
+      status: nextStatus.trim().toUpperCase(),
+    });
+    await loadAllData();
+  }
+
+  async function deletePurchase(item: Purchase) {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar compras.");
+      return;
+    }
+    const confirmDelete = window.confirm(
+      `Deseja cancelar/excluir a compra de ${formatBRL(item.totalAmount)}? (Se já entrou no estoque, será estornado)`
+    );
+    if (!confirmDelete) return;
+    await api.delete<{ deleted: boolean }>(scopedPath(`/purchases/${item._id}`));
+    await loadAllData();
+  }
+
+  async function editExpense(item: Expense) {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar despesas.");
+      return;
+    }
+    const nextDesc = window.prompt("Editar descrição:", item.description);
+    if (nextDesc === null) return;
+    if (!nextDesc.trim()) {
+      setError("A descrição não pode ficar vazia.");
+      return;
+    }
+    const nextCategory = window.prompt("Editar categoria:", item.category);
+    if (nextCategory === null) return;
+    const nextDue = window.prompt("Editar vencimento (YYYY-MM-DD):", item.dueDate.slice(0, 10));
+    if (nextDue === null) return;
+    const nextAmountRaw = window.prompt("Editar valor:", String(item.amount));
+    if (nextAmountRaw === null) return;
+    const nextStatus = window.prompt(
+      "Editar status (PAGO/PENDENTE/AGUARDANDO_APROVACAO/REJEITADO):",
+      item.status
+    );
+    if (nextStatus === null) return;
+
+    const nextAmount = Number(nextAmountRaw);
+    if (!Number.isFinite(nextAmount) || nextAmount < 0) {
+      setError("Valor inválido. Informe um número >= 0.");
+      return;
+    }
+
+    await api.patch<Expense>(scopedPath(`/expenses/${item._id}`), {
+      description: nextDesc.trim(),
+      category: nextCategory.trim(),
+      dueDate: nextDue.trim(),
+      amount: nextAmount,
+      status: nextStatus.trim().toUpperCase(),
+    });
+    await loadAllData();
+  }
+
+  async function deleteExpense(item: Expense) {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar despesas.");
+      return;
+    }
+    const confirmDelete = window.confirm(`Deseja excluir/rejeitar a despesa "${item.description}"?`);
+    if (!confirmDelete) return;
+    await api.delete<{ deleted: boolean }>(scopedPath(`/expenses/${item._id}`));
+    await loadAllData();
+  }
+
   async function submitUserProfile(event: FormEvent) {
     event.preventDefault();
     const updated = await api.put<Settings>("/settings/profile", userForm);
@@ -1131,6 +1404,7 @@ function App() {
                     <th>E-mail</th>
                     <th>Telefone</th>
                     <th>Status</th>
+                    <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1140,6 +1414,16 @@ function App() {
                       <td>{item.email || "-"}</td>
                       <td>{item.phone || "-"}</td>
                       <td>{item.status}</td>
+                      <td>
+                        <div className="table-actions">
+                          <button type="button" className="ghost-btn" onClick={() => editCustomer(item)}>
+                            Editar
+                          </button>
+                          <button type="button" className="ghost-btn danger" onClick={() => deleteCustomer(item)}>
+                            Excluir
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1227,6 +1511,7 @@ function App() {
                     <th>Preço</th>
                     <th>Custo</th>
                     <th>Estoque</th>
+                    <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1239,6 +1524,16 @@ function App() {
                       <td>{formatBRL(item.price)}</td>
                       <td>{formatBRL(item.cost)}</td>
                       <td>{item.stock}</td>
+                      <td>
+                        <div className="table-actions">
+                          <button type="button" className="ghost-btn" onClick={() => editProduct(item)}>
+                            Editar
+                          </button>
+                          <button type="button" className="ghost-btn danger" onClick={() => deleteProduct(item)}>
+                            Excluir
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1296,6 +1591,7 @@ function App() {
                     <th>Status</th>
                     <th>Faturamento</th>
                     <th>NF-e</th>
+                    <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1307,6 +1603,16 @@ function App() {
                       <td>{item.status}</td>
                       <td>{item.billingStatus || "-"}</td>
                       <td>{item.invoice?.number || "Gerando..."}</td>
+                      <td>
+                        <div className="table-actions">
+                          <button type="button" className="ghost-btn" onClick={() => editSale(item)}>
+                            Editar
+                          </button>
+                          <button type="button" className="ghost-btn danger" onClick={() => deleteSale(item)}>
+                            Excluir
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1402,26 +1708,32 @@ function App() {
                       <td>{item.status}</td>
                       <td>{item.approval?.status || "-"}</td>
                       <td>
-                        {item.status === "AGUARDANDO_APROVACAO" ? (
-                          <div className="table-actions">
-                            <button
-                              type="button"
-                              className="ghost-btn"
-                              onClick={() => reviewPurchase(item._id, "aprovar")}
-                            >
-                              Aprovar
-                            </button>
-                            <button
-                              type="button"
-                              className="ghost-btn danger"
-                              onClick={() => reviewPurchase(item._id, "rejeitar")}
-                            >
-                              Rejeitar
-                            </button>
-                          </div>
-                        ) : (
-                          <span>-</span>
-                        )}
+                        <div className="table-actions">
+                          {item.status === "AGUARDANDO_APROVACAO" ? (
+                            <>
+                              <button
+                                type="button"
+                                className="ghost-btn"
+                                onClick={() => reviewPurchase(item._id, "aprovar")}
+                              >
+                                Aprovar
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost-btn danger"
+                                onClick={() => reviewPurchase(item._id, "rejeitar")}
+                              >
+                                Rejeitar
+                              </button>
+                            </>
+                          ) : null}
+                          <button type="button" className="ghost-btn" onClick={() => editPurchase(item)}>
+                            Editar
+                          </button>
+                          <button type="button" className="ghost-btn danger" onClick={() => deletePurchase(item)}>
+                            Excluir
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1495,12 +1807,13 @@ function App() {
                     <th>Ramo</th>
                     <th>Pagamento</th>
                     <th>Status</th>
+                    <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {suppliers.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="empty">
+                      <td colSpan={8} className="empty">
                         Nenhum fornecedor cadastrado ainda.
                       </td>
                     </tr>
@@ -1514,6 +1827,16 @@ function App() {
                         <td>{item.businessArea || "-"}</td>
                         <td>{item.paymentCondition}</td>
                         <td>{item.status}</td>
+                        <td>
+                          <div className="table-actions">
+                            <button type="button" className="ghost-btn" onClick={() => editSupplier(item)}>
+                              Editar
+                            </button>
+                            <button type="button" className="ghost-btn danger" onClick={() => deleteSupplier(item)}>
+                              Excluir
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -1650,6 +1973,12 @@ function App() {
                                 Marcar pago
                               </button>
                             ) : null}
+                            <button type="button" className="ghost-btn" onClick={() => editExpense(item)}>
+                              Editar
+                            </button>
+                            <button type="button" className="ghost-btn danger" onClick={() => deleteExpense(item)}>
+                              Excluir
+                            </button>
                           </div>
                         </td>
                       </tr>
