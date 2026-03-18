@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import express, { Request, Response } from "express";
 import mongoose, { isValidObjectId, Types } from "mongoose";
 import dns from "node:dns";
+import { fetch as undiciFetch } from "undici";
 import {
   BusinessModel,
   ChecklistItemModel,
@@ -46,6 +47,8 @@ const whatsappAccessToken = process.env.WHATSAPP_ACCESS_TOKEN?.trim();
 const whatsappNotifyTo = process.env.WHATSAPP_NOTIFY_TO?.trim();
 let dbConnected = false;
 let connectPromise: Promise<typeof mongoose> | null = null;
+
+const fetchImpl: typeof fetch = (globalThis.fetch || undiciFetch) as typeof fetch;
 
 if (!mongoUri) {
   throw new Error("Defina MONGODB_URI no arquivo .env");
@@ -200,7 +203,7 @@ async function fetchJsonWithTimeout<T>(url: string, timeoutMs = 8000): Promise<T
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await fetchImpl(url, { signal: controller.signal });
     if (!response.ok) {
       throw new Error(`Falha ao consultar ${url}`);
     }
@@ -213,7 +216,7 @@ async function fetchJsonWithTimeout<T>(url: string, timeoutMs = 8000): Promise<T
 async function fetchSgsLatestValue(code: number) {
   try {
     const data = await fetchJsonWithTimeout<Array<{ valor: string }>>(
-      `https://api.bcb.gov.br/dados/serie/bcdata.sgs/${code}/dados/ultimos/1?formato=json`
+      `https://api.bcb.gov.br/dados/serie/bcdata.sgs.${code}/dados/ultimos/1?formato=json`
     );
     const rawValue = data[0]?.valor;
     if (!rawValue) return null;
