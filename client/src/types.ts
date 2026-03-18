@@ -53,6 +53,7 @@ export type Product = {
   minStock: number;
   supplier: string | Supplier; // ID do fornecedor ou objeto Supplier populado
   active: boolean;
+  hasPhoto?: boolean;
 };
 
 export type Sale = {

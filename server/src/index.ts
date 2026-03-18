@@ -4,6 +4,7 @@ import express, { Request, Response } from "express";
 import mongoose, { isValidObjectId, Types } from "mongoose";
 import dns from "node:dns";
 import { fetch as undiciFetch } from "undici";
+import multer from "multer";
 import {
   BusinessModel,
   ChecklistItemModel,
@@ -49,6 +50,11 @@ let dbConnected = false;
 let connectPromise: Promise<typeof mongoose> | null = null;
 
 const fetchImpl: typeof fetch = (globalThis.fetch || undiciFetch) as typeof fetch;
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 3 * 1024 * 1024 }, // 3MB
+});
 
 if (!mongoUri) {
   throw new Error("Defina MONGODB_URI no arquivo .env");
@@ -578,7 +584,62 @@ app.get("/api/products", async (req, res) => {
     ...(includeInactive ? {} : { active: true }),
   };
   const products = await ProductModel.find(filter).populate("supplier", "name").sort({ createdAt: -1 });
-  res.json(products);
+  const payload = products.map((p) => {
+    const obj = p.toObject() as Record<string, unknown>;
+    const hasPhoto = Boolean(obj.photoContentType);
+    // Evita mandar o buffer para o cliente.
+    delete obj.photoData;
+    obj.hasPhoto = hasPhoto;
+    return obj;
+  });
+  res.json(payload);
+});
+
+app.get("/api/products/:id/photo", async (req, res) => {
+  const { businessId } = getScopeContext(req);
+  const { id } = req.params;
+  if (!isValidObjectId(id)) {
+    return res.status(400).json({ message: "ID inválido." });
+  }
+
+  const product = await ProductModel.findOne({ _id: id, businessId }).select("photoContentType").select("+photoData");
+  if (!product || !product.photoData) {
+    return res.status(404).json({ message: "Foto não encontrada." });
+  }
+
+  if (!product.photoContentType) {
+    res.setHeader("Content-Type", "application/octet-stream");
+  } else {
+    res.setHeader("Content-Type", product.photoContentType);
+  }
+  return res.send(product.photoData);
+});
+
+app.post("/api/products/:id/photo", upload.single("photo"), async (req, res) => {
+  if (blockWriteInGeneralScope(req, res)) {
+    return;
+  }
+  const { businessId } = getScopeContext(req);
+  const { id } = req.params;
+  if (!isValidObjectId(id)) {
+    return res.status(400).json({ message: "ID inválido." });
+  }
+
+  const file = (req as unknown as { file?: { mimetype?: string; buffer?: Buffer } }).file;
+  if (!file?.buffer) {
+    return res.status(400).json({ message: "Informe um arquivo de foto em 'photo'." });
+  }
+
+  const product = await ProductModel.findOne({ _id: id, businessId });
+  if (!product) {
+    return res.status(404).json({ message: "Produto não encontrado." });
+  }
+
+  product.photoContentType = file.mimetype || "application/octet-stream";
+  product.photoData = file.buffer;
+  await product.save();
+
+  res.json({ ok: true, hasPhoto: true });
 });
 
 app.post("/api/products", async (req, res) => {

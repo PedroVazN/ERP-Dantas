@@ -31,6 +31,10 @@ const productSchema = new mongoose.Schema(
     minStock: { type: Number, required: true, min: 0, default: 10 },
     supplier: { type: mongoose.Schema.Types.ObjectId, ref: "Supplier" },
     active: { type: Boolean, default: true },
+    // Foto do produto (armazenada no MongoDB). Evitamos retornar o buffer nas listagens,
+    // então `photoData` fica `select: false`.
+    photoContentType: { type: String, default: null },
+    photoData: { type: Buffer, select: false },
   },
   { timestamps: true }
 );

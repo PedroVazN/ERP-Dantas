@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import { api } from "./api";
+import { api, API_URL } from "./api";
 import type {
   AuthUser,
   BiInsights,
@@ -118,6 +118,7 @@ function App() {
     minStock: 10,
     supplierId: "",
   });
+  const [productPhotoFile, setProductPhotoFile] = useState<File | null>(null);
   const [saleForm, setSaleForm] = useState({
     productId: "",
     quantity: 1,
@@ -125,6 +126,108 @@ function App() {
   });
   const [whatsAppStatus, setWhatsAppStatus] = useState<WhatsAppStatus | null>(null);
   const [whatsAppForm, setWhatsAppForm] = useState({ phone: "", message: "" });
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editModalKind, setEditModalKind] = useState<
+    | "customer"
+    | "product"
+    | "supplier"
+    | "sale"
+    | "purchase"
+    | "expense"
+    | "checklist"
+    | null
+  >(null);
+  const [editModalSubtitle, setEditModalSubtitle] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const [editCustomerForm, setEditCustomerForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    status: "ATIVO" as "ATIVO" | "INATIVO",
+  });
+  const [editProductForm, setEditProductForm] = useState({
+    name: "",
+    sku: "",
+    productCode: "",
+    description: "",
+    price: 0,
+    cost: 0,
+    stock: 0,
+    minStock: 10,
+    supplierId: "",
+    active: true,
+  });
+  const [editProductHasPhoto, setEditProductHasPhoto] = useState(false);
+  const [editProductPhotoFile, setEditProductPhotoFile] = useState<File | null>(null);
+  const [editSupplierForm, setEditSupplierForm] = useState({
+    name: "",
+    document: "",
+    contact: "",
+    pixKey: "",
+    city: "",
+    businessArea: "",
+    paymentCondition: "PIX" as "BOLETO" | "PIX" | "DINHEIRO" | "CREDITO",
+    status: "ATIVO" as "ATIVO" | "INATIVO",
+  });
+  const [editSaleForm, setEditSaleForm] = useState({
+    paymentMethod: "PIX",
+    status: "PAGO",
+  });
+  const [editPurchaseForm, setEditPurchaseForm] = useState({
+    status: "RECEBIDA" as Purchase["status"],
+  });
+  const [editExpenseForm, setEditExpenseForm] = useState({
+    description: "",
+    category: "OPERACIONAL",
+    amount: 0,
+    dueDate: new Date().toISOString().slice(0, 10),
+    status: "PENDENTE" as Expense["status"],
+  });
+  const [editChecklistForm, setEditChecklistForm] = useState({
+    title: "",
+    notes: "",
+  });
+
+  function closeEditModal() {
+    setEditModalOpen(false);
+    setEditModalKind(null);
+    setEditingId(null);
+    setEditModalSubtitle("");
+    setEditProductPhotoFile(null);
+    setEditProductHasPhoto(false);
+  }
+
+  function openEditModal(kind: NonNullable<typeof editModalKind>, id: string, subtitle: string) {
+    setEditModalKind(kind);
+    setEditingId(id);
+    setEditModalSubtitle(subtitle);
+    setEditModalOpen(true);
+  }
+
+  function AppModal(props: {
+    title: string;
+    subtitle?: string;
+    onClose: () => void;
+    children: React.ReactNode;
+  }) {
+    return (
+      <div className="app-modal-overlay" onClick={props.onClose}>
+        <div className="app-modal" onClick={(event) => event.stopPropagation()}>
+          <div className="app-modal-header">
+            <div>
+              <h3>{props.title}</h3>
+              {props.subtitle ? <p>{props.subtitle}</p> : null}
+            </div>
+            <button type="button" className="ghost-btn" onClick={props.onClose}>
+              Fechar
+            </button>
+          </div>
+          <div className="app-modal-body">{props.children}</div>
+        </div>
+      </div>
+    );
+  }
   const [purchaseForm, setPurchaseForm] = useState({
     supplierId: "",
     productId: "",
@@ -437,12 +540,18 @@ function App() {
       setError("Selecione um fornecedor para o produto.");
       return;
     }
-    await api.post<Product>(scopedPath("/products"), {
+    const created = await api.post<Product>(scopedPath("/products"), {
       ...productForm,
       supplier: productForm.supplierId,
       category: "SABONETE",
       active: true,
     });
+    if (productPhotoFile) {
+      const formData = new FormData();
+      formData.append("photo", productPhotoFile);
+      await api.postFormData<{ ok: boolean; hasPhoto: boolean }>(scopedPath(`/products/${created._id}/photo`), formData);
+    }
+    setProductPhotoFile(null);
     setProductForm({ name: "", sku: "", productCode: "", description: "", price: 0, cost: 0, stock: 0, minStock: 10, supplierId: "" });
     await loadAllData();
   }
@@ -607,24 +716,13 @@ function App() {
     await loadAllData();
   }
 
-  async function editChecklistItem(item: ChecklistItem) {
+  function editChecklistItem(item: ChecklistItem) {
     if (isGeneralWorkspace) {
       setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar checklist.");
       return;
     }
-    const nextTitle = window.prompt("Editar título da ideia:", item.title);
-    if (nextTitle === null) return;
-    const nextNotes = window.prompt("Editar detalhes da ideia:", item.notes || "");
-    if (nextNotes === null) return;
-    if (!nextTitle.trim()) {
-      setError("O título da ideia não pode ficar vazio.");
-      return;
-    }
-    await api.patch<ChecklistItem>(scopedPath(`/checklist-items/${item._id}`), {
-      title: nextTitle.trim(),
-      notes: nextNotes.trim(),
-    });
-    await loadAllData();
+    setEditChecklistForm({ title: item.title, notes: item.notes || "" });
+    openEditModal("checklist", item._id, `Editar: ${item.title}`);
   }
 
   async function deleteChecklistItem(item: ChecklistItem) {
@@ -638,30 +736,18 @@ function App() {
     await loadAllData();
   }
 
-  async function editCustomer(item: Customer) {
+  function editCustomer(item: Customer) {
     if (isGeneralWorkspace) {
       setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar clientes.");
       return;
     }
-    const nextName = window.prompt("Editar nome do cliente:", item.name);
-    if (nextName === null) return;
-    if (!nextName.trim()) {
-      setError("O nome do cliente não pode ficar vazio.");
-      return;
-    }
-    const nextEmail = window.prompt("Editar e-mail do cliente:", item.email || "") ?? null;
-    if (nextEmail === null) return;
-    const nextPhone = window.prompt("Editar telefone do cliente:", item.phone || "") ?? null;
-    if (nextPhone === null) return;
-    const nextStatus = window.prompt('Status (ATIVO/INATIVO):', item.status) ?? null;
-    if (nextStatus === null) return;
-    await api.patch<Customer>(scopedPath(`/customers/${item._id}`), {
-      name: nextName.trim(),
-      email: nextEmail.trim(),
-      phone: nextPhone.trim(),
-      status: nextStatus.trim().toUpperCase() === "INATIVO" ? "INATIVO" : "ATIVO",
+    setEditCustomerForm({
+      name: item.name,
+      email: item.email || "",
+      phone: item.phone || "",
+      status: item.status,
     });
-    await loadAllData();
+    openEditModal("customer", item._id, `Editar: ${item.name}`);
   }
 
   async function deleteCustomer(item: Customer) {
@@ -675,68 +761,27 @@ function App() {
     await loadAllData();
   }
 
-  async function editProduct(item: Product) {
+  function editProduct(item: Product) {
     if (isGeneralWorkspace) {
       setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar produtos.");
       return;
     }
-    const nextName = window.prompt("Editar nome do produto:", item.name);
-    if (nextName === null) return;
-    if (!nextName.trim()) {
-      setError("O nome do produto não pode ficar vazio.");
-      return;
-    }
-    const nextSku = window.prompt("Editar SKU:", item.sku);
-    if (nextSku === null) return;
-    if (!nextSku.trim()) {
-      setError("O SKU não pode ficar vazio.");
-      return;
-    }
-    const nextCode = window.prompt("Editar código do produto:", item.productCode || "");
-    if (nextCode === null) return;
-    const nextDesc = window.prompt("Editar descrição:", item.description || "");
-    if (nextDesc === null) return;
-    const nextPriceRaw = window.prompt("Editar preço de venda:", String(item.price));
-    if (nextPriceRaw === null) return;
-    const nextCostRaw = window.prompt("Editar custo:", String(item.cost));
-    if (nextCostRaw === null) return;
-    const nextStockRaw = window.prompt("Editar estoque:", String(item.stock));
-    if (nextStockRaw === null) return;
-    const nextMinStockRaw = window.prompt("Editar estoque mínimo:", String(item.minStock));
-    if (nextMinStockRaw === null) return;
-    const currentSupplierId =
-      typeof item.supplier === "string" ? item.supplier : item.supplier?._id || "";
-    const nextSupplierId = window.prompt(
-      "Editar ID do fornecedor (cole o _id):",
-      currentSupplierId
-    );
-    if (nextSupplierId === null) return;
-    const nextActiveRaw = window.prompt("Ativo? (sim/nao):", item.active ? "sim" : "nao");
-    if (nextActiveRaw === null) return;
-
-    const nextPrice = Number(nextPriceRaw);
-    const nextCost = Number(nextCostRaw);
-    const nextStock = Number(nextStockRaw);
-    const nextMinStock = Number(nextMinStockRaw);
-    if (![nextPrice, nextCost, nextStock, nextMinStock].every((v) => Number.isFinite(v) && v >= 0)) {
-      setError("Preço/custo/estoque inválidos. Informe números >= 0.");
-      return;
-    }
-    const nextActive = nextActiveRaw.trim().toLowerCase().startsWith("s");
-
-    await api.patch<Product>(scopedPath(`/products/${item._id}`), {
-      name: nextName.trim(),
-      sku: nextSku.trim(),
-      productCode: nextCode.trim(),
-      description: nextDesc.trim(),
-      price: nextPrice,
-      cost: nextCost,
-      stock: nextStock,
-      minStock: nextMinStock,
-      supplier: nextSupplierId.trim(),
-      active: nextActive,
+    setEditProductHasPhoto(Boolean(item.hasPhoto));
+    setEditProductPhotoFile(null);
+    const supplierId = typeof item.supplier === "string" ? item.supplier : item.supplier?._id || "";
+    setEditProductForm({
+      name: item.name,
+      sku: item.sku,
+      productCode: item.productCode || "",
+      description: item.description || "",
+      price: item.price,
+      cost: item.cost,
+      stock: item.stock,
+      minStock: item.minStock,
+      supplierId,
+      active: item.active,
     });
-    await loadAllData();
+    openEditModal("product", item._id, `Editar: ${item.name}`);
   }
 
   async function deleteProduct(item: Product) {
@@ -750,46 +795,22 @@ function App() {
     await loadAllData();
   }
 
-  async function editSupplier(item: Supplier) {
+  function editSupplier(item: Supplier) {
     if (isGeneralWorkspace) {
       setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar fornecedores.");
       return;
     }
-    const nextName = window.prompt("Editar nome do fornecedor:", item.name);
-    if (nextName === null) return;
-    if (!nextName.trim()) {
-      setError("O nome do fornecedor não pode ficar vazio.");
-      return;
-    }
-    const nextDocument = window.prompt("Editar CNPJ/CPF:", item.document || "");
-    if (nextDocument === null) return;
-    const nextContact = window.prompt("Editar contato (telefone):", item.contact);
-    if (nextContact === null) return;
-    if (!nextContact.trim()) {
-      setError("O contato do fornecedor não pode ficar vazio.");
-      return;
-    }
-    const nextPix = window.prompt("Editar chave PIX:", item.pixKey || "");
-    if (nextPix === null) return;
-    const nextCity = window.prompt("Editar cidade:", item.city || "");
-    if (nextCity === null) return;
-    const nextArea = window.prompt("Editar ramo de atuação:", item.businessArea || "");
-    if (nextArea === null) return;
-    const nextPay = window.prompt("Pagamento (BOLETO/PIX/DINHEIRO/CREDITO):", item.paymentCondition);
-    if (nextPay === null) return;
-    const nextStatus = window.prompt("Status (ATIVO/INATIVO):", item.status);
-    if (nextStatus === null) return;
-    await api.patch<Supplier>(scopedPath(`/suppliers/${item._id}`), {
-      name: nextName.trim(),
-      document: nextDocument.trim(),
-      contact: nextContact.trim(),
-      pixKey: nextPix.trim(),
-      city: nextCity.trim(),
-      businessArea: nextArea.trim(),
-      paymentCondition: nextPay.trim().toUpperCase(),
-      status: nextStatus.trim().toUpperCase() === "INATIVO" ? "INATIVO" : "ATIVO",
+    setEditSupplierForm({
+      name: item.name,
+      document: item.document || "",
+      contact: item.contact,
+      pixKey: item.pixKey || "",
+      city: item.city || "",
+      businessArea: item.businessArea || "",
+      paymentCondition: item.paymentCondition,
+      status: item.status,
     });
-    await loadAllData();
+    openEditModal("supplier", item._id, `Editar: ${item.name}`);
   }
 
   async function deleteSupplier(item: Supplier) {
@@ -803,20 +824,16 @@ function App() {
     await loadAllData();
   }
 
-  async function editSale(item: Sale) {
+  function editSale(item: Sale) {
     if (isGeneralWorkspace) {
       setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar vendas.");
       return;
     }
-    const nextPayment = window.prompt("Editar pagamento (PIX/DINHEIRO/CARTAO/BOLETO):", item.paymentMethod);
-    if (nextPayment === null) return;
-    const nextStatus = window.prompt("Editar status (PAGO/PENDENTE/CANCELADO):", item.status);
-    if (nextStatus === null) return;
-    await api.patch<Sale>(scopedPath(`/sales/${item._id}`), {
-      paymentMethod: nextPayment.trim().toUpperCase(),
-      status: nextStatus.trim().toUpperCase(),
+    setEditSaleForm({
+      paymentMethod: item.paymentMethod || "PIX",
+      status: item.status || "PAGO",
     });
-    await loadAllData();
+    openEditModal("sale", item._id, `Editar venda: ${formatBRL(item.totalAmount)}`);
   }
 
   async function deleteSale(item: Sale) {
@@ -832,20 +849,13 @@ function App() {
     await loadAllData();
   }
 
-  async function editPurchase(item: Purchase) {
+  function editPurchase(item: Purchase) {
     if (isGeneralWorkspace) {
       setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar compras.");
       return;
     }
-    const nextStatus = window.prompt(
-      "Editar status (ABERTA/AGUARDANDO_APROVACAO/APROVADA/RECEBIDA/REJEITADA/CANCELADA):",
-      item.status
-    );
-    if (nextStatus === null) return;
-    await api.patch<Purchase>(scopedPath(`/purchases/${item._id}`), {
-      status: nextStatus.trim().toUpperCase(),
-    });
-    await loadAllData();
+    setEditPurchaseForm({ status: item.status });
+    openEditModal("purchase", item._id, `Editar compra: ${formatBRL(item.totalAmount)}`);
   }
 
   async function deletePurchase(item: Purchase) {
@@ -861,43 +871,19 @@ function App() {
     await loadAllData();
   }
 
-  async function editExpense(item: Expense) {
+  function editExpense(item: Expense) {
     if (isGeneralWorkspace) {
       setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar despesas.");
       return;
     }
-    const nextDesc = window.prompt("Editar descrição:", item.description);
-    if (nextDesc === null) return;
-    if (!nextDesc.trim()) {
-      setError("A descrição não pode ficar vazia.");
-      return;
-    }
-    const nextCategory = window.prompt("Editar categoria:", item.category);
-    if (nextCategory === null) return;
-    const nextDue = window.prompt("Editar vencimento (YYYY-MM-DD):", item.dueDate.slice(0, 10));
-    if (nextDue === null) return;
-    const nextAmountRaw = window.prompt("Editar valor:", String(item.amount));
-    if (nextAmountRaw === null) return;
-    const nextStatus = window.prompt(
-      "Editar status (PAGO/PENDENTE/AGUARDANDO_APROVACAO/REJEITADO):",
-      item.status
-    );
-    if (nextStatus === null) return;
-
-    const nextAmount = Number(nextAmountRaw);
-    if (!Number.isFinite(nextAmount) || nextAmount < 0) {
-      setError("Valor inválido. Informe um número >= 0.");
-      return;
-    }
-
-    await api.patch<Expense>(scopedPath(`/expenses/${item._id}`), {
-      description: nextDesc.trim(),
-      category: nextCategory.trim(),
-      dueDate: nextDue.trim(),
-      amount: nextAmount,
-      status: nextStatus.trim().toUpperCase(),
+    setEditExpenseForm({
+      description: item.description,
+      category: item.category,
+      amount: item.amount,
+      dueDate: item.dueDate.slice(0, 10),
+      status: item.status,
     });
-    await loadAllData();
+    openEditModal("expense", item._id, `Editar despesa: ${item.description}`);
   }
 
   async function deleteExpense(item: Expense) {
@@ -1563,6 +1549,18 @@ function App() {
                   onChange={(event) => setProductForm({ ...productForm, minStock: Number(event.target.value) })}
                 />
               </div>
+              <div className="form-field">
+                <label>Foto do produto</label>
+                <small className="field-help">Opcional. Envie uma imagem para o catálogo (salva no MongoDB).</small>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] || null;
+                    setProductPhotoFile(file);
+                  }}
+                />
+              </div>
               <button type="submit">Cadastrar produto</button>
             </form>
             <section className="table-card">
@@ -1577,6 +1575,7 @@ function App() {
                     <th>Preço</th>
                     <th>Custo</th>
                     <th>Estoque</th>
+                    <th>Foto</th>
                     <th>Ações</th>
                   </tr>
                 </thead>
@@ -1590,6 +1589,17 @@ function App() {
                       <td>{formatBRL(item.price)}</td>
                       <td>{formatBRL(item.cost)}</td>
                       <td>{item.stock}</td>
+                      <td>
+                        {item.hasPhoto ? (
+                          <img
+                            className="product-photo-thumb"
+                            src={`${API_URL}${scopedPath(`/products/${item._id}/photo`)}`}
+                            alt={`Foto de ${item.name}`}
+                          />
+                        ) : (
+                          "-"
+                        )}
+                      </td>
                       <td>
                         <div className="table-actions">
                           <button type="button" className="ghost-btn" onClick={() => editProduct(item)}>
@@ -2330,6 +2340,601 @@ function App() {
             </section>
           </section>
         )}
+
+        {editModalOpen && editModalKind && editingId ? (
+          <AppModal
+            title={
+              editModalKind === "customer"
+                ? "Editar cliente"
+                : editModalKind === "product"
+                  ? "Editar produto"
+                  : editModalKind === "supplier"
+                    ? "Editar fornecedor"
+                    : editModalKind === "sale"
+                      ? "Editar venda"
+                      : editModalKind === "purchase"
+                        ? "Editar compra"
+                        : editModalKind === "expense"
+                          ? "Editar despesa"
+                          : "Editar item"
+            }
+            subtitle={editModalSubtitle}
+            onClose={closeEditModal}
+          >
+            {editModalKind === "customer" ? (
+              <>
+                <div className="form-field">
+                  <label>Nome</label>
+                  <input
+                    value={editCustomerForm.name}
+                    onChange={(event) => setEditCustomerForm((prev) => ({ ...prev, name: event.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="form-field">
+                  <label>E-mail</label>
+                  <input
+                    value={editCustomerForm.email}
+                    onChange={(event) => setEditCustomerForm((prev) => ({ ...prev, email: event.target.value }))}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Telefone</label>
+                  <input
+                    value={editCustomerForm.phone}
+                    onChange={(event) => setEditCustomerForm((prev) => ({ ...prev, phone: event.target.value }))}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Status</label>
+                  <select
+                    value={editCustomerForm.status}
+                    onChange={(event) =>
+                      setEditCustomerForm((prev) => ({
+                        ...prev,
+                        status: event.target.value === "INATIVO" ? "INATIVO" : "ATIVO",
+                      }))
+                    }
+                  >
+                    <option value="ATIVO">ATIVO</option>
+                    <option value="INATIVO">INATIVO</option>
+                  </select>
+                </div>
+                <div className="app-modal-footer">
+                  <button type="button" className="ghost-btn" onClick={closeEditModal}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (isGeneralWorkspace) {
+                        setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar.");
+                        return;
+                      }
+                      if (!editCustomerForm.name.trim()) {
+                        setError("O nome do cliente não pode ficar vazio.");
+                        return;
+                      }
+                      await api.patch<Customer>(scopedPath(`/customers/${editingId}`), {
+                        name: editCustomerForm.name.trim(),
+                        email: editCustomerForm.email.trim(),
+                        phone: editCustomerForm.phone.trim(),
+                        status: editCustomerForm.status,
+                      });
+                      closeEditModal();
+                      await loadAllData();
+                    }}
+                  >
+                    Salvar alterações
+                  </button>
+                </div>
+              </>
+            ) : null}
+
+            {editModalKind === "product" ? (
+              <>
+                <div className="form-field">
+                  <label>Nome</label>
+                  <input
+                    value={editProductForm.name}
+                    onChange={(event) => setEditProductForm((prev) => ({ ...prev, name: event.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="form-field">
+                  <label>SKU</label>
+                  <input
+                    value={editProductForm.sku}
+                    onChange={(event) => setEditProductForm((prev) => ({ ...prev, sku: event.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Código</label>
+                  <input
+                    value={editProductForm.productCode}
+                    onChange={(event) => setEditProductForm((prev) => ({ ...prev, productCode: event.target.value }))}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Descrição</label>
+                  <textarea
+                    rows={3}
+                    value={editProductForm.description}
+                    onChange={(event) => setEditProductForm((prev) => ({ ...prev, description: event.target.value }))}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Fornecedor</label>
+                  <select
+                    value={editProductForm.supplierId}
+                    onChange={(event) => setEditProductForm((prev) => ({ ...prev, supplierId: event.target.value }))}
+                    required
+                  >
+                    <option value="">Selecione</option>
+                    {suppliers.filter((s) => s.status === "ATIVO").map((s) => (
+                      <option key={s._id} value={s._id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-field">
+                  <label>Preço</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={editProductForm.price}
+                    onChange={(event) => setEditProductForm((prev) => ({ ...prev, price: Number(event.target.value) }))}
+                    required
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Custo</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={editProductForm.cost}
+                    onChange={(event) => setEditProductForm((prev) => ({ ...prev, cost: Number(event.target.value) }))}
+                    required
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Estoque</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editProductForm.stock}
+                    onChange={(event) => setEditProductForm((prev) => ({ ...prev, stock: Number(event.target.value) }))}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Estoque mínimo</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editProductForm.minStock}
+                    onChange={(event) =>
+                      setEditProductForm((prev) => ({ ...prev, minStock: Number(event.target.value) }))
+                    }
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Ativo</label>
+                  <select
+                    value={editProductForm.active ? "true" : "false"}
+                    onChange={(event) => setEditProductForm((prev) => ({ ...prev, active: event.target.value === "true" }))}
+                  >
+                    <option value="true">Sim</option>
+                    <option value="false">Não</option>
+                  </select>
+                </div>
+                <div className="form-field">
+                  <label>Foto do produto</label>
+                  <small className="field-help">Opcional. Para trocar a foto, selecione uma nova imagem.</small>
+                  {editProductHasPhoto && editingId ? (
+                    <img
+                      className="product-photo-preview"
+                      src={`${API_URL}${scopedPath(`/products/${editingId}/photo`)}`}
+                      alt={`Foto de ${editProductForm.name || "produto"}`}
+                    />
+                  ) : (
+                    <span className="field-help">Sem foto cadastrada.</span>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] || null;
+                      setEditProductPhotoFile(file);
+                    }}
+                  />
+                </div>
+                <div className="app-modal-footer">
+                  <button type="button" className="ghost-btn" onClick={closeEditModal}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (isGeneralWorkspace) {
+                        setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar.");
+                        return;
+                      }
+                      if (!editProductForm.name.trim() || !editProductForm.sku.trim() || !editProductForm.supplierId) {
+                        setError("Preencha nome, SKU e fornecedor.");
+                        return;
+                      }
+                      await api.patch<Product>(scopedPath(`/products/${editingId}`), {
+                        name: editProductForm.name.trim(),
+                        sku: editProductForm.sku.trim(),
+                        productCode: editProductForm.productCode.trim(),
+                        description: editProductForm.description.trim(),
+                        price: editProductForm.price,
+                        cost: editProductForm.cost,
+                        stock: editProductForm.stock,
+                        minStock: editProductForm.minStock,
+                        supplier: editProductForm.supplierId,
+                        active: editProductForm.active,
+                      });
+                      if (editProductPhotoFile) {
+                        const formData = new FormData();
+                        formData.append("photo", editProductPhotoFile);
+                        await api.postFormData<{ ok: boolean; hasPhoto: boolean }>(
+                          scopedPath(`/products/${editingId}/photo`),
+                          formData
+                        );
+                      }
+                      closeEditModal();
+                      await loadAllData();
+                    }}
+                  >
+                    Salvar alterações
+                  </button>
+                </div>
+              </>
+            ) : null}
+
+            {editModalKind === "supplier" ? (
+              <>
+                <div className="form-field">
+                  <label>Nome</label>
+                  <input
+                    value={editSupplierForm.name}
+                    onChange={(event) => setEditSupplierForm((prev) => ({ ...prev, name: event.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="form-field">
+                  <label>CNPJ/CPF</label>
+                  <input
+                    value={editSupplierForm.document}
+                    onChange={(event) => setEditSupplierForm((prev) => ({ ...prev, document: event.target.value }))}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Contato</label>
+                  <input
+                    value={editSupplierForm.contact}
+                    onChange={(event) => setEditSupplierForm((prev) => ({ ...prev, contact: event.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Chave PIX</label>
+                  <input
+                    value={editSupplierForm.pixKey}
+                    onChange={(event) => setEditSupplierForm((prev) => ({ ...prev, pixKey: event.target.value }))}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Cidade</label>
+                  <input
+                    value={editSupplierForm.city}
+                    onChange={(event) => setEditSupplierForm((prev) => ({ ...prev, city: event.target.value }))}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Ramo</label>
+                  <input
+                    value={editSupplierForm.businessArea}
+                    onChange={(event) => setEditSupplierForm((prev) => ({ ...prev, businessArea: event.target.value }))}
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Pagamento</label>
+                  <select
+                    value={editSupplierForm.paymentCondition}
+                    onChange={(event) =>
+                      setEditSupplierForm((prev) => ({
+                        ...prev,
+                        paymentCondition: event.target.value as Supplier["paymentCondition"],
+                      }))
+                    }
+                  >
+                    <option value="BOLETO">BOLETO</option>
+                    <option value="PIX">PIX</option>
+                    <option value="DINHEIRO">DINHEIRO</option>
+                    <option value="CREDITO">CREDITO</option>
+                  </select>
+                </div>
+                <div className="form-field">
+                  <label>Status</label>
+                  <select
+                    value={editSupplierForm.status}
+                    onChange={(event) =>
+                      setEditSupplierForm((prev) => ({
+                        ...prev,
+                        status: event.target.value === "INATIVO" ? "INATIVO" : "ATIVO",
+                      }))
+                    }
+                  >
+                    <option value="ATIVO">ATIVO</option>
+                    <option value="INATIVO">INATIVO</option>
+                  </select>
+                </div>
+                <div className="app-modal-footer">
+                  <button type="button" className="ghost-btn" onClick={closeEditModal}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (isGeneralWorkspace) {
+                        setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar.");
+                        return;
+                      }
+                      if (!editSupplierForm.name.trim() || !editSupplierForm.contact.trim()) {
+                        setError("Preencha nome e contato.");
+                        return;
+                      }
+                      await api.patch<Supplier>(scopedPath(`/suppliers/${editingId}`), {
+                        name: editSupplierForm.name.trim(),
+                        document: editSupplierForm.document.trim(),
+                        contact: editSupplierForm.contact.trim(),
+                        pixKey: editSupplierForm.pixKey.trim(),
+                        city: editSupplierForm.city.trim(),
+                        businessArea: editSupplierForm.businessArea.trim(),
+                        paymentCondition: editSupplierForm.paymentCondition,
+                        status: editSupplierForm.status,
+                      });
+                      closeEditModal();
+                      await loadAllData();
+                    }}
+                  >
+                    Salvar alterações
+                  </button>
+                </div>
+              </>
+            ) : null}
+
+            {editModalKind === "sale" ? (
+              <>
+                <div className="form-field">
+                  <label>Forma de pagamento</label>
+                  <select
+                    value={editSaleForm.paymentMethod}
+                    onChange={(event) => setEditSaleForm((prev) => ({ ...prev, paymentMethod: event.target.value }))}
+                  >
+                    <option value="PIX">PIX</option>
+                    <option value="DINHEIRO">DINHEIRO</option>
+                    <option value="CARTAO">CARTAO</option>
+                    <option value="BOLETO">BOLETO</option>
+                    <option value="TRANSFERENCIA">TRANSFERENCIA</option>
+                  </select>
+                </div>
+                <div className="form-field">
+                  <label>Status</label>
+                  <select
+                    value={editSaleForm.status}
+                    onChange={(event) => setEditSaleForm((prev) => ({ ...prev, status: event.target.value }))}
+                  >
+                    <option value="PAGO">PAGO</option>
+                    <option value="PENDENTE">PENDENTE</option>
+                    <option value="CANCELADO">CANCELADO</option>
+                  </select>
+                </div>
+                <div className="app-modal-footer">
+                  <button type="button" className="ghost-btn" onClick={closeEditModal}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (isGeneralWorkspace) {
+                        setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar.");
+                        return;
+                      }
+                      await api.patch<Sale>(scopedPath(`/sales/${editingId}`), {
+                        paymentMethod: editSaleForm.paymentMethod,
+                        status: editSaleForm.status,
+                      });
+                      closeEditModal();
+                      await loadAllData();
+                    }}
+                  >
+                    Salvar alterações
+                  </button>
+                </div>
+              </>
+            ) : null}
+
+            {editModalKind === "purchase" ? (
+              <>
+                <div className="form-field">
+                  <label>Status</label>
+                  <select
+                    value={editPurchaseForm.status}
+                    onChange={(event) =>
+                      setEditPurchaseForm((prev) => ({ ...prev, status: event.target.value as Purchase["status"] }))
+                    }
+                  >
+                    <option value="ABERTA">ABERTA</option>
+                    <option value="AGUARDANDO_APROVACAO">AGUARDANDO_APROVACAO</option>
+                    <option value="APROVADA">APROVADA</option>
+                    <option value="RECEBIDA">RECEBIDA</option>
+                    <option value="REJEITADA">REJEITADA</option>
+                    <option value="CANCELADA">CANCELADA</option>
+                  </select>
+                </div>
+                <div className="app-modal-footer">
+                  <button type="button" className="ghost-btn" onClick={closeEditModal}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (isGeneralWorkspace) {
+                        setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar.");
+                        return;
+                      }
+                      await api.patch<Purchase>(scopedPath(`/purchases/${editingId}`), {
+                        status: editPurchaseForm.status,
+                      });
+                      closeEditModal();
+                      await loadAllData();
+                    }}
+                  >
+                    Salvar alterações
+                  </button>
+                </div>
+              </>
+            ) : null}
+
+            {editModalKind === "expense" ? (
+              <>
+                <div className="form-field">
+                  <label>Descrição</label>
+                  <input
+                    value={editExpenseForm.description}
+                    onChange={(event) => setEditExpenseForm((prev) => ({ ...prev, description: event.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Categoria</label>
+                  <input
+                    value={editExpenseForm.category}
+                    onChange={(event) => setEditExpenseForm((prev) => ({ ...prev, category: event.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Valor</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={editExpenseForm.amount}
+                    onChange={(event) => setEditExpenseForm((prev) => ({ ...prev, amount: Number(event.target.value) }))}
+                    required
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Vencimento</label>
+                  <input
+                    type="date"
+                    value={editExpenseForm.dueDate}
+                    onChange={(event) => setEditExpenseForm((prev) => ({ ...prev, dueDate: event.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Status</label>
+                  <select
+                    value={editExpenseForm.status}
+                    onChange={(event) =>
+                      setEditExpenseForm((prev) => ({ ...prev, status: event.target.value as Expense["status"] }))
+                    }
+                  >
+                    <option value="PENDENTE">PENDENTE</option>
+                    <option value="PAGO">PAGO</option>
+                    <option value="AGUARDANDO_APROVACAO">AGUARDANDO_APROVACAO</option>
+                    <option value="REJEITADO">REJEITADO</option>
+                  </select>
+                </div>
+                <div className="app-modal-footer">
+                  <button type="button" className="ghost-btn" onClick={closeEditModal}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (isGeneralWorkspace) {
+                        setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar.");
+                        return;
+                      }
+                      if (!editExpenseForm.description.trim()) {
+                        setError("A descrição não pode ficar vazia.");
+                        return;
+                      }
+                      await api.patch<Expense>(scopedPath(`/expenses/${editingId}`), {
+                        description: editExpenseForm.description.trim(),
+                        category: editExpenseForm.category.trim(),
+                        amount: editExpenseForm.amount,
+                        dueDate: editExpenseForm.dueDate,
+                        status: editExpenseForm.status,
+                      });
+                      closeEditModal();
+                      await loadAllData();
+                    }}
+                  >
+                    Salvar alterações
+                  </button>
+                </div>
+              </>
+            ) : null}
+
+            {editModalKind === "checklist" ? (
+              <>
+                <div className="form-field">
+                  <label>Título</label>
+                  <input
+                    value={editChecklistForm.title}
+                    onChange={(event) => setEditChecklistForm((prev) => ({ ...prev, title: event.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Detalhes</label>
+                  <textarea
+                    rows={4}
+                    value={editChecklistForm.notes}
+                    onChange={(event) => setEditChecklistForm((prev) => ({ ...prev, notes: event.target.value }))}
+                  />
+                </div>
+                <div className="app-modal-footer">
+                  <button type="button" className="ghost-btn" onClick={closeEditModal}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (isGeneralWorkspace) {
+                        setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar.");
+                        return;
+                      }
+                      if (!editChecklistForm.title.trim()) {
+                        setError("O título da ideia não pode ficar vazio.");
+                        return;
+                      }
+                      await api.patch<ChecklistItem>(scopedPath(`/checklist-items/${editingId}`), {
+                        title: editChecklistForm.title.trim(),
+                        notes: editChecklistForm.notes.trim(),
+                      });
+                      closeEditModal();
+                      await loadAllData();
+                    }}
+                  >
+                    Salvar alterações
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </AppModal>
+        ) : null}
       </main>
     </div>
   );
