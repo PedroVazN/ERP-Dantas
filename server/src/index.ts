@@ -226,6 +226,51 @@ async function fetchSgsLatestValue(code: number) {
   }
 }
 
+function normalizeNumberOrNull(value: unknown) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === "string") {
+    const normalized = Number(value.replace(",", "."));
+    return Number.isFinite(normalized) ? normalized : null;
+  }
+  return null;
+}
+
+async function fetchFxRates() {
+  // Tentativa 1: AwesomeAPI (rápida e simples).
+  try {
+    const fxData = await fetchJsonWithTimeout<{
+      USDBRL?: { bid?: string };
+      EURBRL?: { bid?: string };
+    }>("https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL", 9000);
+    const usdBrl = normalizeNumberOrNull(fxData.USDBRL?.bid);
+    const eurBrl = normalizeNumberOrNull(fxData.EURBRL?.bid);
+    if (usdBrl && eurBrl) {
+      return { usdBrl, eurBrl, source: "AwesomeAPI" as const };
+    }
+  } catch {
+    // Ignora e cai no fallback.
+  }
+
+  // Tentativa 2: fallback público (ER API).
+  try {
+    const [usd, eur] = await Promise.all([
+      fetchJsonWithTimeout<{ rates?: Record<string, number> }>("https://open.er-api.com/v6/latest/USD", 9000),
+      fetchJsonWithTimeout<{ rates?: Record<string, number> }>("https://open.er-api.com/v6/latest/EUR", 9000),
+    ]);
+    const usdBrl = normalizeNumberOrNull(usd.rates?.BRL);
+    const eurBrl = normalizeNumberOrNull(eur.rates?.BRL);
+    if (usdBrl && eurBrl) {
+      return { usdBrl, eurBrl, source: "ER API" as const };
+    }
+  } catch {
+    // Ignora e devolve null.
+  }
+
+  return { usdBrl: null, eurBrl: null, source: "Indisponível" as const };
+}
+
 function generateInvoicePayload(businessId: string, saleId: string, status: "EMITIDA" | "PENDENTE") {
   const now = new Date();
   const seed = `${now.getTime()}`.slice(-8);
@@ -1504,28 +1549,16 @@ app.put("/api/settings/profile", async (req, res) => {
 });
 
 app.get("/api/economic/indicators", async (_req, res) => {
-  let usdBrl: number | null = null;
-  let eurBrl: number | null = null;
-
-  try {
-    const fxData = await fetchJsonWithTimeout<{
-      USDBRL?: { bid?: string };
-      EURBRL?: { bid?: string };
-    }>("https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL");
-    usdBrl = fxData.USDBRL?.bid ? Number(fxData.USDBRL.bid) : null;
-    eurBrl = fxData.EURBRL?.bid ? Number(fxData.EURBRL.bid) : null;
-  } catch {
-    // Fica com null quando a API externa falhar.
-  }
+  const fx = await fetchFxRates();
 
   const [selic, ipca] = await Promise.all([fetchSgsLatestValue(432), fetchSgsLatestValue(433)]);
 
   res.json({
     updatedAt: new Date().toISOString(),
     exchange: {
-      usdBrl,
-      eurBrl,
-      source: "AwesomeAPI",
+      usdBrl: fx.usdBrl,
+      eurBrl: fx.eurBrl,
+      source: fx.source,
     },
     indicators: {
       selic,
