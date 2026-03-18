@@ -22,6 +22,8 @@ const productSchema = new mongoose.Schema(
     businessId: { type: String, default: "geral", index: true },
     name: { type: String, required: true, trim: true },
     sku: { type: String, required: true, unique: true, trim: true },
+    productCode: { type: String, trim: true }, // Código do produto
+    description: { type: String, trim: true }, // Descrição do produto
     category: { type: String, trim: true, default: "SABONETE" },
     price: { type: Number, required: true, min: 0 },
     cost: { type: Number, required: true, min: 0 },

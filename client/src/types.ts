@@ -44,11 +44,14 @@ export type Product = {
   _id: string;
   name: string;
   sku: string;
+  productCode?: string; // Código do produto
+  description?: string; // Descrição do produto
   category: string;
   price: number;
   cost: number;
   stock: number;
   minStock: number;
+  supplier: string | Supplier; // ID do fornecedor ou objeto Supplier populado
   active: boolean;
 };
 

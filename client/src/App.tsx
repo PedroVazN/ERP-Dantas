@@ -110,10 +110,13 @@ function App() {
   const [productForm, setProductForm] = useState({
     name: "",
     sku: "",
+    productCode: "",
+    description: "",
     price: 0,
     cost: 0,
     stock: 0,
     minStock: 10,
+    supplierId: "",
   });
   const [saleForm, setSaleForm] = useState({
     productId: "",
@@ -161,6 +164,16 @@ function App() {
         .reduce((acc, sale) => acc + sale.totalAmount, 0),
     [sales]
   );
+
+  const filteredProductsBySupplier = useMemo(() => {
+    if (!purchaseForm.supplierId) {
+      return [];
+    }
+    return products.filter((product) => {
+      const supplierId = typeof product.supplier === "string" ? product.supplier : product.supplier._id;
+      return supplierId === purchaseForm.supplierId;
+    });
+  }, [products, purchaseForm.supplierId]);
 
   const currentDate = useMemo(
     () =>
@@ -416,12 +429,17 @@ function App() {
       setError("No ERP Geral voce visualiza consolidado. Para lancar, selecione um ERP especifico.");
       return;
     }
+    if (!productForm.supplierId) {
+      setError("Selecione um fornecedor para o produto.");
+      return;
+    }
     await api.post<Product>(scopedPath("/products"), {
       ...productForm,
+      supplier: productForm.supplierId,
       category: "SABONETE",
       active: true,
     });
-    setProductForm({ name: "", sku: "", price: 0, cost: 0, stock: 0, minStock: 10 });
+    setProductForm({ name: "", sku: "", productCode: "", description: "", price: 0, cost: 0, stock: 0, minStock: 10, supplierId: "" });
     await loadAllData();
   }
 
@@ -1128,6 +1146,29 @@ function App() {
                 required
               />
               <input
+                placeholder="Código do produto"
+                value={productForm.productCode}
+                onChange={(event) => setProductForm({ ...productForm, productCode: event.target.value })}
+              />
+              <textarea
+                rows={3}
+                placeholder="Descrição do produto"
+                value={productForm.description}
+                onChange={(event) => setProductForm({ ...productForm, description: event.target.value })}
+              />
+              <select
+                value={productForm.supplierId}
+                onChange={(event) => setProductForm({ ...productForm, supplierId: event.target.value })}
+                required
+              >
+                <option value="">Selecione o fornecedor *</option>
+                {suppliers.filter((s) => s.status === "ATIVO").map((item) => (
+                  <option key={item._id} value={item._id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+              <input
                 type="number"
                 placeholder="Preço de venda"
                 value={productForm.price}
@@ -1162,6 +1203,8 @@ function App() {
                   <tr>
                     <th>Nome</th>
                     <th>SKU</th>
+                    <th>Código</th>
+                    <th>Descrição</th>
                     <th>Preço</th>
                     <th>Custo</th>
                     <th>Estoque</th>
@@ -1172,6 +1215,8 @@ function App() {
                     <tr key={item._id}>
                       <td>{item.name}</td>
                       <td>{item.sku}</td>
+                      <td>{item.productCode || "-"}</td>
+                      <td>{item.description || "-"}</td>
                       <td>{formatBRL(item.price)}</td>
                       <td>{formatBRL(item.cost)}</td>
                       <td>{item.stock}</td>
@@ -1271,7 +1316,9 @@ function App() {
               <h3>Registrar compra</h3>
               <select
                 value={purchaseForm.supplierId}
-                onChange={(event) => setPurchaseForm({ ...purchaseForm, supplierId: event.target.value })}
+                onChange={(event) => {
+                  setPurchaseForm({ ...purchaseForm, supplierId: event.target.value, productId: "" });
+                }}
                 required
               >
                 <option value="">Selecione o fornecedor</option>
@@ -1285,9 +1332,12 @@ function App() {
                 value={purchaseForm.productId}
                 onChange={(event) => setPurchaseForm({ ...purchaseForm, productId: event.target.value })}
                 required
+                disabled={!purchaseForm.supplierId}
               >
-                <option value="">Selecione o produto</option>
-                {products.map((item) => (
+                <option value="">
+                  {purchaseForm.supplierId ? "Selecione o produto" : "Selecione primeiro o fornecedor"}
+                </option>
+                {filteredProductsBySupplier.map((item) => (
                   <option key={item._id} value={item._id}>
                     {item.name}
                   </option>

@@ -471,7 +471,7 @@ app.post("/api/customers", async (req, res) => {
 });
 
 app.get("/api/products", async (req, res) => {
-  const products = await ProductModel.find(getBusinessFilter(req)).sort({ createdAt: -1 });
+  const products = await ProductModel.find(getBusinessFilter(req)).populate("supplier", "name").sort({ createdAt: -1 });
   res.json(products);
 });
 
