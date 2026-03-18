@@ -868,12 +868,27 @@ th {
   border-radius: 12px;
   border: 1px solid var(--border);
   background: var(--panel-2);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.product-photo-thumb:hover {
+  transform: scale(1.05);
 }
 
 .product-photo-preview {
   width: 110px;
   height: 110px;
   object-fit: cover;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+.product-photo-full {
+  width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
   border-radius: 14px;
   border: 1px solid var(--border);
   background: var(--panel-2);

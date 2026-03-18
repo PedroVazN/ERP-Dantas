@@ -119,6 +119,19 @@ function App() {
     supplierId: "",
   });
   const [productPhotoFile, setProductPhotoFile] = useState<File | null>(null);
+
+  const [productPhotoModalOpen, setProductPhotoModalOpen] = useState(false);
+  const [productPhotoModalProductId, setProductPhotoModalProductId] = useState<string | null>(null);
+
+  function openProductPhotoModal(productId: string) {
+    setProductPhotoModalProductId(productId);
+    setProductPhotoModalOpen(true);
+  }
+
+  function closeProductPhotoModal() {
+    setProductPhotoModalOpen(false);
+    setProductPhotoModalProductId(null);
+  }
   const [saleForm, setSaleForm] = useState({
     productId: "",
     quantity: 1,
@@ -1595,6 +1608,8 @@ function App() {
                             className="product-photo-thumb"
                             src={`${API_URL}${scopedPath(`/products/${item._id}/photo`)}`}
                             alt={`Foto de ${item.name}`}
+                        title="Clique para ampliar"
+                        onClick={() => openProductPhotoModal(item._id)}
                           />
                         ) : (
                           "-"
@@ -2934,6 +2949,31 @@ function App() {
               </>
             ) : null}
           </AppModal>
+        ) : null}
+
+        {productPhotoModalOpen && productPhotoModalProductId ? (
+          <div className="app-modal-overlay" onClick={closeProductPhotoModal}>
+            <div className="app-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="app-modal-header">
+                <div>
+                  <h3>Foto do produto</h3>
+                  <p>Visualização ampliada</p>
+                </div>
+                <button type="button" className="ghost-btn" onClick={closeProductPhotoModal}>
+                  Fechar
+                </button>
+              </div>
+              <div className="app-modal-body" style={{ justifyItems: "center" }}>
+                <img
+                  className="product-photo-full"
+                  src={`${API_URL}${scopedPath(
+                    `/products/${productPhotoModalProductId}/photo`
+                  )}`}
+                  alt="Foto ampliada do produto"
+                />
+              </div>
+            </div>
+          </div>
         ) : null}
       </main>
     </div>
