@@ -1773,7 +1773,7 @@ app.post("/api/ai/plan", async (req, res) => {
         const supplierName = (product as any).supplier?.name as string | null | undefined;
         if (!supplierName) {
           status = "NEEDS_INFO";
-          questions.push("Nao consegui identificar o fornecedor do produto. Edite o produto e vincule um fornecedor.");
+          questions.push(`Vincule um fornecedor no produto "${product.name}" para eu poder comprar.`);
         } else {
           const costToUse = unitCost ?? product.cost ?? 0;
           const totalAmount = quantity * costToUse;
@@ -1991,9 +1991,16 @@ app.post("/api/ai/execute", async (req, res) => {
         if (!productId) {
           throw new Error("Produto não resolvido para compra.");
         }
-        const product = await ProductModel.findOne({ _id: productId, businessId });
+        const product = await ProductModel.findOne({ _id: productId, businessId }).populate(
+          "supplier",
+          "name"
+        );
         if (!product) {
           throw new Error("Produto não encontrado para compra.");
+        }
+        const supplierName = (product as any).supplier?.name as string | undefined | null;
+        if (!supplierName) {
+          throw new Error(`Produto "${product.name}" nao possui fornecedor vinculado no cadastro.`);
         }
 
         const quantity = action.input.quantity;
@@ -2017,7 +2024,7 @@ app.post("/api/ai/execute", async (req, res) => {
 
         const purchase = await PurchaseModel.create({
           businessId,
-          supplier: action.input.supplierName,
+          supplier: supplierName,
           items: normalizedItems,
           status: needsApproval ? "AGUARDANDO_APROVACAO" : "RECEBIDA",
           approval: {
