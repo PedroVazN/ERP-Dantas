@@ -51,6 +51,7 @@ type ModuleKey =
   | "usuario";
 
 const moduleMeta: Record<ModuleKey, { label: string; short: string; helper: string }> = {
+  ia: { label: "IA", short: "AI", helper: "Automatize compra/venda/cadastro" },
   dashboard: { label: "Dashboard", short: "DB", helper: "Visao geral do negocio" },
   clientes: { label: "Clientes", short: "CL", helper: "Cadastro e relacionamento" },
   produtos: { label: "Produtos", short: "PR", helper: "Catalogo e estoque" },
@@ -59,7 +60,6 @@ const moduleMeta: Record<ModuleKey, { label: string; short: string; helper: stri
   fornecedores: { label: "Fornecedores", short: "FR", helper: "Cadastro de fornecedores" },
   financeiro: { label: "Financeiro", short: "FN", helper: "Contas e despesas" },
   checklist: { label: "Checklist", short: "CK", helper: "Ideias e futuros implementos" },
-  ia: { label: "IA", short: "AI", helper: "Automatize compra/venda/cadastro" },
   usuario: { label: "Usuario", short: "US", helper: "Perfil e preferências" },
 };
 

@@ -185,12 +185,15 @@ export async function createAiPlan(params: {
           const costToUse = unitCost ?? 0;
           const arnicaDesc = "extrato de arnica + bucha";
           const camomilaDesc = "camomila + bucha";
+          const alecrimDesc = "alecrim + bucha";
           const lower = productName.toLowerCase();
           const suggestedDescription = lower.includes("camom")
             ? camomilaDesc
             : lower.includes("arnica")
               ? arnicaDesc
-              : arnicaDesc;
+              : lower.includes("alecrim")
+                ? alecrimDesc
+                : arnicaDesc;
           const suggestedPrice = 5;
 
           productDraft = {
@@ -216,7 +219,8 @@ export async function createAiPlan(params: {
                 suggestedProductCode,
                 `${suggestedProductCode.slice(0, 8)}${sku.slice(-4)}`.slice(0, 12),
               ],
-              description: [arnicaDesc, camomilaDesc, productName],
+              // Nao sugerir "descricao = nome passado" para evitar descricoes genericas.
+              description: [arnicaDesc, camomilaDesc, alecrimDesc],
               price: [5, 10, 15, 20],
             },
           };
