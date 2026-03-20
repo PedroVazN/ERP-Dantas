@@ -5,6 +5,7 @@ import mongoose, { isValidObjectId, Types } from "mongoose";
 import dns from "node:dns";
 import { fetch as undiciFetch } from "undici";
 import multer from "multer";
+import crypto from "node:crypto";
 import {
   BusinessModel,
   ChecklistItemModel,
@@ -42,6 +43,13 @@ const explicitAllowedOrigins = [
 const allowVercelPreviews = (process.env.ALLOW_VERCEL_PREVIEWS || "true").toLowerCase() === "true";
 const purchaseApprovalThreshold = Number(process.env.PURCHASE_APPROVAL_THRESHOLD || 1500);
 const expenseApprovalThreshold = Number(process.env.EXPENSE_APPROVAL_THRESHOLD || 800);
+const aiPlanTtlMs = Number(process.env.AI_PLAN_TTL_MS || 5 * 60 * 1000); // 5 min
+const autoApprovePurchasesForAi = (process.env.AI_AUTO_APPROVE_PURCHASES || "true").toLowerCase() === "true";
+
+const openRouterApiKey = process.env.OPENROUTER_API_KEY?.trim();
+const openRouterBaseUrl = (process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1").replace(/\/$/, "");
+const openRouterModel = process.env.OPENROUTER_MODEL?.trim() || "openai/gpt-4o-mini";
+const openRouterTimeoutMs = Number(process.env.OPENROUTER_TIMEOUT_MS || 10000);
 const whatsappApiUrl = (process.env.WHATSAPP_API_URL || "https://graph.facebook.com/v20.0").replace(/\/$/, "");
 const whatsappPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID?.trim();
 const whatsappAccessToken = process.env.WHATSAPP_ACCESS_TOKEN?.trim();
@@ -55,6 +63,75 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 3 * 1024 * 1024 }, // 3MB
 });
+
+type AiIntent = "purchase" | "sale" | "customer_create" | "unknown";
+
+type AiPlanAction =
+  | {
+      kind: "createCustomer";
+      input: { name: string; email?: string; phone?: string };
+      outputKey: "customerId";
+    }
+  | {
+      kind: "createProduct";
+      input: {
+        name: string;
+        sku: string;
+        productCode?: string;
+        description?: string;
+        supplierId: string;
+        price: number;
+        cost: number;
+        stock: number;
+        minStock: number;
+        active: boolean;
+      };
+      outputKey: "productId";
+    }
+  | {
+      kind: "createPurchase";
+      input: {
+        supplierName: string;
+        productId?: string;
+        productRefKey?: "productId";
+        quantity: number;
+        cost: number;
+        autoApprove: boolean;
+      };
+      outputKey: "purchaseId";
+    }
+  | {
+      kind: "createSale";
+      input: {
+        productId: string;
+        quantity: number;
+        unitPrice: number;
+        paymentMethod: "PIX" | "DINHEIRO" | "CARTAO" | "BOLETO" | "TRANSFERENCIA";
+      };
+      outputKey: "saleId";
+    };
+
+type AiPlanRecord = {
+  planId: string;
+  createdAt: string;
+  expiresAt: number;
+  executed: boolean;
+  scope: { scope: "geral" | "negocio"; businessId: string };
+  status: "READY" | "NEEDS_INFO" | "ERROR";
+  source: "rules" | "openrouter";
+  summary: string;
+  warnings: string[];
+  requiresConfirmation: boolean;
+  questions?: string[];
+  actions?: AiPlanAction[];
+  actionsPreview?: string[];
+};
+
+const aiPlanStore = new Map<string, AiPlanRecord>();
+
+function newPlanId() {
+  return crypto.randomBytes(16).toString("hex");
+}
 
 if (!mongoUri) {
   throw new Error("Defina MONGODB_URI no arquivo .env");
@@ -141,6 +218,87 @@ function slugify(input: string) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
+}
+
+function escapeRegExp(input: string) {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function parseLooseNumber(raw: string) {
+  const normalized = raw.replace(",", ".");
+  const value = Number(normalized);
+  return Number.isFinite(value) ? value : null;
+}
+
+function extractAiIntent(message: string): {
+  intent: AiIntent;
+  quantity?: number;
+  productName?: string;
+  customerName?: string;
+  unitCost?: number;
+  unitPrice?: number;
+  paymentMethod?:
+    | "PIX"
+    | "DINHEIRO"
+    | "CARTAO"
+    | "BOLETO"
+    | "TRANSFERENCIA"
+    | undefined;
+} {
+  const lower = message.toLowerCase();
+
+  const paymentMethod =
+    lower.includes("pix")
+      ? "PIX"
+      : lower.includes("dinheiro")
+        ? "DINHEIRO"
+        : lower.includes("cartao") || lower.includes("cartão")
+          ? "CARTAO"
+          : lower.includes("boleto")
+            ? "BOLETO"
+            : lower.includes("transferencia")
+              ? "TRANSFERENCIA"
+              : undefined;
+
+  const purchaseMatch = lower.match(/(?:compre|comprar)\s+(\d+)\s+(.+)$/i);
+  if (purchaseMatch) {
+    const quantity = Number(purchaseMatch[1]);
+    const productName = purchaseMatch[2].trim();
+    const costMatch = lower.match(/(?:\bpor\b|\ba\b)\s+(\d+(?:[.,]\d+)?)/);
+    const unitCost = costMatch ? parseLooseNumber(costMatch[1]) : null;
+    return { intent: "purchase", quantity, productName, unitCost: unitCost ?? undefined };
+  }
+
+  const saleMatch = lower.match(/(?:vender|venda)\s+(\d+)\s+(.+)$/i);
+  if (saleMatch) {
+    const quantity = Number(saleMatch[1]);
+    const productName = saleMatch[2].trim();
+    const priceMatch = lower.match(/(?:\bpor\b|\ba\b)\s+(\d+(?:[.,]\d+)?)/);
+    const unitPrice = priceMatch ? parseLooseNumber(priceMatch[1]) : null;
+    return {
+      intent: "sale",
+      quantity,
+      productName,
+      unitPrice: unitPrice ?? undefined,
+      paymentMethod,
+    };
+  }
+
+  const customerCreateMatch = lower.match(/(?:cadastrar|criar|adicionar)\s+(?:um\s+)?cliente\s+(.+)$/i);
+  if (customerCreateMatch) {
+    const customerName = customerCreateMatch[1].trim();
+    return { intent: "customer_create", customerName };
+  }
+
+  // “cliente João” sem prefixo explícito: tentamos apenas se estiver muito claro
+  if (lower.includes("cliente") && (lower.includes("cadastrar") || lower.includes("criar") || lower.includes("adicionar"))) {
+    const nameMatch = lower.match(/cliente\s+(.+)$/i);
+    if (nameMatch) {
+      return { intent: "customer_create", customerName: nameMatch[1].trim() };
+    }
+  }
+
+  return { intent: "unknown" };
 }
 
 function monthBounds(date = new Date()) {
@@ -1532,6 +1690,421 @@ app.patch("/api/approvals/expenses/:id", async (req, res) => {
     ].join("\n")
   );
   res.json(expense);
+});
+
+app.post("/api/ai/plan", async (req, res) => {
+  const { scope, businessId } = getScopeContext(req);
+  if (scope === "geral") {
+    res.status(400).json({
+      message:
+        "O ERP Geral e apenas para consolidacao. Selecione um ERP especifico para lancamentos.",
+    });
+    return;
+  }
+
+  const now = Date.now();
+  for (const [id, record] of aiPlanStore.entries()) {
+    if (record.expiresAt <= now) aiPlanStore.delete(id);
+  }
+
+  const payload = req.body as { message?: string };
+  const message = payload.message?.trim() || "";
+  if (!message) {
+    return res.status(400).json({ message: "Informe uma mensagem para a IA." });
+  }
+
+  const extracted = extractAiIntent(message);
+  const warnings: string[] = [];
+  const questions: string[] = [];
+  const actions: AiPlanAction[] = [];
+  let status: AiPlanRecord["status"] = "READY";
+  let summary = "";
+  let actionsPreview: string[] = [];
+  let source: AiPlanRecord["source"] = "rules";
+
+  const intent = extracted.intent;
+
+  if (intent === "unknown") {
+    status = "NEEDS_INFO";
+    questions.push(
+      "Nao entendi a solicitacao. Exemplos: \"compre 20 sabonetes de cidreira\" ou \"vender 5 sabonete X\" ou \"cadastrar cliente Maria\"."
+    );
+  } else if (intent === "customer_create") {
+    const name = extracted.customerName?.trim() || "";
+    if (!name) {
+      status = "NEEDS_INFO";
+      questions.push("Informe o nome do cliente para cadastrar.");
+    } else {
+      const emailMatch = message.match(/\b[\w.+-]+@[\w-]+\.[\w.-]+\b/i);
+      const phoneMatch = message.match(/(?:telefone|tel)\s*[:\-]?\s*([0-9+()\-\s]{8,})/i);
+      const email = emailMatch?.[0]?.trim();
+      const phone = phoneMatch?.[1]?.trim();
+
+      actions.push({
+        kind: "createCustomer",
+        input: { name, email, phone },
+        outputKey: "customerId",
+      });
+      summary = `Cadastrar cliente: ${name}`;
+      actionsPreview = [`Criar cliente (${name})`];
+    }
+  } else if (intent === "purchase") {
+    const quantity = extracted.quantity;
+    const productName = extracted.productName?.trim() || "";
+    const unitCost = extracted.unitCost;
+
+    if (!quantity || quantity <= 0 || !productName) {
+      status = "NEEDS_INFO";
+      questions.push("Informe a quantidade e o nome do produto (ex.: \"compre 20 sabonetes de cidreira\").");
+    } else {
+      const regex = new RegExp(escapeRegExp(productName), "i");
+      const product = await ProductModel.findOne({
+        businessId,
+        active: true,
+        $or: [{ name: regex }, { sku: regex }, { productCode: regex }],
+      }).populate("supplier", "name");
+
+      const fallbackSupplier = await SupplierModel.findOne({ businessId, status: "ATIVO" });
+
+      if (!product && !fallbackSupplier) {
+        status = "NEEDS_INFO";
+        questions.push("Cadastre ao menos 1 fornecedor ativo antes de eu criar uma compra.");
+      } else if (product) {
+        const supplierName = (product as any).supplier?.name as string | null | undefined;
+        if (!supplierName) {
+          status = "NEEDS_INFO";
+          questions.push("Nao consegui identificar o fornecedor do produto. Edite o produto e vincule um fornecedor.");
+        } else {
+          const costToUse = unitCost ?? product.cost ?? 0;
+          const totalAmount = quantity * costToUse;
+          const needsApproval = totalAmount >= purchaseApprovalThreshold;
+          warnings.push(
+            needsApproval
+              ? "A compra provavelmente vai aguardar aprovaçao. Vou auto-aprovar (se permitido) para entrar no estoque."
+              : "A compra entra no estoque imediatamente (abaixo do limite de aprovaçao)."
+          );
+
+          actions.push({
+            kind: "createPurchase",
+            input: {
+              supplierName,
+              productId: String(product._id),
+              quantity,
+              cost: costToUse,
+              autoApprove: autoApprovePurchasesForAi,
+            },
+            outputKey: "purchaseId",
+          });
+          summary = `Comprar ${quantity}x ${product.name}`;
+          actionsPreview = [`Criar compra de ${quantity}x ${product.name} (custo unit.: R$ ${costToUse.toFixed(2)})`];
+        }
+      } else {
+        // Product não existe: cria produto no momento de execução com defaults e compra logo em seguida.
+        const supplierId = String(fallbackSupplier!._id);
+        const supplierName = fallbackSupplier!.name;
+        const sku = `${slugify(productName)}-${Date.now().toString().slice(-6)}`;
+        const costToUse = unitCost ?? 0;
+
+        actions.push({
+          kind: "createProduct",
+          input: {
+            name: productName,
+            sku,
+            productCode: "",
+            description: "",
+            supplierId,
+            price: 0,
+            cost: costToUse,
+            stock: 0,
+            minStock: 10,
+            active: true,
+          },
+          outputKey: "productId",
+        });
+        actions.push({
+          kind: "createPurchase",
+          input: {
+            supplierName,
+            productRefKey: "productId",
+            quantity,
+            cost: costToUse,
+            autoApprove: autoApprovePurchasesForAi,
+          },
+          outputKey: "purchaseId",
+        });
+        status = "READY";
+        warnings.push("Produto nao existia. Vou criar com preco=0 e custo conforme o valor informado (ou 0).");
+        summary = `Comprar ${quantity}x ${productName} (com criação do produto se necessário)`;
+        actionsPreview = [
+          `Criar produto: ${productName} (SKU: ${sku})`,
+          `Criar compra de ${quantity}x ${productName} (custo unit.: R$ ${costToUse.toFixed(2)})`,
+        ];
+      }
+    }
+  } else if (intent === "sale") {
+    const quantity = extracted.quantity;
+    const productName = extracted.productName?.trim() || "";
+    const unitPrice = extracted.unitPrice;
+
+    if (!quantity || quantity <= 0 || !productName) {
+      status = "NEEDS_INFO";
+      questions.push("Informe a quantidade e o nome do produto (ex.: \"vender 5 sabonete X\").");
+    } else {
+      const regex = new RegExp(escapeRegExp(productName), "i");
+      const product = await ProductModel.findOne({
+        businessId,
+        active: true,
+        $or: [{ name: regex }, { sku: regex }, { productCode: regex }],
+      });
+
+      if (!product) {
+        status = "NEEDS_INFO";
+        questions.push("Produto nao encontrado no cadastro. Cadastre o produto para a IA vender.");
+      } else if (product.stock < quantity) {
+        status = "NEEDS_INFO";
+        questions.push(`Estoque insuficiente para ${product.name}. Disponível: ${product.stock}.`);
+      } else {
+        const paymentMethod = extracted.paymentMethod || "PIX";
+        const priceToUse = unitPrice ?? product.price;
+        actions.push({
+          kind: "createSale",
+          input: {
+            productId: String(product._id),
+            quantity,
+            unitPrice: priceToUse,
+            paymentMethod,
+          },
+          outputKey: "saleId",
+        });
+        summary = `Vender ${quantity}x ${product.name}`;
+        actionsPreview = [`Criar venda de ${quantity}x ${product.name} (preço unit.: R$ ${priceToUse.toFixed(2)})`];
+      }
+    }
+  }
+
+  const planId = newPlanId();
+  const record: AiPlanRecord = {
+    planId,
+    createdAt: new Date().toISOString(),
+    expiresAt: now + aiPlanTtlMs,
+    executed: false,
+    scope: { scope: scope as "geral" | "negocio", businessId },
+    status,
+    source,
+    summary: summary || "Planejamento pronto",
+    warnings,
+    requiresConfirmation: status === "READY",
+    questions: status === "NEEDS_INFO" ? questions : undefined,
+    actions: status === "READY" ? actions : undefined,
+    actionsPreview: status === "READY" ? actionsPreview : undefined,
+  };
+  aiPlanStore.set(planId, record);
+
+  return res.json({
+    planId,
+    status: record.status,
+    source: record.source,
+    summary: record.summary,
+    warnings: record.warnings,
+    requiresConfirmation: record.requiresConfirmation,
+    questions: record.questions,
+    actionsPreview: record.actionsPreview,
+  });
+});
+
+app.post("/api/ai/execute", async (req, res) => {
+  const { scope, businessId } = getScopeContext(req);
+  const payload = req.body as { planId?: string; confirm?: boolean | string; clientNotes?: string };
+  const planId = payload.planId?.trim() || "";
+  if (!planId) {
+    return res.status(400).json({ message: "planId ausente." });
+  }
+
+  const record = aiPlanStore.get(planId);
+  if (!record) {
+    return res.status(404).json({ ok: false, message: "Plano nao encontrado ou expirado." });
+  }
+  if (record.expiresAt <= Date.now()) {
+    aiPlanStore.delete(planId);
+    return res.status(400).json({ ok: false, message: "Plano expirado." });
+  }
+
+  if (record.scope.scope !== scope || record.scope.businessId !== businessId) {
+    return res.status(400).json({ ok: false, message: "Plano nao pertence ao escopo atual." });
+  }
+
+  const confirm = payload.confirm;
+  const isConfirmed = confirm === true || confirm === "I_CONFIRM";
+  if (!isConfirmed) {
+    return res.status(400).json({ ok: false, message: "Confirmação necessária para executar." });
+  }
+
+  if (record.executed) {
+    return res.json({ ok: true, planId: record.planId, executedAt: new Date().toISOString(), results: {} });
+  }
+
+  if (record.status !== "READY" || !record.actions) {
+    return res.status(400).json({ ok: false, message: "Plano não está pronto para execução." });
+  }
+
+  // Executor (rule-based / MVP)
+  const refs: Record<string, string> = {};
+  const results: Record<string, unknown> = {};
+  const runtimeWarnings = [...record.warnings];
+  const errors: string[] = [];
+
+  try {
+    for (const action of record.actions) {
+      if (action.kind === "createCustomer") {
+        const customer = await CustomerModel.create({
+          businessId,
+          name: action.input.name.trim(),
+          email: action.input.email?.trim() || undefined,
+          phone: action.input.phone?.trim() || undefined,
+          status: "ATIVO",
+        });
+        refs[action.outputKey] = String(customer._id);
+        results[action.outputKey] = customer._id;
+      }
+
+      if (action.kind === "createProduct") {
+        const product = await ProductModel.create({
+          businessId,
+          name: action.input.name.trim(),
+          sku: action.input.sku.trim(),
+          productCode: action.input.productCode?.trim() || undefined,
+          description: action.input.description?.trim() || undefined,
+          supplier: new Types.ObjectId(action.input.supplierId),
+          price: action.input.price,
+          cost: action.input.cost,
+          stock: action.input.stock,
+          minStock: action.input.minStock,
+          active: action.input.active,
+        });
+        refs[action.outputKey] = String(product._id);
+        results[action.outputKey] = product._id;
+      }
+
+      if (action.kind === "createPurchase") {
+        const productId =
+          action.input.productId || (action.input.productRefKey ? refs[action.input.productRefKey] : undefined);
+        if (!productId) {
+          throw new Error("Produto não resolvido para compra.");
+        }
+        const product = await ProductModel.findOne({ _id: productId, businessId });
+        if (!product) {
+          throw new Error("Produto não encontrado para compra.");
+        }
+
+        const quantity = action.input.quantity;
+        const cost = action.input.cost;
+        const totalAmount = quantity * cost;
+        const needsApproval = totalAmount >= purchaseApprovalThreshold;
+
+        const normalizedItems = [
+          {
+            product: new Types.ObjectId(productId),
+            description: product.name,
+            quantity,
+            cost,
+            total: quantity * cost,
+          },
+        ];
+
+        if (!needsApproval) {
+          await applyPurchaseStock(businessId, normalizedItems as Array<{ product?: Types.ObjectId; quantity: number; cost: number }>);
+        }
+
+        const purchase = await PurchaseModel.create({
+          businessId,
+          supplier: action.input.supplierName,
+          items: normalizedItems,
+          status: needsApproval ? "AGUARDANDO_APROVACAO" : "RECEBIDA",
+          approval: {
+            required: needsApproval,
+            status: needsApproval ? "PENDENTE" : "APROVADA",
+            requestedBy: "Sistema",
+            requestedAt: new Date(),
+          },
+          stockApplied: !needsApproval,
+          totalAmount,
+        });
+
+        if (needsApproval && action.input.autoApprove) {
+          await applyPurchaseStock(businessId, normalizedItems as Array<{ product?: Types.ObjectId; quantity: number; cost: number }>);
+          purchase.stockApplied = true;
+          purchase.status = "RECEBIDA";
+          if (purchase.approval) {
+            purchase.approval.status = "APROVADA";
+            purchase.approval.reviewedBy = "IA";
+            purchase.approval.reviewedAt = new Date();
+            purchase.approval.reason = "Auto-aprovado pela IA.";
+          }
+          await purchase.save();
+        }
+
+        refs[action.outputKey] = String(purchase._id);
+        results[action.outputKey] = purchase._id;
+
+        if (needsApproval && action.input.autoApprove) {
+          runtimeWarnings.push("Compra acima do limite: auto-aprovada pela IA para aplicar estoque.");
+        }
+      }
+
+      if (action.kind === "createSale") {
+        const items: SaleItemInput[] = [
+          {
+            product: new Types.ObjectId(action.input.productId),
+            quantity: action.input.quantity,
+            unitPrice: action.input.unitPrice,
+          },
+        ];
+        const normalizedItems = await normalizeSaleItemsAndApplyStock(businessId, items);
+        const totalAmount = normalizedItems.reduce((sum, item) => sum + item.total, 0);
+
+        const sale = await SaleModel.create({
+          businessId,
+          items: normalizedItems,
+          paymentMethod: action.input.paymentMethod,
+          status: "PAGO",
+          billingStatus: "FATURADO",
+          invoice: generateInvoicePayload(
+            businessId,
+            new Types.ObjectId().toString(),
+            "EMITIDA"
+          ),
+          totalAmount,
+          createdBy: "IA",
+        });
+
+        if (sale.invoice?.key) {
+          sale.invoice = generateInvoicePayload(businessId, String(sale._id), "EMITIDA");
+          await sale.save();
+        }
+
+        refs[action.outputKey] = String(sale._id);
+        results[action.outputKey] = sale._id;
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Erro ao executar plano";
+    errors.push(message);
+  }
+
+  if (errors.length) {
+    return res.status(400).json({ ok: false, planId, error: errors[0] });
+  }
+
+  record.executed = true;
+  aiPlanStore.set(planId, record);
+
+  return res.json({
+    ok: true,
+    planId,
+    executedAt: new Date().toISOString(),
+    results,
+    warnings: runtimeWarnings,
+  });
 });
 
 app.get("/api/businesses", async (_req, res) => {

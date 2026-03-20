@@ -33,6 +33,7 @@ type ModuleKey =
   | "fornecedores"
   | "financeiro"
   | "checklist"
+  | "ia"
   | "usuario";
 
 const moduleMeta: Record<ModuleKey, { label: string; short: string; helper: string }> = {
@@ -44,6 +45,7 @@ const moduleMeta: Record<ModuleKey, { label: string; short: string; helper: stri
   fornecedores: { label: "Fornecedores", short: "FR", helper: "Cadastro de fornecedores" },
   financeiro: { label: "Financeiro", short: "FN", helper: "Contas e despesas" },
   checklist: { label: "Checklist", short: "CK", helper: "Ideias e futuros implementos" },
+  ia: { label: "IA", short: "AI", helper: "Automatize compra/venda/cadastro" },
   usuario: { label: "Usuário", short: "US", helper: "Perfil e preferências" },
 };
 
@@ -139,6 +141,22 @@ function App() {
   });
   const [whatsAppStatus, setWhatsAppStatus] = useState<WhatsAppStatus | null>(null);
   const [whatsAppForm, setWhatsAppForm] = useState({ phone: "", message: "" });
+
+  const [aiMessages, setAiMessages] = useState<Array<{ id: string; role: "user" | "assistant"; content: string }>>(
+    []
+  );
+  const [aiInput, setAiInput] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiPlan, setAiPlan] = useState<null | {
+    planId: string;
+    status: "READY" | "NEEDS_INFO" | "ERROR";
+    source: "rules" | "openrouter" | string;
+    summary: string;
+    warnings: string[];
+    requiresConfirmation: boolean;
+    questions?: string[];
+    actionsPreview?: string[];
+  }>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editModalKind, setEditModalKind] = useState<
     | "customer"
@@ -521,6 +539,110 @@ function App() {
     setIsAuthenticated(false);
     setCurrentUser(null);
     setWorkspaceId(null);
+  }
+
+  async function handleAiSend() {
+    const text = aiInput.trim();
+    if (!text || aiBusy) return;
+    if (!workspaceId) {
+      setError("Selecione um ERP antes de usar a IA.");
+      return;
+    }
+
+    const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    setAiMessages((prev) => [...prev, { id, role: "user", content: text }]);
+    setAiInput("");
+    setAiBusy(true);
+    setError("");
+    try {
+      const response = await api.post<{
+        planId: string;
+        status: "READY" | "NEEDS_INFO" | "ERROR";
+        source: string;
+        summary: string;
+        warnings: string[];
+        requiresConfirmation: boolean;
+        questions?: string[];
+        actionsPreview?: string[];
+      }>(scopedPath("/ai/plan"), { message: text });
+
+      setAiPlan({
+        planId: response.planId,
+        status: response.status,
+        source: response.source,
+        summary: response.summary,
+        warnings: response.warnings || [],
+        requiresConfirmation: response.requiresConfirmation,
+        questions: response.questions,
+        actionsPreview: response.actionsPreview,
+      });
+
+      if (response.status === "READY") {
+        setAiMessages((prev) => [
+          ...prev,
+          {
+            id: `${id}-a`,
+            role: "assistant",
+            content: `Plano pronto. ${response.summary}`,
+          },
+        ]);
+      } else if (response.status === "NEEDS_INFO") {
+        const q = response.questions?.join("\n") || "Me explique melhor.";
+        setAiMessages((prev) => [
+          ...prev,
+          { id: `${id}-a`, role: "assistant", content: `Preciso de:\n${q}` },
+        ]);
+      } else {
+        setAiMessages((prev) => [
+          ...prev,
+          { id: `${id}-a`, role: "assistant", content: response.summary || "Erro no planejamento." },
+        ]);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao chamar IA.";
+      setError(message);
+      setAiMessages((prev) => [
+        ...prev,
+        { id: `${id}-a`, role: "assistant", content: message },
+      ]);
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  async function handleAiExecute() {
+    if (!aiPlan || aiBusy) return;
+    setAiBusy(true);
+    setError("");
+    try {
+      const response = await api.post<{
+        ok: boolean;
+        planId: string;
+        executedAt: string;
+        results: Record<string, unknown>;
+        warnings: string[];
+        error?: string;
+      }>(scopedPath("/ai/execute"), { planId: aiPlan.planId, confirm: true });
+
+      const resultsText = response.ok
+        ? `Executado com sucesso. Resultados: ${Object.keys(response.results || {}).join(", ") || "ok"}`
+        : response.error || "Falha ao executar.";
+
+      setAiMessages((prev) => [
+        ...prev,
+        { id: `${Date.now()}-e`, role: "assistant", content: resultsText },
+      ]);
+      setAiPlan(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao executar IA.";
+      setError(message);
+      setAiMessages((prev) => [
+        ...prev,
+        { id: `${Date.now()}-e`, role: "assistant", content: message },
+      ]);
+    } finally {
+      setAiBusy(false);
+    }
   }
 
   async function handleCreateBusiness(event: FormEvent) {
@@ -2237,6 +2359,107 @@ function App() {
                   )}
                 </tbody>
               </table>
+            </section>
+          </section>
+        )}
+
+        {!loading && activeModule === "ia" && (
+          <section className="module-grid animated">
+            <section className="form-card">
+              <h3>IA operacional</h3>
+              <p className="theme-helper">
+                Digite o que você quer fazer. Exemplos: <strong>compre 20 sabonetes de cidreira</strong>,
+                <strong>vender 5 sabonete X</strong> ou <strong>cadastrar cliente Maria</strong>.
+              </p>
+
+              <div className="ai-chat">
+                <div className="ai-messages">
+                  {aiMessages.length === 0 ? (
+                    <div className="empty">Nenhuma mensagem ainda.</div>
+                  ) : (
+                    aiMessages.map((m) => (
+                      <div
+                        key={m.id}
+                        className={m.role === "user" ? "ai-bubble ai-user" : "ai-bubble ai-assistant"}
+                      >
+                        {m.content}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="ai-compose">
+                  <input
+                    placeholder="Ex.: compre 20 sabonetes de cidreira"
+                    value={aiInput}
+                    onChange={(event) => setAiInput(event.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        void handleAiSend();
+                      }
+                    }}
+                  />
+                  <button type="button" onClick={() => void handleAiSend()} disabled={aiBusy}>
+                    {aiBusy ? "Processando..." : "Enviar"}
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section className="table-card">
+              <h3>Prévia / Confirmação</h3>
+
+              {aiPlan ? (
+                <>
+                  <p className="theme-helper">
+                    <strong>Status:</strong> {aiPlan.status}
+                  </p>
+                  <p>{aiPlan.summary}</p>
+                  {aiPlan.warnings.length ? (
+                    <div className="ai-warning">
+                      <strong>Atenção:</strong>
+                      <ul>
+                        {aiPlan.warnings.map((w) => (
+                          <li key={w}>{w}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  {aiPlan.questions?.length ? (
+                    <div className="ai-warning">
+                      <strong>Preciso de:</strong>
+                      <ul>
+                        {aiPlan.questions.map((q) => (
+                          <li key={q}>{q}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  {aiPlan.actionsPreview?.length ? (
+                    <div className="ai-plan-preview">
+                      <strong>Ações:</strong>
+                      <ul>
+                        {aiPlan.actionsPreview.map((a) => (
+                          <li key={a}>{a}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  {aiPlan.requiresConfirmation ? (
+                    <div className="table-actions" style={{ justifyContent: "flex-end" }}>
+                      <button type="button" className="ghost-btn" disabled={aiBusy} onClick={() => void handleAiExecute()}>
+                        Confirmar e executar
+                      </button>
+                    </div>
+                  ) : null}
+                </>
+              ) : (
+                <p className="theme-helper">A prévia do plano aparecerá aqui.</p>
+              )}
             </section>
           </section>
         )}
