@@ -2220,7 +2220,11 @@ app.get("/api/dashboard", async (req, res) => {
       { $match: { ...businessFilter, status: { $in: ["PAGO", "PENDENTE", "AGUARDANDO_APROVACAO"] } } },
       { $group: { _id: null, total: { $sum: "$amount" } } },
     ]),
-    ProductModel.find({ ...businessFilter, $expr: { $lte: ["$stock", "$minStock"] } })
+    ProductModel.find({
+      ...businessFilter,
+      active: true,
+      $expr: { $lte: ["$stock", "$minStock"] },
+    })
       .sort({ stock: 1 })
       .limit(10),
     SaleModel.countDocuments(businessFilter),
