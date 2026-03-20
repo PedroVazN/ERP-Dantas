@@ -15,13 +15,40 @@ export type IaModuleProps = {
 
 export default function IaModule(props: IaModuleProps) {
   const productDraft = props.aiPlan?.productDraft;
+  const purchaseDraft = props.aiPlan?.purchaseDraft;
 
   type ProductDraftSelection = Partial<Record<AiProductDraftField, string | number>>;
   const [productSelection, setProductSelection] = useState<ProductDraftSelection>({});
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+  const [useMatchedSupplier, setUseMatchedSupplier] = useState<boolean | null>(null);
+  const [customProductInputs, setCustomProductInputs] = useState<{
+    name: string;
+    sku: string;
+    productCode: string;
+    description: string;
+    price: string;
+  }>({
+    name: "",
+    sku: "",
+    productCode: "",
+    description: "",
+    price: "",
+  });
 
   useEffect(() => {
     if (!props.aiPlan?.planId) return;
     setProductSelection({});
+    setSelectedSupplierId(null);
+    setSelectedProductId(null);
+    setUseMatchedSupplier(null);
+    setCustomProductInputs({
+      name: "",
+      sku: "",
+      productCode: "",
+      description: "",
+      price: "",
+    });
   }, [props.aiPlan?.planId]);
 
   const isProductDraftComplete = useMemo(() => {
@@ -32,18 +59,66 @@ export default function IaModule(props: IaModuleProps) {
     });
   }, [productDraft, productSelection]);
 
+  const selectedSupplierName = useMemo(() => {
+    if (!purchaseDraft || !selectedSupplierId) return null;
+    return purchaseDraft.supplierOptions.find((s) => s.supplierId === selectedSupplierId)?.supplierName || null;
+  }, [purchaseDraft, selectedSupplierId]);
+
+  const productsForSelectedSupplier = useMemo(() => {
+    if (!purchaseDraft || purchaseDraft.mode !== "productFound" || !selectedSupplierId) return [];
+    return purchaseDraft.productsBySupplierId[selectedSupplierId] || [];
+  }, [purchaseDraft, selectedSupplierId]);
+
+  const canExecute = useMemo(() => {
+    if (!props.aiPlan) return false;
+    if (!purchaseDraft) {
+      // fallback: comportamento antigo (só produto)
+      return isProductDraftComplete;
+    }
+
+    if (purchaseDraft.mode === "productFound") {
+      if (useMatchedSupplier === true) return true;
+      if (useMatchedSupplier === false) return Boolean(selectedProductId);
+      return false;
+    }
+
+    if (purchaseDraft.mode === "productMissing") {
+      return Boolean(selectedSupplierId) && isProductDraftComplete;
+    }
+
+    return false;
+  }, [props.aiPlan, purchaseDraft, useMatchedSupplier, selectedProductId, selectedSupplierId, isProductDraftComplete]);
+
   const executeOverrides = useMemo(() => {
-    if (!productDraft || !isProductDraftComplete) return undefined;
-    return {
-      createProduct: {
-        name: productSelection.name as string,
-        sku: productSelection.sku as string,
-        productCode: productSelection.productCode as string,
-        description: productSelection.description as string,
-        price: productSelection.price as number,
-      },
-    };
-  }, [productDraft, isProductDraftComplete, productSelection]);
+    if (!canExecute) return undefined;
+    if (!purchaseDraft) return undefined;
+
+    if (purchaseDraft.mode === "productFound") {
+      const productIdToUse = useMatchedSupplier ? purchaseDraft.defaultProductId : selectedProductId;
+      if (!productIdToUse) return undefined;
+      return {
+        createPurchase: {
+          productId: productIdToUse,
+        },
+      };
+    }
+
+    if (purchaseDraft.mode === "productMissing") {
+      if (!selectedSupplierId) return undefined;
+      return {
+        createProduct: {
+          supplierId: selectedSupplierId,
+          name: productSelection.name as string,
+          sku: productSelection.sku as string,
+          productCode: productSelection.productCode as string,
+          description: productSelection.description as string,
+          price: productSelection.price as number,
+        },
+      };
+    }
+
+    return undefined;
+  }, [canExecute, purchaseDraft, useMatchedSupplier, selectedProductId, selectedSupplierId, productSelection]);
 
   return (
     <section className="module-grid animated">
@@ -129,9 +204,127 @@ export default function IaModule(props: IaModuleProps) {
               </div>
             ) : null}
 
+            {purchaseDraft?.mode === "productFound" ? (
+              <div className="ai-warning" style={{ marginTop: 16 }}>
+                <strong>Fornecedor do produto:</strong> {purchaseDraft.defaultSupplierName}
+                <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="ghost-btn"
+                    onClick={() => {
+                      setUseMatchedSupplier(true);
+                      setSelectedSupplierId(purchaseDraft.defaultSupplierId);
+                      setSelectedProductId(purchaseDraft.defaultProductId);
+                    }}
+                    disabled={props.aiBusy}
+                    style={{ opacity: useMatchedSupplier === true ? 1 : 0.85 }}
+                  >
+                    Sim (usar este fornecedor)
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-btn"
+                    onClick={() => {
+                      setUseMatchedSupplier(false);
+                      setSelectedSupplierId(null);
+                      setSelectedProductId(null);
+                    }}
+                    disabled={props.aiBusy}
+                    style={{ opacity: useMatchedSupplier === false ? 1 : 0.85 }}
+                  >
+                    Nao (escolher outros)
+                  </button>
+                </div>
+
+                {useMatchedSupplier === false ? (
+                  <div style={{ marginTop: 14 }}>
+                    <div className="theme-helper">Escolha um fornecedor</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                      {purchaseDraft.supplierOptions.map((s) => {
+                        const selected = selectedSupplierId === s.supplierId;
+                        return (
+                          <button
+                            key={s.supplierId}
+                            type="button"
+                            className="ghost-btn"
+                            onClick={() => {
+                              setSelectedSupplierId(s.supplierId);
+                              setSelectedProductId(null);
+                            }}
+                            style={{ opacity: selected ? 1 : 0.75 }}
+                          >
+                            {s.supplierName}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {selectedSupplierId ? (
+                      <div style={{ marginTop: 14 }}>
+                        <div className="theme-helper">Produtos deste fornecedor</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                          {productsForSelectedSupplier.length ? (
+                            productsForSelectedSupplier.map((p) => {
+                              const selected = selectedProductId === p.productId;
+                              return (
+                                <button
+                                  key={p.productId}
+                                  type="button"
+                                  className="ghost-btn"
+                                  onClick={() => setSelectedProductId(p.productId)}
+                                  style={{ opacity: selected ? 1 : 0.75 }}
+                                >
+                                  {p.label}
+                                </button>
+                              );
+                            })
+                          ) : (
+                            <p className="empty">Este fornecedor nao tem o produto identificado no cadastro.</p>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {purchaseDraft?.mode === "productMissing" ? (
+              <div className="ai-warning" style={{ marginTop: 16 }}>
+                <strong>Escolha o fornecedor (direto do banco)</strong>
+                {selectedSupplierName ? (
+                  <p style={{ marginTop: 6 }}>Fornecedor selecionado: {selectedSupplierName}</p>
+                ) : (
+                  <p className="theme-helper" style={{ marginTop: 6 }}>
+                    Preciso que voce selecione o fornecedor antes de executar.
+                  </p>
+                )}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+                  {purchaseDraft.supplierOptions.map((s) => {
+                    const selected = selectedSupplierId === s.supplierId;
+                    return (
+                      <button
+                        key={s.supplierId}
+                        type="button"
+                        className="ghost-btn"
+                        onClick={() => setSelectedSupplierId(s.supplierId)}
+                        disabled={props.aiBusy}
+                        style={{ opacity: selected ? 1 : 0.75 }}
+                      >
+                        {s.supplierName}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
             {productDraft ? (
               <div className="ai-product-draft" style={{ marginTop: 16 }}>
                 <strong>Produto sugerido (clique para selecionar antes de executar)</strong>
+                <p className="theme-helper" style={{ marginTop: 6 }}>
+                  Se nao gostar, voce pode digitar um “outro” valor e aplicar.
+                </p>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, marginTop: 10 }}>
                   {productDraft.requiredFields.includes("name") ? (
@@ -152,6 +345,24 @@ export default function IaModule(props: IaModuleProps) {
                             </button>
                           );
                         })}
+                      </div>
+                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                        <input
+                          placeholder="Digite outro nome"
+                          value={customProductInputs.name}
+                          onChange={(e) => setCustomProductInputs((p) => ({ ...p, name: e.target.value }))}
+                        />
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          onClick={() => {
+                            const v = customProductInputs.name.trim();
+                            if (!v) return;
+                            setProductSelection((p) => ({ ...p, name: v }));
+                          }}
+                        >
+                          Aplicar
+                        </button>
                       </div>
                     </div>
                   ) : null}
@@ -175,6 +386,24 @@ export default function IaModule(props: IaModuleProps) {
                           );
                         })}
                       </div>
+                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                        <input
+                          placeholder="Digite outro SKU"
+                          value={customProductInputs.sku}
+                          onChange={(e) => setCustomProductInputs((p) => ({ ...p, sku: e.target.value }))}
+                        />
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          onClick={() => {
+                            const v = customProductInputs.sku.trim();
+                            if (!v) return;
+                            setProductSelection((p) => ({ ...p, sku: v }));
+                          }}
+                        >
+                          Aplicar
+                        </button>
+                      </div>
                     </div>
                   ) : null}
 
@@ -196,6 +425,26 @@ export default function IaModule(props: IaModuleProps) {
                             </button>
                           );
                         })}
+                      </div>
+                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                        <input
+                          placeholder="Digite outro código"
+                          value={customProductInputs.productCode}
+                          onChange={(e) =>
+                            setCustomProductInputs((p) => ({ ...p, productCode: e.target.value }))
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          onClick={() => {
+                            const v = customProductInputs.productCode.trim();
+                            if (!v) return;
+                            setProductSelection((p) => ({ ...p, productCode: v }));
+                          }}
+                        >
+                          Aplicar
+                        </button>
                       </div>
                     </div>
                   ) : null}
@@ -219,6 +468,26 @@ export default function IaModule(props: IaModuleProps) {
                           );
                         })}
                       </div>
+                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                        <input
+                          placeholder="Digite outra descrição"
+                          value={customProductInputs.description}
+                          onChange={(e) =>
+                            setCustomProductInputs((p) => ({ ...p, description: e.target.value }))
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          onClick={() => {
+                            const v = customProductInputs.description.trim();
+                            if (!v) return;
+                            setProductSelection((p) => ({ ...p, description: v }));
+                          }}
+                        >
+                          Aplicar
+                        </button>
+                      </div>
                     </div>
                   ) : null}
 
@@ -240,6 +509,26 @@ export default function IaModule(props: IaModuleProps) {
                             </button>
                           );
                         })}
+                      </div>
+                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="Digite outro preço"
+                          value={customProductInputs.price}
+                          onChange={(e) => setCustomProductInputs((p) => ({ ...p, price: e.target.value }))}
+                        />
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          onClick={() => {
+                            const v = Number(customProductInputs.price);
+                            if (!Number.isFinite(v)) return;
+                            setProductSelection((p) => ({ ...p, price: v }));
+                          }}
+                        >
+                          Aplicar
+                        </button>
                       </div>
                     </div>
                   ) : null}
@@ -270,7 +559,7 @@ export default function IaModule(props: IaModuleProps) {
                 <button
                   type="button"
                   className="ghost-btn"
-                  disabled={props.aiBusy || !isProductDraftComplete}
+                  disabled={props.aiBusy || !canExecute}
                   onClick={() => void props.handleAiExecute(executeOverrides)}
                 >
                   Confirmar e executar

@@ -47,6 +47,7 @@ export function useAiHandlers(deps: {
         questions?: string[];
         actionsPreview?: string[];
         productDraft?: AiPlan["productDraft"];
+        purchaseDraft?: AiPlan["purchaseDraft"];
       }>(deps.scopedPath("/ai/plan"), { message: text });
 
       deps.setAiPlan({
@@ -59,6 +60,7 @@ export function useAiHandlers(deps: {
         questions: response.questions,
         actionsPreview: response.actionsPreview,
         productDraft: response.productDraft,
+        purchaseDraft: response.purchaseDraft,
       });
 
       if (response.status === "READY") {

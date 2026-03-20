@@ -37,7 +37,34 @@ export type AiPlan = {
   questions?: string[];
   actionsPreview?: string[];
   productDraft?: AiProductDraft;
+  purchaseDraft?: AiPurchaseDraft;
 };
 
 export type AiMessage = { id: string; role: "user" | "assistant"; content: string };
+
+export type AiSupplierOption = {
+  supplierId: string;
+  supplierName: string;
+};
+
+export type AiProductOption = {
+  productId: string;
+  label: string;
+};
+
+export type AiPurchaseDraft =
+  | {
+      mode: "productFound";
+      supplierOptions: AiSupplierOption[];
+      productsBySupplierId: Record<string, AiProductOption[]>;
+      defaultSupplierId: string;
+      defaultSupplierName: string;
+      defaultProductId: string;
+      defaultProductLabel: string;
+    }
+  | {
+      mode: "productMissing";
+      supplierOptions: AiSupplierOption[];
+      defaultSupplierId?: string;
+    };
 

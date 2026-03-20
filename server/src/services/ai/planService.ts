@@ -4,7 +4,7 @@ import { escapeRegExp, slugify } from "../../lib/normalizers";
 import { extractAiIntent } from "./extractAiIntent";
 import { aiPlanStore } from "./aiPlanStore";
 import type { AiPlanAction, AiPlanRecord } from "./types";
-import type { AiProductDraft } from "./types";
+import type { AiProductDraft, AiPurchaseDraft } from "./types";
 import { ProductModel, SupplierModel } from "../../models";
 
 export async function createAiPlan(params: {
@@ -33,6 +33,7 @@ export async function createAiPlan(params: {
   let actionsPreview: string[] = [];
   let source: AiPlanRecord["source"] = "rules";
   let productDraft: AiProductDraft | undefined;
+  let purchaseDraft: AiPurchaseDraft | undefined;
 
   const intent = extracted.intent;
   if (intent === "unknown") {
@@ -69,24 +70,59 @@ export async function createAiPlan(params: {
       questions.push('Informe a quantidade e o nome do produto (ex.: "compre 20 sabonetes de cidreira").');
     } else {
       const regex = new RegExp(escapeRegExp(productName), "i");
-      const product = await ProductModel.findOne({
-        businessId,
-        active: true,
-        $or: [{ name: regex }, { sku: regex }, { productCode: regex }],
-      }).populate("supplier", "name");
 
-      const fallbackSupplier = await SupplierModel.findOne({ businessId, status: "ATIVO" });
+      const suppliers = await SupplierModel.find({ businessId, status: "ATIVO" }).sort({ createdAt: -1 });
+      const supplierOptions = suppliers.map((s) => ({ supplierId: String(s._id), supplierName: s.name }));
 
-      if (!product && !fallbackSupplier) {
+      if (suppliers.length === 0) {
         status = "NEEDS_INFO";
         questions.push("Cadastre ao menos 1 fornecedor ativo antes de eu criar uma compra.");
-      } else if (product) {
-        const supplierName = (product as any).supplier?.name as string | null | undefined;
-        if (!supplierName) {
-          status = "NEEDS_INFO";
-          questions.push(`Vincule um fornecedor no produto "${product.name}" para eu poder comprar.`);
-        } else {
-          const costToUse = unitCost ?? product.cost ?? 0;
+      } else {
+        const productCandidates = await ProductModel.find({
+          businessId,
+          active: true,
+          $or: [{ name: regex }, { sku: regex }, { productCode: regex }],
+        }).populate("supplier", "name");
+
+        const resolveSupplierId = (supplier: any): string | null => {
+          if (!supplier) return null;
+          if (typeof supplier === "string") return supplier;
+          return supplier._id ? String(supplier._id) : null;
+        };
+
+        const resolveSupplierName = (supplier: any): string | null => {
+          if (!supplier) return null;
+          if (typeof supplier === "string") return null;
+          return supplier.name ? String(supplier.name) : null;
+        };
+
+        const resolvedProducts = productCandidates
+          .map((p) => ({
+            productId: String(p._id),
+            name: p.name as string,
+            sku: p.sku as string,
+            cost: p.cost as number,
+            supplierId: resolveSupplierId((p as any).supplier),
+            supplierName: resolveSupplierName((p as any).supplier),
+          }))
+          .filter((p) => p.supplierId && p.supplierName) as Array<{
+          productId: string;
+          name: string;
+          sku: string;
+          cost: number;
+          supplierId: string;
+          supplierName: string;
+        }>;
+
+        // Caso exista ao menos 1 produto compatível com fornecedor vinculado
+        if (resolvedProducts.length > 0) {
+          const defaultProduct = resolvedProducts[0];
+          const defaultSupplierId = defaultProduct.supplierId;
+          const defaultSupplierName = defaultProduct.supplierName;
+          const defaultProductId = defaultProduct.productId;
+          const defaultProductLabel = `${defaultProduct.name} (${defaultProduct.sku})`;
+
+          const costToUse = unitCost ?? defaultProduct.cost ?? 0;
           const totalAmount = quantity * costToUse;
           const needsApproval = totalAmount >= purchaseApprovalThreshold;
 
@@ -96,93 +132,137 @@ export async function createAiPlan(params: {
               : "A compra entra no estoque imediatamente (abaixo do limite de aprovaçao)."
           );
 
+          // Para o passo “escolher outros fornecedores”: agrupa os produtos candidatos por fornecedor.
+          const productsBySupplierId: Record<string, Array<{ productId: string; label: string }>> = {};
+          for (const p of resolvedProducts) {
+            const label = `${p.name} (${p.sku})`;
+            if (!productsBySupplierId[p.supplierId]) productsBySupplierId[p.supplierId] = [];
+            productsBySupplierId[p.supplierId].push({ productId: p.productId, label });
+          }
+
+          const filteredSupplierOptions = supplierOptions.filter(
+            (s) => (productsBySupplierId[s.supplierId] || []).length > 0
+          );
+
+          purchaseDraft = {
+            mode: "productFound",
+            supplierOptions: filteredSupplierOptions,
+            productsBySupplierId,
+            defaultSupplierId,
+            defaultSupplierName,
+            defaultProductId,
+            defaultProductLabel,
+          };
+
           actions.push({
             kind: "createPurchase",
             input: {
-              supplierName,
-              productId: String(product._id),
+              supplierName: defaultSupplierName,
+              productId: defaultProductId,
               quantity,
               cost: costToUse,
               autoApprove: autoApprovePurchasesForAi,
             },
             outputKey: "purchaseId",
           });
-          summary = `Comprar ${quantity}x ${product.name}`;
-          actionsPreview = [`Criar compra de ${quantity}x ${product.name} (custo unit.: R$ ${costToUse.toFixed(2)})`];
+
+          status = "READY";
+          summary = `Comprar ${quantity}x ${defaultProduct.name}`;
+          actionsPreview = [
+            `Criar compra de ${quantity}x ${defaultProduct.name} (custo unit.: R$ ${costToUse.toFixed(2)})`,
+          ];
+        } else {
+          // Produto não existe (ou não tem fornecedor vinculado): cria no momento de execução.
+          // Supplier tem que ser escolha vinda do banco de dados (direto, sem sugestao).
+          const defaultSupplier = suppliers[0];
+          const supplierId = String(defaultSupplier._id);
+          const supplierName = defaultSupplier.name;
+
+          const sku = `${slugify(productName)}-${Date.now().toString().slice(-6)}`;
+          const suggestedProductCode = slugify(productName).replace(/-/g, "").slice(0, 12);
+          const costToUse = unitCost ?? 0;
+          const arnicaDesc = "extrato de arnica + bucha";
+          const camomilaDesc = "camomila + bucha";
+          const lower = productName.toLowerCase();
+          const suggestedDescription = lower.includes("camom")
+            ? camomilaDesc
+            : lower.includes("arnica")
+              ? arnicaDesc
+              : arnicaDesc;
+          const suggestedPrice = 5;
+
+          productDraft = {
+            kind: "createProduct",
+            missingForIntent: "purchase",
+            suggested: {
+              name: productName,
+              sku,
+              productCode: suggestedProductCode,
+              description: suggestedDescription,
+              supplierId,
+              price: suggestedPrice,
+              cost: costToUse,
+              stock: 0,
+              minStock: 10,
+              active: true,
+            },
+            requiredFields: ["name", "sku", "productCode", "description", "price"],
+            options: {
+              name: [productName, `Sabonete ${productName}`],
+              sku: [sku, `${slugify(productName)}-${Date.now().toString().slice(-4)}`],
+              productCode: [
+                suggestedProductCode,
+                `${suggestedProductCode.slice(0, 8)}${sku.slice(-4)}`.slice(0, 12),
+              ],
+              description: [arnicaDesc, camomilaDesc, `Sabonete ${productName}`, productName],
+              price: [5, 10, 15, 20],
+            },
+          };
+
+          actions.push({
+            kind: "createProduct",
+            input: {
+              name: productName,
+              sku,
+              productCode: suggestedProductCode,
+              description: suggestedDescription,
+              supplierId,
+              price: suggestedPrice,
+              cost: costToUse,
+              stock: 0,
+              minStock: 10,
+              active: true,
+            },
+            outputKey: "productId",
+          });
+          actions.push({
+            kind: "createPurchase",
+            input: {
+              supplierName,
+              productRefKey: "productId",
+              quantity,
+              cost: costToUse,
+              autoApprove: autoApprovePurchasesForAi,
+            },
+            outputKey: "purchaseId",
+          });
+
+          purchaseDraft = {
+            mode: "productMissing",
+            supplierOptions,
+            defaultSupplierId: supplierId,
+          };
+
+          status = "READY";
+          warnings.push(
+            "Produto nao existia (ou nao possui fornecedor vinculado). Vou criar usando valores sugeridos. Revise (ou digite) antes de executar."
+          );
+          summary = `Comprar ${quantity}x ${productName} (com criação do produto se necessário)`;
+          actionsPreview = [
+            `Criar produto: ${productName} (SKU: ${sku})`,
+            `Criar compra de ${quantity}x ${productName} (custo unit.: R$ ${costToUse.toFixed(2)})`,
+          ];
         }
-      } else {
-        // Produto não existe: cria produto no momento de execução com defaults e compra logo em seguida.
-        const supplierId = String(fallbackSupplier!._id);
-        const supplierName = fallbackSupplier!.name;
-        const sku = `${slugify(productName)}-${Date.now().toString().slice(-6)}`;
-        const suggestedProductCode = slugify(productName).replace(/-/g, "").slice(0, 12);
-        const costToUse = unitCost ?? 0;
-        const suggestedDescription = productName;
-        const suggestedPrice = costToUse; // valor inicial sugerido; pode ser ajustado antes de executar
-
-        productDraft = {
-          kind: "createProduct",
-          missingForIntent: "purchase",
-          suggested: {
-            name: productName,
-            sku,
-            productCode: suggestedProductCode,
-            description: suggestedDescription,
-            supplierId,
-            price: suggestedPrice,
-            cost: costToUse,
-            stock: 0,
-            minStock: 10,
-            active: true,
-          },
-          requiredFields: ["name", "sku", "productCode", "description", "price"],
-          options: {
-            name: [productName, productName.replace(/^\w/, (c) => c.toUpperCase())],
-            sku: [sku, `${slugify(productName)}-${Date.now().toString().slice(-4)}`],
-            productCode: [suggestedProductCode, `${suggestedProductCode.slice(0, 8)}${sku.slice(-4)}`.slice(0, 12)],
-            description: [suggestedDescription, `Sabonete ${productName}`],
-            price:
-              costToUse > 0
-                ? [costToUse, Number((costToUse * 1.2).toFixed(2)), Number((costToUse * 1.5).toFixed(2))]
-                : [0, 1, 5],
-          },
-        };
-
-        actions.push({
-          kind: "createProduct",
-          input: {
-            name: productName,
-            sku,
-            productCode: suggestedProductCode,
-            description: suggestedDescription,
-            supplierId,
-            price: suggestedPrice,
-            cost: costToUse,
-            stock: 0,
-            minStock: 10,
-            active: true,
-          },
-          outputKey: "productId",
-        });
-        actions.push({
-          kind: "createPurchase",
-          input: {
-            supplierName,
-            productRefKey: "productId",
-            quantity,
-            cost: costToUse,
-            autoApprove: autoApprovePurchasesForAi,
-          },
-          outputKey: "purchaseId",
-        });
-
-        status = "READY";
-        warnings.push("Produto nao existia. Vou criar usando valores sugeridos. Revise os campos do produto antes de executar.");
-        summary = `Comprar ${quantity}x ${productName} (com criação do produto se necessário)`;
-        actionsPreview = [
-          `Criar produto: ${productName} (SKU: ${sku})`,
-          `Criar compra de ${quantity}x ${productName} (custo unit.: R$ ${costToUse.toFixed(2)})`,
-        ];
       }
     }
   } else if (intent === "sale") {
@@ -245,6 +325,7 @@ export async function createAiPlan(params: {
     actions: status === "READY" ? actions : undefined,
     actionsPreview: status === "READY" ? actionsPreview : undefined,
     productDraft: productDraft,
+    purchaseDraft,
   };
 
   aiPlanStore.set(planId, record);
@@ -259,6 +340,7 @@ export async function createAiPlan(params: {
     questions: record.questions,
     actionsPreview: record.actionsPreview,
     productDraft: record.productDraft,
+    purchaseDraft: record.purchaseDraft,
   };
 }
 

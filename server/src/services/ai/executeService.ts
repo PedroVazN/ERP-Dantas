@@ -12,6 +12,7 @@ export async function executeAiPlan(
     confirm: boolean | string | undefined;
     overrides?: {
       createProduct?: Partial<Extract<AiPlanAction, { kind: "createProduct" }>["input"]>;
+      createPurchase?: Partial<Extract<AiPlanAction, { kind: "createPurchase" }>["input"]>;
     };
   },
   deps: {
@@ -106,8 +107,14 @@ export async function executeAiPlan(
       }
 
       if (action.kind === "createPurchase") {
+        const mergedInput: Extract<AiPlanAction, { kind: "createPurchase" }>["input"] = {
+          ...action.input,
+          ...(overrides?.createPurchase || {}),
+        };
+
         const productId =
-          action.input.productId || (action.input.productRefKey ? refs[action.input.productRefKey] : undefined);
+          mergedInput.productId ||
+          (mergedInput.productRefKey ? refs[mergedInput.productRefKey] : undefined);
         if (!productId) {
           throw new Error("Produto não resolvido para compra.");
         }
@@ -122,8 +129,8 @@ export async function executeAiPlan(
           throw new Error(`Produto "${product.name}" nao possui fornecedor vinculado no cadastro.`);
         }
 
-        const quantity = action.input.quantity;
-        const cost = action.input.cost;
+        const quantity = mergedInput.quantity;
+        const cost = mergedInput.cost;
         const totalAmount = quantity * cost;
         const needsApproval = totalAmount >= purchaseApprovalThreshold;
 
@@ -159,7 +166,7 @@ export async function executeAiPlan(
           totalAmount,
         });
 
-        if (needsApproval && action.input.autoApprove) {
+        if (needsApproval && mergedInput.autoApprove) {
           await applyPurchaseStock(
             businessId,
             normalizedItems as Array<{ product?: Types.ObjectId; quantity: number; cost: number }>
@@ -178,7 +185,7 @@ export async function executeAiPlan(
         refs[action.outputKey] = String(purchase._id);
         results[action.outputKey] = purchase._id;
 
-        if (needsApproval && action.input.autoApprove) {
+        if (needsApproval && mergedInput.autoApprove) {
           runtimeWarnings.push("Compra acima do limite: auto-aprovada pela IA para aplicar estoque.");
         }
       }
