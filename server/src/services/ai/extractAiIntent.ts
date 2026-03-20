@@ -23,6 +23,10 @@ export function extractAiIntent(message: string): {
       ? "PIX"
       : lower.includes("dinheiro")
         ? "DINHEIRO"
+        : lower.includes("debito") || lower.includes("débito")
+          ? "CARTAO"
+          : lower.includes("credito") || lower.includes("crédito")
+            ? "CARTAO"
         : lower.includes("cartao") || lower.includes("cartão")
           ? "CARTAO"
           : lower.includes("boleto")
@@ -55,17 +59,36 @@ export function extractAiIntent(message: string): {
     };
   }
 
-  const customerCreateMatch = lower.match(/(?:cadastrar|criar|adicionar)\s+(?:um\s+)?cliente\s+(.+)$/i);
+  const emailRe = /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/i;
+  const phoneRe = /\b([0-9]{8,})\b/;
+
+  const customerCreateMatch = message.match(/(?:cadastrar|criar|adicionar)\s+(?:um\s+)?cliente\s+(.+)$/i);
   if (customerCreateMatch) {
-    const customerName = customerCreateMatch[1].trim();
-    return { intent: "customer_create", customerName };
+    const rest = customerCreateMatch[1].trim();
+    const emailMatch = rest.match(emailRe)?.[0] || null;
+    const phoneMatch = rest.match(phoneRe)?.[1] || null;
+
+    const restWithoutEmail = emailMatch ? rest.replace(emailMatch, " ").trim() : rest;
+    const restWithoutPhone = phoneMatch
+      ? restWithoutEmail.replace(phoneMatch, " ").trim()
+      : restWithoutEmail;
+
+    const customerName = restWithoutPhone.replace(/\s+/g, " ").trim();
+    return { intent: "customer_create", customerName: customerName || undefined };
   }
 
   // “cliente João” sem prefixo explícito: tentamos apenas se estiver muito claro
   if (lower.includes("cliente") && (lower.includes("cadastrar") || lower.includes("criar") || lower.includes("adicionar"))) {
     const nameMatch = lower.match(/cliente\s+(.+)$/i);
     if (nameMatch) {
-      return { intent: "customer_create", customerName: nameMatch[1].trim() };
+      const rest = nameMatch[1].trim();
+      const emailMatch = rest.match(emailRe)?.[0] || null;
+      const phoneMatch = rest.match(phoneRe)?.[1] || null;
+
+      const restWithoutEmail = emailMatch ? rest.replace(emailMatch, " ").trim() : rest;
+      const restWithoutPhone = phoneMatch ? restWithoutEmail.replace(phoneMatch, " ").trim() : restWithoutEmail;
+      const customerName = restWithoutPhone.replace(/\s+/g, " ").trim();
+      return { intent: "customer_create", customerName: customerName || undefined };
     }
   }
 

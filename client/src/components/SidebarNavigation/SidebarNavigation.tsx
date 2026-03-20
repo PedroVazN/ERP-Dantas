@@ -35,9 +35,9 @@ export default function SidebarNavigation(props: SidebarNavigationProps) {
       </nav>
 
       <div className="theme-switch">
-        <small>Personalize o visual no mÃ³dulo de usuÃ¡rio.</small>
+        <small>Personalize o visual no módulo de usuário.</small>
         <button className="ghost-btn" onClick={() => props.selectModule("usuario")}>
-          Abrir preferÃªncias
+          Abrir preferências
         </button>
       </div>
     </aside>

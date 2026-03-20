@@ -27,7 +27,7 @@ export default function DashboardPanel(props: DashboardPanelProps) {
         <article className="kpi-card animated delay-2">
           <h3>Despesas</h3>
           <strong>{props.formatBRL(dashboard.expenses)}</strong>
-          <span>Custos operacionais lanÃ§ados</span>
+          <span>Custos operacionais lançados</span>
         </article>
         <article className="kpi-card animated delay-3">
           <h3>Lucro</h3>
@@ -43,24 +43,24 @@ export default function DashboardPanel(props: DashboardPanelProps) {
 
       <section className="kpi-grid kpi-grid-bi">
         <article className="kpi-card animated delay-1">
-          <h3>Margem lÃ­quida</h3>
+          <h3>Margem líquida</h3>
           <strong>{biInsights.kpis.margin.toFixed(1)}%</strong>
-          <span>EficiÃªncia sobre faturamento do mÃªs</span>
+          <span>Eficiência sobre faturamento do mês</span>
         </article>
         <article className="kpi-card animated delay-2">
           <h3>Crescimento de vendas</h3>
           <strong>{props.formatPct(biInsights.kpis.revenueGrowth)}</strong>
-          <span>Comparativo com o mÃªs anterior</span>
+          <span>Comparativo com o mês anterior</span>
         </article>
         <article className="kpi-card animated delay-3">
           <h3>Crescimento do lucro</h3>
           <strong>{props.formatPct(biInsights.kpis.profitGrowth)}</strong>
-          <span>VariaÃ§Ã£o mensal do resultado</span>
+          <span>Variação mensal do resultado</span>
         </article>
         <article className="kpi-card animated delay-4">
-          <h3>Ticket mÃ©dio</h3>
+          <h3>Ticket médio</h3>
           <strong>{props.formatBRL(biInsights.kpis.averageTicket)}</strong>
-          <span>{biInsights.kpis.salesCount} vendas no mÃªs corrente</span>
+          <span>{biInsights.kpis.salesCount} vendas no mês corrente</span>
         </article>
       </section>
 
@@ -71,7 +71,7 @@ export default function DashboardPanel(props: DashboardPanelProps) {
         </button>
         <button className="quick-card" onClick={() => props.selectModule("produtos")}>
           <h4>Gerir estoque</h4>
-          <p>Atualizar catÃ¡logo e acompanhar mÃ­nimos</p>
+          <p>Atualizar catálogo e acompanhar mínimos</p>
         </button>
         <button className="quick-card" onClick={() => props.selectModule("financeiro")}>
           <h4>Fluxo financeiro</h4>
@@ -81,10 +81,10 @@ export default function DashboardPanel(props: DashboardPanelProps) {
 
       <section className="module-grid animated bi-grid">
         <article className="table-card">
-          <h3>RelatÃ³rio visual: receita x custo x lucro (6 meses)</h3>
+          <h3>Relatório visual: receita x custo x lucro (6 meses)</h3>
           <p className="theme-helper">
-            AtualizaÃ§Ã£o em tempo real a cada 15s{" "}
-            {props.biRefreshing ? "(sincronizando...)" : `(Ãºltima: ${new Date(biInsights.updatedAt).toLocaleTimeString("pt-BR")})`}
+            Atualização em tempo real a cada 15s{" "}
+            {props.biRefreshing ? "(sincronizando...)" : `(última: ${new Date(biInsights.updatedAt).toLocaleTimeString("pt-BR")})`}
           </p>
           <div className="bi-series-list">
             {biInsights.timeseries.map((point) => (
@@ -116,9 +116,9 @@ export default function DashboardPanel(props: DashboardPanelProps) {
         </article>
 
         <article className="table-card">
-          <h3>Top produtos por faturamento no mÃªs</h3>
+          <h3>Top produtos por faturamento no mês</h3>
           {biInsights.topProducts.length === 0 ? (
-            <p className="empty">Sem vendas suficientes para anÃ¡lise neste perÃ­odo.</p>
+            <p className="empty">Sem vendas suficientes para análise neste período.</p>
           ) : (
             <div className="bi-rank-list">
               {biInsights.topProducts.map((item) => (
@@ -143,9 +143,9 @@ export default function DashboardPanel(props: DashboardPanelProps) {
 
       <section className="module-grid animated bi-grid">
         <article className="table-card">
-          <h3>Custos por categoria (mÃªs atual)</h3>
+          <h3>Custos por categoria (mês atual)</h3>
           {biInsights.costByCategory.length === 0 ? (
-            <p className="empty">Nenhum custo lanÃ§ado no mÃªs atual.</p>
+            <p className="empty">Nenhum custo lançado no mês atual.</p>
           ) : (
             <div className="bi-rank-list">
               {biInsights.costByCategory.map((item) => (
@@ -165,7 +165,7 @@ export default function DashboardPanel(props: DashboardPanelProps) {
         </article>
 
         <article className="table-card">
-          <h3>AnÃ¡lise preditiva para decisÃ£o</h3>
+          <h3>Análise preditiva para decisão</h3>
           <div className="prediction-grid">
             <div className="prediction-card">
               <span>Receita projetada</span>
@@ -181,7 +181,7 @@ export default function DashboardPanel(props: DashboardPanelProps) {
             </div>
           </div>
           <p className="theme-helper">
-            ConfianÃ§a da projeÃ§Ã£o: <strong>{biInsights.forecast.confidence}</strong>. Baseada na tendÃªncia dos Ãºltimos meses.
+            Confiança da projeção: <strong>{biInsights.forecast.confidence}</strong>. Baseada na tendência dos últimos meses.
           </p>
           <h4 className="bi-subtitle">Risco de ruptura de estoque</h4>
           {biInsights.forecast.stockRisk.length === 0 ? (
@@ -193,11 +193,11 @@ export default function DashboardPanel(props: DashboardPanelProps) {
                   <div>
                     <strong>{risk.name}</strong>
                     <small>
-                      Estoque: {risk.stock} | MÃ­nimo: {risk.minStock} | Giro diÃ¡rio: {risk.avgDailySold}
+                      Estoque: {risk.stock} | Mínimo: {risk.minStock} | Giro diário: {risk.avgDailySold}
                     </small>
                   </div>
                   <span>
-                    {risk.projectedDaysToStockout === null ? "Sem previsÃ£o" : `${risk.projectedDaysToStockout} dias`}
+                    {risk.projectedDaysToStockout === null ? "Sem previsão" : `${risk.projectedDaysToStockout} dias`}
                   </span>
                 </div>
               ))}
@@ -207,21 +207,21 @@ export default function DashboardPanel(props: DashboardPanelProps) {
       </section>
 
       <section className="table-card animated">
-        <h3>Produtos com estoque crÃ­tico</h3>
+        <h3>Produtos com estoque crítico</h3>
         <table>
           <thead>
             <tr>
               <th>Produto</th>
               <th>SKU</th>
               <th>Estoque</th>
-              <th>MÃ­nimo</th>
+              <th>Mínimo</th>
             </tr>
           </thead>
           <tbody>
             {dashboard.lowStock.length === 0 ? (
               <tr>
                 <td colSpan={4} className="empty">
-                  Nenhum item em nÃ­vel crÃ­tico no momento.
+                  Nenhum item em nível crítico no momento.
                 </td>
               </tr>
             ) : (
@@ -239,12 +239,12 @@ export default function DashboardPanel(props: DashboardPanelProps) {
       </section>
 
       <section className="promo-card animated">
-        <h3>ERP pronto para crescer com seu negÃ³cio</h3>
+        <h3>ERP pronto para crescer com seu negócio</h3>
         <p>
-          Expanda com fiscal, mÃºltiplas lojas, permissÃµes por perfil e painÃ©is analÃ­ticos avanÃ§ados sem trocar de plataforma.
+          Expanda com fiscal, múltiplas lojas, permissões por perfil e painéis analíticos avançados sem trocar de plataforma.
         </p>
         <button className="ghost-btn" onClick={() => props.selectModule("clientes")}>
-          Explorar mÃ³dulos
+          Explorar módulos
         </button>
       </section>
     </>

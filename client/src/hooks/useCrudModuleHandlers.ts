@@ -239,13 +239,13 @@ export function useCrudModuleHandlers(deps: {
     }
     const product = products.find((item) => item._id === saleForm.productId);
     if (!product) {
-      setError("Selecione um produto vÃ¡lido.");
+      setError("Selecione um produto válido.");
       return;
     }
 
     const quantity = Number(saleForm.quantity);
     if (quantity > product.stock) {
-      setError(`Estoque insuficiente para ${product.name}. DisponÃ­vel: ${product.stock} unidades.`);
+      setError(`Estoque insuficiente para ${product.name}. Disponível: ${product.stock} unidades.`);
       return;
     }
 
@@ -266,7 +266,7 @@ export function useCrudModuleHandlers(deps: {
       setSaleForm({ productId: "", quantity: 1, paymentMethod: "PIX" });
       await loadAllData();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erro ao lanÃ§ar venda.";
+      const message = err instanceof Error ? err.message : "Erro ao lançar venda.";
       setError(message);
     }
   }
@@ -497,7 +497,7 @@ export function useCrudModuleHandlers(deps: {
       return;
     }
     const confirmDelete = window.confirm(
-      `Deseja cancelar/excluir a venda de ${formatBRL(item.totalAmount)}? (O estoque serÃ¡ estornado)`
+      `Deseja cancelar/excluir a venda de ${formatBRL(item.totalAmount)}? (O estoque será estornado)`
     );
     if (!confirmDelete) return;
     await api.delete<{ deleted: boolean }>(scopedPath(`/sales/${item._id}`));
@@ -519,7 +519,7 @@ export function useCrudModuleHandlers(deps: {
       return;
     }
     const confirmDelete = window.confirm(
-      `Deseja cancelar/excluir a compra de ${formatBRL(item.totalAmount)}? (Se jÃ¡ entrou no estoque, serÃ¡ estornado)`
+      `Deseja cancelar/excluir a compra de ${formatBRL(item.totalAmount)}? (Se já entrou no estoque, será estornado)`
     );
     if (!confirmDelete) return;
     await api.delete<{ deleted: boolean }>(scopedPath(`/purchases/${item._id}`));

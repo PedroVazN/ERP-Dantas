@@ -60,7 +60,7 @@ const moduleMeta: Record<ModuleKey, { label: string; short: string; helper: stri
   financeiro: { label: "Financeiro", short: "FN", helper: "Contas e despesas" },
   checklist: { label: "Checklist", short: "CK", helper: "Ideias e futuros implementos" },
   ia: { label: "IA", short: "AI", helper: "Automatize compra/venda/cadastro" },
-  usuario: { label: "Usuario", short: "US", helper: "Perfil e preferÃªncias" },
+  usuario: { label: "Usuario", short: "US", helper: "Perfil e preferências" },
 };
 
 const themeOptions: Array<{ value: Theme; label: string; description: string }> = [
@@ -497,7 +497,7 @@ function App() {
   });
 
   if (authChecking) {
-    return <div className="auth-checking">Verificando sessÃ£o...</div>;
+    return <div className="auth-checking">Verificando sessão...</div>;
   }
 
   if (!isAuthenticated) {
@@ -508,7 +508,7 @@ function App() {
             <div className="brand-mark">E-S</div>
             <div>
               <h1>E-Sentinel</h1>
-              <p>GestÃ£o moderna para operaÃ§Ã£o de sabonetes</p>
+              <p>Gestão moderna para operação de sabonetes</p>
             </div>
           </div>
           <h2>Acesse sua conta</h2>
@@ -527,7 +527,7 @@ function App() {
             </div>
             <div className="form-field">
               <label>Senha</label>
-              <small className="field-help">Sua senha de acesso (nÃ£o compartilhe).</small>
+              <small className="field-help">Sua senha de acesso (não compartilhe).</small>
               <input
                 type="password"
                 placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
@@ -578,7 +578,7 @@ function App() {
           <form className="auth-form" onSubmit={handleCreateBusiness}>
             <div className="form-field">
               <label>Novo ERP especial</label>
-              <small className="field-help">Crie um ambiente separado por negÃ³cio (ex.: â€œLoja Centroâ€).</small>
+              <small className="field-help">Crie um ambiente separado por negócio (ex.: &quot;Loja Centro&quot;).</small>
               <input
                 placeholder="ex.: Loja Centro"
                 value={businessForm.name}
@@ -604,7 +604,7 @@ function App() {
         moduleMeta={moduleMeta}
         activeModule={activeModule}
         selectModule={(key) => selectModule(key as ModuleKey)}
-        companyName={selectedBusiness?.name || settings?.companyName || "GestÃ£o inteligente de sabonetes"}
+        companyName={selectedBusiness?.name || settings?.companyName || "Gestão inteligente de sabonetes"}
       />
 
       <main className="content">

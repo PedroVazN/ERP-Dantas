@@ -91,7 +91,7 @@ export default function AppHeader(props: AppHeaderProps) {
               props.handleLogout();
             }}
           >
-            Sair ({props.currentUser?.name || "UsuÃ¡rio"})
+            Sair ({props.currentUser?.name || "Usuário"})
           </button>
         </div>
       </header>

@@ -48,7 +48,9 @@ export async function createAiPlan(params: {
       questions.push("Informe o nome do cliente para cadastrar.");
     } else {
       const emailMatch = message.match(/\b[\w.+-]+@[\w-]+\.[\w.-]+\b/i);
-      const phoneMatch = message.match(/(?:telefone|tel)\s*[:\-]?\s*([0-9+()\-\s]{8,})/i);
+      const phoneMatch =
+        message.match(/(?:telefone|tel)\s*[:\-]?\s*([0-9+()\-\s]{8,})/i) ||
+        message.match(/\b([0-9]{8,})\b/);
       const email = emailMatch?.[0]?.trim();
       const phone = phoneMatch?.[1]?.trim();
 
