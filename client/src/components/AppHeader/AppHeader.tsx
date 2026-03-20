@@ -25,6 +25,13 @@ export type AppHeaderProps = {
 
 export default function AppHeader(props: AppHeaderProps) {
   const activeMeta = props.moduleMeta[props.activeModule];
+  // Mantem a IA como primeiro item do menu (sidebar e mobile).
+  const menuEntries = Object.entries(props.moduleMeta);
+  const iaIndex = menuEntries.findIndex(([key]) => key === "ia");
+  if (iaIndex > 0) {
+    const [iaEntry] = menuEntries.splice(iaIndex, 1);
+    if (iaEntry) menuEntries.unshift(iaEntry);
+  }
 
   return (
     <>
@@ -47,7 +54,7 @@ export default function AppHeader(props: AppHeaderProps) {
       {props.mobileMenuOpen ? (
         <section className="mobile-menu-panel">
           <nav className="menu mobile-menu-list">
-            {Object.entries(props.moduleMeta).map(([key, meta]) => (
+            {menuEntries.map(([key, meta]) => (
               <button
                 key={key}
                 className={props.activeModule === key ? "nav-button active" : "nav-button"}

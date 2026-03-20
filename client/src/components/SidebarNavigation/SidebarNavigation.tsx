@@ -8,6 +8,14 @@ export type SidebarNavigationProps = {
 };
 
 export default function SidebarNavigation(props: SidebarNavigationProps) {
+  // Garante que a IA apareca sempre como primeiro item do menu.
+  const menuEntries = Object.entries(props.moduleMeta);
+  const iaIndex = menuEntries.findIndex(([key]) => key === "ia");
+  if (iaIndex > 0) {
+    const [iaEntry] = menuEntries.splice(iaIndex, 1);
+    if (iaEntry) menuEntries.unshift(iaEntry);
+  }
+
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -19,7 +27,7 @@ export default function SidebarNavigation(props: SidebarNavigationProps) {
       </div>
 
       <nav className="menu">
-        {Object.entries(props.moduleMeta).map(([key, meta]) => (
+        {menuEntries.map(([key, meta]) => (
           <button
             key={key}
             className={props.activeModule === key ? "nav-button active" : "nav-button"}

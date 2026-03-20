@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 
 import type { AiMessage, AiPlan, AiProductDraftField } from "../aiTypes";
@@ -16,12 +16,16 @@ export type IaModuleProps = {
 export default function IaModule(props: IaModuleProps) {
   const productDraft = props.aiPlan?.productDraft;
   const purchaseDraft = props.aiPlan?.purchaseDraft;
+  const recognitionRef = useRef<any>(null);
 
   type ProductDraftSelection = Partial<Record<AiProductDraftField, string | number>>;
   const [productSelection, setProductSelection] = useState<ProductDraftSelection>({});
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [useMatchedSupplier, setUseMatchedSupplier] = useState<boolean | null>(null);
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const [voiceListening, setVoiceListening] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   const [customProductInputs, setCustomProductInputs] = useState<{
     name: string;
     sku: string;
@@ -50,6 +54,67 @@ export default function IaModule(props: IaModuleProps) {
       price: "",
     });
   }, [props.aiPlan?.planId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const SpeechRecognitionCtor =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionCtor) {
+      setVoiceSupported(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = "pt-BR";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      setVoiceError(null);
+      setVoiceListening(true);
+    };
+    recognition.onend = () => {
+      setVoiceListening(false);
+    };
+    recognition.onerror = (event: any) => {
+      const code = String(event?.error || "erro_desconhecido");
+      if (code === "not-allowed" || code === "service-not-allowed") {
+        setVoiceError("Permissao de microfone negada.");
+      } else if (code === "no-speech") {
+        setVoiceError("Nenhuma fala detectada. Tente novamente.");
+      } else {
+        setVoiceError(`Falha ao capturar voz (${code}).`);
+      }
+    };
+    recognition.onresult = (event: any) => {
+      const text = String(event?.results?.[0]?.[0]?.transcript || "").trim();
+      if (!text) return;
+      props.setAiInput((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text));
+    };
+
+    recognitionRef.current = recognition;
+    setVoiceSupported(true);
+
+    return () => {
+      try {
+        recognition.stop();
+      } catch {
+        // Ignora erros de parada durante unmount.
+      }
+      recognitionRef.current = null;
+    };
+  }, [props.setAiInput]);
+
+  function toggleVoiceCapture() {
+    if (!recognitionRef.current) return;
+    setVoiceError(null);
+    try {
+      if (voiceListening) recognitionRef.current.stop();
+      else recognitionRef.current.start();
+    } catch {
+      setVoiceError("Nao foi possivel iniciar a captura de voz.");
+    }
+  }
 
   const isProductDraftComplete = useMemo(() => {
     if (!productDraft) return true;
@@ -157,10 +222,23 @@ export default function IaModule(props: IaModuleProps) {
                 }
               }}
             />
+            {voiceSupported ? (
+              <button
+                type="button"
+                className="ghost-btn"
+                onClick={toggleVoiceCapture}
+                disabled={props.aiBusy}
+                title={voiceListening ? "Parar captura de voz" : "Falar no microfone"}
+              >
+                {voiceListening ? "Parar voz" : "Falar"}
+              </button>
+            ) : null}
             <button type="button" onClick={() => void props.handleAiSend()} disabled={props.aiBusy}>
               {props.aiBusy ? "Processando..." : "Enviar"}
             </button>
           </div>
+          {voiceSupported ? <small className="theme-helper">Use "Falar" para ditar o comando.</small> : null}
+          {voiceError ? <small className="theme-helper">{voiceError}</small> : null}
         </div>
       </section>
 
