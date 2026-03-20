@@ -208,13 +208,13 @@ export async function createAiPlan(params: {
             },
             requiredFields: ["name", "sku", "productCode", "description", "price"],
             options: {
-              name: [productName, `Sabonete ${productName}`],
+              name: [productName],
               sku: [sku, `${slugify(productName)}-${Date.now().toString().slice(-4)}`],
               productCode: [
                 suggestedProductCode,
                 `${suggestedProductCode.slice(0, 8)}${sku.slice(-4)}`.slice(0, 12),
               ],
-              description: [arnicaDesc, camomilaDesc, `Sabonete ${productName}`, productName],
+              description: [arnicaDesc, camomilaDesc, productName],
               price: [5, 10, 15, 20],
             },
           };
