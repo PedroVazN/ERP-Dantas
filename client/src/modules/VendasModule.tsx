@@ -1,8 +1,10 @@
-import type { Product, Sale } from "../types";
+import type { Customer, Product, Sale } from "../types";
+import { saleCustomerLabel } from "../utils/saleCustomerLabel";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { useMemo, useRef, useState } from "react";
 
 type SaleFormState = {
+  customerId: string;
   productId: string;
   quantity: number;
   unitPrice: number;
@@ -13,6 +15,7 @@ export type VendasModuleProps = {
   submitSale: (event: FormEvent) => Promise<void> | void;
   saleForm: SaleFormState;
   setSaleForm: Dispatch<SetStateAction<SaleFormState>>;
+  customers: Customer[];
   products: Product[];
   sales: Sale[];
   editSale: (sale: Sale) => void;
@@ -50,11 +53,13 @@ export default function VendasModule(props: VendasModuleProps) {
         if (paymentFilter !== "TODOS" && item.paymentMethod !== paymentFilter) return false;
         if (!normalizedSearch) return true;
         const orderCode = `ov-${String(item._id).slice(-4).toLowerCase()}`;
+        const clientLabel = saleCustomerLabel(item).toLowerCase();
         return (
           orderCode.includes(normalizedSearch) ||
           item.status.toLowerCase().includes(normalizedSearch) ||
           item.paymentMethod.toLowerCase().includes(normalizedSearch) ||
-          String(item.invoice?.number || "").toLowerCase().includes(normalizedSearch)
+          String(item.invoice?.number || "").toLowerCase().includes(normalizedSearch) ||
+          clientLabel.includes(normalizedSearch)
         );
       });
   }, [paymentFilter, props.sales, search, statusFilter]);
@@ -206,7 +211,7 @@ export default function VendasModule(props: VendasModuleProps) {
               <div className="form-field">
                 <label>Buscar</label>
                 <input
-                  placeholder="Buscar por número, status, pagamento ou NF-e"
+                  placeholder="Buscar por cliente, número, status, pagamento ou NF-e"
                   value={search}
                   onChange={(event) => {
                     setSearch(event.target.value);
@@ -221,6 +226,7 @@ export default function VendasModule(props: VendasModuleProps) {
                 <thead>
                   <tr>
                     <th>Número</th>
+                    <th>Cliente</th>
                     <th>Data</th>
                     <th>Valor</th>
                     <th>Pagamento</th>
@@ -235,6 +241,7 @@ export default function VendasModule(props: VendasModuleProps) {
                     paginatedSales.map((item) => (
                       <tr key={item._id}>
                         <td>OV-{String(item._id).slice(-4).toUpperCase()}</td>
+                        <td>{saleCustomerLabel(item)}</td>
                         <td>{new Date(item.createdAt).toLocaleDateString("pt-BR")}</td>
                         <td>{props.formatBRL(item.totalAmount)}</td>
                         <td>{item.paymentMethod}</td>
@@ -265,7 +272,7 @@ export default function VendasModule(props: VendasModuleProps) {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={8} className="empty">
+                      <td colSpan={9} className="empty">
                         Nenhuma ordem encontrada com os filtros atuais.
                       </td>
                     </tr>
@@ -299,6 +306,28 @@ export default function VendasModule(props: VendasModuleProps) {
         ) : (
           <form className="form-card order-form" ref={quickFormRef} onSubmit={props.submitSale}>
             <h3>Emitir nova ordem de venda</h3>
+            <div className="form-field">
+              <label>Cliente</label>
+              <small className="field-help">
+                Selecione quem comprou (cadastre em Clientes, se necessário). Opcional para venda avulsa.
+              </small>
+              <select
+                value={props.saleForm.customerId}
+                onChange={(event) =>
+                  props.setSaleForm({ ...props.saleForm, customerId: event.target.value })
+                }
+              >
+                <option value="">Consumidor / não informado</option>
+                {props.customers
+                  .filter((c) => c.status === "ATIVO")
+                  .map((c) => (
+                    <option key={c._id} value={c._id}>
+                      {c.name}
+                      {c.phone ? ` — ${c.phone}` : ""}
+                    </option>
+                  ))}
+              </select>
+            </div>
             <div className="form-field">
               <label>Forma de pagamento</label>
               <small className="field-help">Como o cliente pagou (PIX, dinheiro, cartão, boleto).</small>

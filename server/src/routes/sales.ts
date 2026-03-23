@@ -20,7 +20,7 @@ export function registerSalesRoutes(
       ...(includeCancelled ? {} : { status: { $ne: "CANCELADO" } }),
     };
     const sales = await SaleModel.find(filter)
-      .populate("customer", "name")
+      .populate("customer", "name email phone")
       .sort({ createdAt: -1 });
     res.json(sales);
   });
@@ -89,7 +89,9 @@ export function registerSalesRoutes(
       await sale.save();
     }
 
-    res.status(201).json(sale);
+    const created =
+      (await SaleModel.findById(sale._id).populate("customer", "name email phone")) ?? sale;
+    res.status(201).json(created);
   });
 
   app.patch("/api/sales/:id", async (req: Request, res: Response) => {
@@ -148,7 +150,7 @@ export function registerSalesRoutes(
     }
 
     await sale.save();
-    const populated = await SaleModel.findById(sale._id).populate("customer", "name");
+    const populated = await SaleModel.findById(sale._id).populate("customer", "name email phone");
     res.json(populated);
   });
 

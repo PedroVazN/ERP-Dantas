@@ -56,12 +56,23 @@ export type Product = {
   hasPhoto?: boolean;
 };
 
+export type SaleCustomerRef =
+  | string
+  | {
+      _id: string;
+      name: string;
+      email?: string;
+      phone?: string;
+    };
+
 export type Sale = {
   _id: string;
   totalAmount: number;
   paymentMethod: string;
   status: string;
   createdAt: string;
+  /** Cliente que comprou (ObjectId ou documento populado pela API). */
+  customer?: SaleCustomerRef | null;
   billingStatus?: "PENDENTE" | "FATURADO" | "CANCELADO";
   invoice?: {
     number?: string;

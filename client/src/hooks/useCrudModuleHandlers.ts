@@ -13,6 +13,8 @@ import type {
   Settings,
 } from "../types";
 
+import { saleCustomerLabel } from "../utils/saleCustomerLabel";
+
 export type CrudEditModalKind = "customer" | "product" | "supplier" | "sale" | "purchase" | "expense" | "checklist";
 
 type UserFormState = { userName: string; userEmail: string; userRole: string; companyName: string };
@@ -59,9 +61,15 @@ export function useCrudModuleHandlers(deps: {
   productPhotoFile: File | null;
   setProductPhotoFile: Dispatch<SetStateAction<File | null>>;
 
-  saleForm: { productId: string; quantity: number; unitPrice: number; paymentMethod: string };
+  saleForm: { customerId: string; productId: string; quantity: number; unitPrice: number; paymentMethod: string };
   setSaleForm: Dispatch<
-    SetStateAction<{ productId: string; quantity: number; unitPrice: number; paymentMethod: string }>
+    SetStateAction<{
+      customerId: string;
+      productId: string;
+      quantity: number;
+      unitPrice: number;
+      paymentMethod: string;
+    }>
   >;
 
   purchaseForm: {
@@ -143,7 +151,7 @@ export function useCrudModuleHandlers(deps: {
       status: "ATIVO" | "INATIVO";
     }>
   >;
-  setEditSaleForm: Dispatch<SetStateAction<{ paymentMethod: string; status: string }>>;
+  setEditSaleForm: Dispatch<SetStateAction<{ paymentMethod: string; status: string; customerDisplay: string }>>;
   setEditPurchaseForm: Dispatch<SetStateAction<{ status: Purchase["status"] }>>;
   setEditExpenseForm: Dispatch<
     SetStateAction<{
@@ -270,6 +278,7 @@ export function useCrudModuleHandlers(deps: {
           ? Number(saleForm.unitPrice)
           : product.price;
       await api.post<Sale>(scopedPath("/sales"), {
+        ...(saleForm.customerId.trim() ? { customer: saleForm.customerId.trim() } : {}),
         items: [
           {
             product: product._id,
@@ -281,7 +290,7 @@ export function useCrudModuleHandlers(deps: {
         status: "PAGO",
         createdBy: "Admin",
       });
-      setSaleForm({ productId: "", quantity: 1, unitPrice: 0, paymentMethod: "PIX" });
+      setSaleForm({ customerId: "", productId: "", quantity: 1, unitPrice: 0, paymentMethod: "PIX" });
       await loadAllData();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro ao lançar venda.";
@@ -505,6 +514,7 @@ export function useCrudModuleHandlers(deps: {
     setEditSaleForm({
       paymentMethod: item.paymentMethod || "PIX",
       status: item.status || "PAGO",
+      customerDisplay: saleCustomerLabel(item),
     });
     openEditModal("sale", item._id, `Editar venda: ${formatBRL(item.totalAmount)}`);
   }

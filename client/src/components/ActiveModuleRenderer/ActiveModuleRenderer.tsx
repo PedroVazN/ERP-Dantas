@@ -70,9 +70,21 @@ export type ActiveModuleRendererProps = {
   deleteProduct: (product: Product) => void;
 
   // Vendas
-  saleForm: { productId: string; quantity: number; unitPrice: number; paymentMethod: string };
+  saleForm: {
+    customerId: string;
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+    paymentMethod: string;
+  };
   setSaleForm: Dispatch<
-    SetStateAction<{ productId: string; quantity: number; unitPrice: number; paymentMethod: string }>
+    SetStateAction<{
+      customerId: string;
+      productId: string;
+      quantity: number;
+      unitPrice: number;
+      paymentMethod: string;
+    }>
   >;
   submitSale: (event: FormEvent) => Promise<void> | void;
   sales: Sale[];
@@ -217,6 +229,7 @@ export default function ActiveModuleRenderer(props: ActiveModuleRendererProps) {
         submitSale={props.submitSale}
         saleForm={props.saleForm}
         setSaleForm={props.setSaleForm}
+        customers={props.customers}
         products={props.products}
         sales={props.sales}
         editSale={props.editSale}

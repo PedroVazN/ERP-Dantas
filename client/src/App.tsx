@@ -151,6 +151,7 @@ function App() {
     setProductPhotoModalProductId(null);
   }
   const [saleForm, setSaleForm] = useState({
+    customerId: "",
     productId: "",
     quantity: 1,
     unitPrice: 0,
@@ -212,6 +213,7 @@ function App() {
   const [editSaleForm, setEditSaleForm] = useState({
     paymentMethod: "PIX",
     status: "PAGO",
+    customerDisplay: "",
   });
   const [editPurchaseForm, setEditPurchaseForm] = useState({
     status: "RECEBIDA" as Purchase["status"],

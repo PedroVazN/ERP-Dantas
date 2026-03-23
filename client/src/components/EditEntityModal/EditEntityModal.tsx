@@ -46,6 +46,8 @@ export type EditSupplierFormState = {
 export type EditSaleFormState = {
   paymentMethod: string;
   status: string;
+  /** Somente leitura — comprador registrado na venda */
+  customerDisplay: string;
 };
 
 export type EditPurchaseFormState = {
@@ -550,6 +552,11 @@ export default function EditEntityModal(props: EditEntityModalProps) {
 
       {props.editModalKind === "sale" ? (
         <>
+          <div className="form-field">
+            <label>Cliente</label>
+            <input type="text" readOnly value={props.editSaleForm.customerDisplay || "—"} />
+            <small className="field-help">Dados do comprador vinculados a esta venda.</small>
+          </div>
           <div className="form-field">
             <label>Forma de pagamento</label>
             <select
