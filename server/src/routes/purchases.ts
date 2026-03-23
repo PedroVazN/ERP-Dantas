@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { Types, isValidObjectId } from "mongoose";
 
-import { ProductModel, PurchaseModel } from "../models";
+import { ExpenseModel, ProductModel, PurchaseModel } from "../models";
 import { blockWriteInGeneralScope, getBusinessFilter, getScopeContext } from "../middleware/scope";
 
 export function registerPurchaseRoutes(
@@ -75,6 +75,25 @@ export function registerPurchaseRoutes(
       },
       stockApplied: !needsApproval,
       totalAmount,
+    });
+
+    // Ao gerar ordem de compra, lança automaticamente no financeiro como pendente.
+    await ExpenseModel.create({
+      businessId,
+      description: `Ordem de compra ${String(purchase._id).slice(-6).toUpperCase()} - ${supplier}`,
+      category: "COMPRAS",
+      amount: totalAmount,
+      dueDate: new Date(),
+      status: "PENDENTE",
+      approval: {
+        required: false,
+        status: "APROVADA",
+        requestedBy: "Sistema",
+        requestedAt: new Date(),
+        reviewedBy: "Sistema",
+        reviewedAt: new Date(),
+        reason: "Despesa gerada automaticamente a partir da ordem de compra.",
+      },
     });
 
     if (needsApproval) {

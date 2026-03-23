@@ -6,6 +6,7 @@ export type DashboardPanelProps = {
   biRefreshing: boolean;
   realSalesCount: number;
   realPurchasesCount: number;
+  viewerOnly: boolean;
   totalOpenReceivables: number;
   formatBRL: (value: number) => string;
   formatPct: (value: number) => string;
@@ -88,20 +89,22 @@ export default function DashboardPanel(props: DashboardPanelProps) {
         </article>
       </section>
 
-      <section className="quick-grid animated">
-        <button className="quick-card" onClick={() => props.selectModule("vendas")}>
-          <h4>Novo pedido</h4>
-          <p>Registrar venda rapidamente no caixa</p>
-        </button>
-        <button className="quick-card" onClick={() => props.selectModule("produtos")}>
-          <h4>Gerir estoque</h4>
-          <p>Atualizar catálogo e acompanhar mínimos</p>
-        </button>
-        <button className="quick-card" onClick={() => props.selectModule("financeiro")}>
-          <h4>Fluxo financeiro</h4>
-          <p>Controlar despesas e contas futuras</p>
-        </button>
-      </section>
+      {!props.viewerOnly ? (
+        <section className="quick-grid animated">
+          <button className="quick-card" onClick={() => props.selectModule("vendas")}>
+            <h4>Novo pedido</h4>
+            <p>Registrar venda rapidamente no caixa</p>
+          </button>
+          <button className="quick-card" onClick={() => props.selectModule("produtos")}>
+            <h4>Gerir estoque</h4>
+            <p>Atualizar catálogo e acompanhar mínimos</p>
+          </button>
+          <button className="quick-card" onClick={() => props.selectModule("financeiro")}>
+            <h4>Fluxo financeiro</h4>
+            <p>Controlar despesas e contas futuras</p>
+          </button>
+        </section>
+      ) : null}
 
       <section className="module-grid animated bi-grid">
         <article className="table-card">
@@ -256,11 +259,7 @@ export default function DashboardPanel(props: DashboardPanelProps) {
                   <td>{item.stock}</td>
                   <td>{item.minStock}</td>
                   <td>{item.suggestedQty} un.</td>
-                  <td>
-                    <button type="button" className="ghost-btn" onClick={() => props.selectModule("compras")}>
-                      Repor estoque
-                    </button>
-                  </td>
+                  <td>{props.viewerOnly ? "—" : <button type="button" className="ghost-btn" onClick={() => props.selectModule("compras")}>Repor estoque</button>}</td>
                 </tr>
               ))
             )}

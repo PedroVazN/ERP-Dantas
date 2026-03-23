@@ -15,6 +15,7 @@ export type FinanceiroModuleProps = {
   setExpenseForm: Dispatch<SetStateAction<ExpenseFormState>>;
   expenses: Expense[];
   reviewExpense: (expenseId: string, action: "aprovar" | "rejeitar" | "pagar") => void;
+  updateExpensePaymentStatus: (expenseId: string, status: "PAGO" | "PENDENTE") => void;
   editExpense: (expense: Expense) => void;
   deleteExpense: (expense: Expense) => void;
   formatBRL: (value: number) => string;
@@ -185,6 +186,15 @@ export default function FinanceiroModule(props: FinanceiroModuleProps) {
                           onClick={() => props.reviewExpense(item._id, "pagar")}
                         >
                           Marcar pago
+                        </button>
+                      ) : null}
+                      {item.status === "PAGO" ? (
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          onClick={() => props.updateExpensePaymentStatus(item._id, "PENDENTE")}
+                        >
+                          Marcar não pago
                         </button>
                       ) : null}
                       <button type="button" className="ghost-btn" onClick={() => props.editExpense(item)}>

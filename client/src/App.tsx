@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { api } from "./api";
 import type {
@@ -306,6 +306,12 @@ function App() {
   );
 
   const isGeneralWorkspace = workspaceId === "geral";
+  const visibleModuleMeta = useMemo<Record<string, { label: string; short: string; helper: string }>>(() => {
+    if (!isGeneralWorkspace) return moduleMeta;
+    return {
+      dashboard: moduleMeta.dashboard,
+    };
+  }, [isGeneralWorkspace]);
   const selectedBusiness = businesses.find((item) => item.businessId === workspaceId) || null;
   const pendingApprovalsCount = useMemo(
     () =>
@@ -342,7 +348,18 @@ function App() {
     [workspaceId]
   );
 
+  useEffect(() => {
+    if (isGeneralWorkspace && activeModule !== "dashboard") {
+      setActiveModule("dashboard");
+      setMobileMenuOpen(false);
+    }
+  }, [activeModule, isGeneralWorkspace]);
+
   function selectModule(module: ModuleKey) {
+    if (isGeneralWorkspace && module !== "dashboard") {
+      setMobileMenuOpen(false);
+      return;
+    }
     setActiveModule(module);
     setMobileMenuOpen(false);
   }
@@ -604,7 +621,7 @@ function App() {
   return (
     <div className="erp-layout">
       <SidebarNavigation
-        moduleMeta={moduleMeta}
+        moduleMeta={visibleModuleMeta}
         activeModule={activeModule}
         selectModule={(key) => selectModule(key as ModuleKey)}
         companyName={selectedBusiness?.name || settings?.companyName || "Gestão inteligente de sabonetes"}
@@ -612,7 +629,7 @@ function App() {
 
       <main className="content">
         <AppHeader
-          moduleMeta={moduleMeta}
+          moduleMeta={visibleModuleMeta}
           activeModule={activeModule}
           mobileMenuOpen={mobileMenuOpen}
           setMobileMenuOpen={setMobileMenuOpen}
@@ -638,6 +655,7 @@ function App() {
           biRefreshing={biRefreshing}
           realSalesCount={sales.length}
           realPurchasesCount={purchases.length}
+          viewerOnly={isGeneralWorkspace}
           totalOpenReceivables={totalOpenReceivables}
           formatBRL={formatBRL}
           formatPct={formatPct}
@@ -694,6 +712,7 @@ function App() {
           submitExpense={crudHandlers.submitExpense}
           expenses={expenses}
           reviewExpense={crudHandlers.reviewExpense}
+          updateExpensePaymentStatus={crudHandlers.updateExpensePaymentStatus}
           editExpense={crudHandlers.editExpense}
           deleteExpense={crudHandlers.deleteExpense}
 

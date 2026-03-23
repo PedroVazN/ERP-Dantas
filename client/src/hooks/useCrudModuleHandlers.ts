@@ -594,6 +594,15 @@ export function useCrudModuleHandlers(deps: {
     await loadAllData();
   }
 
+  async function updateExpensePaymentStatus(expenseId: string, status: "PAGO" | "PENDENTE") {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar despesas.");
+      return;
+    }
+    await api.patch<Expense>(scopedPath(`/expenses/${expenseId}`), { status });
+    await loadAllData();
+  }
+
   return {
     submitCustomer,
     submitProduct,
@@ -620,6 +629,7 @@ export function useCrudModuleHandlers(deps: {
     submitUserProfile,
     reviewPurchase,
     reviewExpense,
+    updateExpensePaymentStatus,
   };
 }
 

@@ -135,6 +135,7 @@ export type ActiveModuleRendererProps = {
   submitExpense: (event: FormEvent) => Promise<void> | void;
   expenses: Expense[];
   reviewExpense: (expenseId: string, action: "aprovar" | "rejeitar" | "pagar") => void;
+  updateExpensePaymentStatus: (expenseId: string, status: "PAGO" | "PENDENTE") => void;
   editExpense: (expense: Expense) => void;
   deleteExpense: (expense: Expense) => void;
 
@@ -266,6 +267,7 @@ export default function ActiveModuleRenderer(props: ActiveModuleRendererProps) {
         setExpenseForm={props.setExpenseForm}
         expenses={props.expenses}
         reviewExpense={props.reviewExpense}
+        updateExpensePaymentStatus={props.updateExpensePaymentStatus}
         editExpense={props.editExpense}
         deleteExpense={props.deleteExpense}
         formatBRL={props.formatBRL}

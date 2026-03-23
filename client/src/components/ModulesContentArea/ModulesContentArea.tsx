@@ -15,6 +15,7 @@ export type ModulesContentAreaProps = Omit<ActiveModuleRendererProps, "loading" 
   biRefreshing: boolean;
   realSalesCount: number;
   realPurchasesCount: number;
+  viewerOnly: boolean;
   totalOpenReceivables: number;
   formatPct: DashboardPanelProps["formatPct"];
   maxTimeseriesValue: DashboardPanelProps["maxTimeseriesValue"];
@@ -33,6 +34,7 @@ export default function ModulesContentArea(props: ModulesContentAreaProps) {
     biRefreshing,
     realSalesCount,
     realPurchasesCount,
+    viewerOnly,
     totalOpenReceivables,
     formatBRL,
     formatPct,
@@ -55,6 +57,7 @@ export default function ModulesContentArea(props: ModulesContentAreaProps) {
           biRefreshing={biRefreshing}
           realSalesCount={realSalesCount}
           realPurchasesCount={realPurchasesCount}
+          viewerOnly={viewerOnly}
           totalOpenReceivables={totalOpenReceivables}
           formatBRL={formatBRL}
           formatPct={formatPct}
