@@ -835,6 +835,59 @@ th {
   border: 1px solid var(--border);
 }
 
+.updates-shell {
+  grid-column: 1 / -1;
+}
+
+.updates-header h3 {
+  margin-bottom: 4px;
+}
+
+.updates-list {
+  display: grid;
+  gap: 12px;
+}
+
+.update-card {
+  border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--panel) 82%, var(--panel-2));
+  padding: 14px;
+}
+
+.update-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.update-card-head h4 {
+  margin: 8px 0 0;
+  color: var(--title);
+}
+
+.update-card-head small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.update-card p {
+  margin: 8px 0;
+  color: var(--muted);
+}
+
+.update-card ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 5px;
+}
+
+.update-card li {
+  color: var(--text);
+}
+
 .dashboard-shell {
   display: grid;
   gap: 16px;
@@ -1375,6 +1428,10 @@ th {
 
   .dashboard-hero-metrics {
     justify-content: flex-start;
+  }
+
+  .update-card-head {
+    flex-direction: column;
   }
 
   .prediction-grid {

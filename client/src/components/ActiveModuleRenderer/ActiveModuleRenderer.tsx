@@ -11,10 +11,22 @@ import FinanceiroModule from "../../modules/FinanceiroModule";
 import ChecklistModule from "../../modules/ChecklistModule";
 import IaModule from "../../modules/IaModule";
 import UsuarioModule from "../../modules/UsuarioModule";
+import AtualizacoesModule from "../../modules/AtualizacoesModule";
 
 export type ActiveModuleRendererProps = {
   loading: boolean;
-  activeModule: "dashboard" | "clientes" | "produtos" | "vendas" | "compras" | "fornecedores" | "financeiro" | "checklist" | "ia" | "usuario";
+  activeModule:
+    | "dashboard"
+    | "atualizacoes"
+    | "clientes"
+    | "produtos"
+    | "vendas"
+    | "compras"
+    | "fornecedores"
+    | "financeiro"
+    | "checklist"
+    | "ia"
+    | "usuario";
 
   // Clientes
   customerForm: { name: string; email: string; phone: string };
@@ -158,6 +170,10 @@ export default function ActiveModuleRenderer(props: ActiveModuleRendererProps) {
         deleteCustomer={props.deleteCustomer}
       />
     );
+  }
+
+  if (props.activeModule === "atualizacoes") {
+    return <AtualizacoesModule />;
   }
 
   if (props.activeModule === "produtos") {

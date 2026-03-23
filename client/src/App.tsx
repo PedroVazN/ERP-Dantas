@@ -40,6 +40,7 @@ const BUSINESS_KEY = "e_sentinel_workspace";
 
 type ModuleKey =
   | "dashboard"
+  | "atualizacoes"
   | "clientes"
   | "produtos"
   | "vendas"
@@ -53,6 +54,7 @@ type ModuleKey =
 const moduleMeta: Record<ModuleKey, { label: string; short: string; helper: string }> = {
   ia: { label: "IA", short: "AI", helper: "Automatize compra/venda/cadastro" },
   dashboard: { label: "Dashboard", short: "DB", helper: "Visao geral do negocio" },
+  atualizacoes: { label: "Atualizações", short: "UP", helper: "Changelog e novidades da versão" },
   clientes: { label: "Clientes", short: "CL", helper: "Cadastro e relacionamento" },
   produtos: { label: "Produtos", short: "PR", helper: "Catalogo e estoque" },
   vendas: { label: "Vendas", short: "VD", helper: "PDV e faturamento" },
