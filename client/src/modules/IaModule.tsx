@@ -11,6 +11,8 @@ export type IaModuleProps = {
   aiPlan: AiPlan | null;
   handleAiSend: () => Promise<void> | void;
   handleAiExecute: (overrides?: unknown) => Promise<void> | void;
+  /** Layout em coluna única para painel lateral */
+  variant?: "page" | "drawer";
 };
 
 export default function IaModule(props: IaModuleProps) {
@@ -185,8 +187,11 @@ export default function IaModule(props: IaModuleProps) {
     return undefined;
   }, [canExecute, purchaseDraft, useMatchedSupplier, selectedProductId, selectedSupplierId, productSelection]);
 
+  const layoutClass =
+    props.variant === "drawer" ? "module-grid animated ia-module-drawer" : "module-grid animated";
+
   return (
-    <section className="module-grid animated">
+    <section className={layoutClass}>
       <section className="form-card">
         <h3>IA operacional</h3>
         <p className="theme-helper">

@@ -5,6 +5,7 @@ import type { AuthUser, Business } from "../../types";
 export type AppHeaderProps = {
   moduleMeta: Record<string, { label: string; short: string; helper: string }>;
   activeModule: string;
+  aiPanelOpen?: boolean;
 
   mobileMenuOpen: boolean;
   setMobileMenuOpen: Dispatch<SetStateAction<boolean>>;
@@ -85,6 +86,16 @@ export default function AppHeader(props: AppHeaderProps) {
           ) : null}
         </div>
         <div className="header-actions">
+          {"ia" in props.moduleMeta ? (
+            <button
+              type="button"
+              className="ghost-btn"
+              onClick={() => props.selectModule("ia")}
+              aria-expanded={props.aiPanelOpen}
+            >
+              {props.aiPanelOpen ? "Fechar IA" : "Abrir IA"}
+            </button>
+          ) : null}
           <button className="ghost-btn" onClick={() => void props.loadAllData()}>
             Atualizar dados
           </button>

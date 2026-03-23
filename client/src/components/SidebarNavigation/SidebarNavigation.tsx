@@ -3,6 +3,8 @@ export type SidebarModuleMeta = Record<string, { label: string; short: string; h
 export type SidebarNavigationProps = {
   moduleMeta: SidebarModuleMeta;
   activeModule: string;
+  /** Painel de IA aberto (destaca o item IA no menu) */
+  aiPanelOpen?: boolean;
   selectModule: (key: string) => void;
   companyName: string;
 };
@@ -30,7 +32,11 @@ export default function SidebarNavigation(props: SidebarNavigationProps) {
         {menuEntries.map(([key, meta]) => (
           <button
             key={key}
-            className={props.activeModule === key ? "nav-button active" : "nav-button"}
+            className={
+              props.activeModule === key || (key === "ia" && props.aiPanelOpen)
+                ? "nav-button active"
+                : "nav-button"
+            }
             onClick={() => props.selectModule(key)}
           >
             <span className="nav-icon">{meta.short}</span>

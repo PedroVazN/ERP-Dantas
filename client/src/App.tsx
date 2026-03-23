@@ -33,6 +33,7 @@ import GlobalModalsRenderer from "./components/GlobalModalsRenderer/GlobalModals
 import SidebarNavigation from "./components/SidebarNavigation/SidebarNavigation";
 import AppHeader from "./components/AppHeader/AppHeader";
 import ModulesContentArea from "./components/ModulesContentArea/ModulesContentArea";
+import AiSidePanel from "./components/AiSidePanel/AiSidePanel";
 import type { AiPlan } from "./aiTypes";
 
 const SESSION_KEY = "e_sentinel_session";
@@ -92,6 +93,7 @@ const formatPct = (value: number) => `${value >= 0 ? "+" : ""}${value.toFixed(1)
 
 function App() {
   const [activeModule, setActiveModule] = useState<ModuleKey>("dashboard");
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [pixModalOpen, setPixModalOpen] = useState(false);
   const [authChecking, setAuthChecking] = useState(true);
@@ -313,6 +315,7 @@ function App() {
     if (!isGeneralWorkspace) return moduleMeta;
     return {
       dashboard: moduleMeta.dashboard,
+      ia: moduleMeta.ia,
     };
   }, [isGeneralWorkspace]);
   const selectedBusiness = businesses.find((item) => item.businessId === workspaceId) || null;
@@ -359,6 +362,11 @@ function App() {
   }, [activeModule, isGeneralWorkspace]);
 
   function selectModule(module: ModuleKey) {
+    if (module === "ia") {
+      setAiPanelOpen((prev) => !prev);
+      setMobileMenuOpen(false);
+      return;
+    }
     if (isGeneralWorkspace && module !== "dashboard") {
       setMobileMenuOpen(false);
       return;
@@ -626,6 +634,7 @@ function App() {
       <SidebarNavigation
         moduleMeta={visibleModuleMeta}
         activeModule={activeModule}
+        aiPanelOpen={aiPanelOpen}
         selectModule={(key) => selectModule(key as ModuleKey)}
         companyName={selectedBusiness?.name || settings?.companyName || "Gestão inteligente de sabonetes"}
       />
@@ -634,6 +643,7 @@ function App() {
         <AppHeader
           moduleMeta={visibleModuleMeta}
           activeModule={activeModule}
+          aiPanelOpen={aiPanelOpen}
           mobileMenuOpen={mobileMenuOpen}
           setMobileMenuOpen={setMobileMenuOpen}
           selectModule={(key) => selectModule(key as ModuleKey)}
@@ -781,6 +791,19 @@ function App() {
           productPhotoModalOpen={productPhotoModalOpen}
           productPhotoModalProductId={productPhotoModalProductId}
           closeProductPhotoModal={closeProductPhotoModal}
+        />
+
+        <AiSidePanel
+          open={aiPanelOpen}
+          onClose={() => setAiPanelOpen(false)}
+          onToggleFab={() => setAiPanelOpen((prev) => !prev)}
+          aiMessages={aiMessages}
+          aiInput={aiInput}
+          setAiInput={setAiInput}
+          aiBusy={aiBusy}
+          aiPlan={aiPlan}
+          handleAiSend={handleAiSend}
+          handleAiExecute={handleAiExecute}
         />
       </main>
     </div>
