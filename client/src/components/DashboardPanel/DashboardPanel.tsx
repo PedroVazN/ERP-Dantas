@@ -4,21 +4,53 @@ export type DashboardPanelProps = {
   dashboard: Dashboard;
   biInsights: BiInsights;
   biRefreshing: boolean;
+  realSalesCount: number;
+  realPurchasesCount: number;
+  realCriticalStockCount: number;
+  pendingReceivablesCount: number;
+  overdueExpensesCount: number;
+  overdueExpensesTotal: number;
+  opsReminderEnabled: boolean;
+  opsReminderSending: boolean;
+  opsReminderSentToday: boolean;
+  sendOpsReminder: () => Promise<void> | void;
   totalOpenReceivables: number;
   formatBRL: (value: number) => string;
   formatPct: (value: number) => string;
   maxTimeseriesValue: number;
   maxTopProductValue: number;
   maxCostCategoryValue: number;
-  selectModule: (key: "vendas" | "produtos" | "financeiro" | "clientes") => void;
+  selectModule: (key: "vendas" | "produtos" | "financeiro" | "clientes" | "compras") => void;
 };
 
 export default function DashboardPanel(props: DashboardPanelProps) {
   const { dashboard, biInsights } = props;
+  const lowStockSuggestions = dashboard.lowStock.map((item) => {
+    const gapToMin = Math.max(item.minStock - item.stock, 0);
+    const targetStock = Math.max(item.minStock * 2, item.minStock + 5);
+    const suggestedQty = Math.max(targetStock - item.stock, gapToMin, 1);
+    return { ...item, suggestedQty };
+  });
 
   return (
-    <>
-      <section className="kpi-grid">
+    <section className="dashboard-shell">
+      <section className="dashboard-hero table-card animated">
+        <div>
+          <h3>Painel executivo</h3>
+          <p className="theme-helper">
+            Visão consolidada de performance, risco e crescimento em uma única tela.
+          </p>
+        </div>
+        <div className="dashboard-hero-metrics">
+          <span className="metric-pill">Vendas: {props.realSalesCount}</span>
+          <span className="metric-pill">Compras: {props.realPurchasesCount}</span>
+          <span className="metric-pill">
+            Atualização: {new Date(biInsights.updatedAt).toLocaleTimeString("pt-BR")}
+          </span>
+        </div>
+      </section>
+
+      <section className="kpi-grid dashboard-kpi-grid">
         <article className="kpi-card animated delay-1">
           <h3>Faturamento</h3>
           <strong>{props.formatBRL(dashboard.revenue)}</strong>
@@ -41,7 +73,7 @@ export default function DashboardPanel(props: DashboardPanelProps) {
         </article>
       </section>
 
-      <section className="kpi-grid kpi-grid-bi">
+      <section className="kpi-grid kpi-grid-bi dashboard-kpi-grid">
         <article className="kpi-card animated delay-1">
           <h3>Margem líquida</h3>
           <strong>{biInsights.kpis.margin.toFixed(1)}%</strong>
@@ -77,6 +109,45 @@ export default function DashboardPanel(props: DashboardPanelProps) {
           <h4>Fluxo financeiro</h4>
           <p>Controlar despesas e contas futuras</p>
         </button>
+      </section>
+
+      <section className="table-card animated">
+        <div className="order-header">
+          <h3>Automação Fase 1</h3>
+          <button
+            type="button"
+            className="ghost-btn"
+            disabled={!props.opsReminderEnabled || props.opsReminderSending}
+            onClick={() => void props.sendOpsReminder()}
+          >
+            {props.opsReminderSending
+              ? "Enviando resumo..."
+              : props.opsReminderSentToday
+                ? "Resumo enviado hoje"
+                : "Enviar resumo no WhatsApp"}
+          </button>
+        </div>
+        <p className="theme-helper">
+          Alertas operacionais baseados nos dados reais carregados do ERP para apoiar reposição e cobrança diária.
+        </p>
+        <div className="prediction-grid">
+          <div className="prediction-card">
+            <span>Estoque crítico</span>
+            <strong>{props.realCriticalStockCount}</strong>
+          </div>
+          <div className="prediction-card">
+            <span>Recebíveis pendentes</span>
+            <strong>
+              {props.pendingReceivablesCount} ({props.formatBRL(props.totalOpenReceivables)})
+            </strong>
+          </div>
+          <div className="prediction-card">
+            <span>Despesas vencidas</span>
+            <strong>
+              {props.overdueExpensesCount} ({props.formatBRL(props.overdueExpensesTotal)})
+            </strong>
+          </div>
+        </div>
       </section>
 
       <section className="module-grid animated bi-grid">
@@ -180,9 +251,7 @@ export default function DashboardPanel(props: DashboardPanelProps) {
               <strong>{props.formatBRL(biInsights.forecast.nextProfit)}</strong>
             </div>
           </div>
-          <p className="theme-helper">
-            Confiança da projeção: <strong>{biInsights.forecast.confidence}</strong>. Baseada na tendência dos últimos meses.
-          </p>
+          <p className="theme-helper">Projeção baseada na tendência dos últimos meses.</p>
           <h4 className="bi-subtitle">Risco de ruptura de estoque</h4>
           {biInsights.forecast.stockRisk.length === 0 ? (
             <p className="empty">Sem risco imediato detectado com base no giro recente.</p>
@@ -215,22 +284,30 @@ export default function DashboardPanel(props: DashboardPanelProps) {
               <th>SKU</th>
               <th>Estoque</th>
               <th>Mínimo</th>
+              <th>Sugestão de compra</th>
+              <th>Ação</th>
             </tr>
           </thead>
           <tbody>
-            {dashboard.lowStock.length === 0 ? (
+            {lowStockSuggestions.length === 0 ? (
               <tr>
-                <td colSpan={4} className="empty">
+                <td colSpan={6} className="empty">
                   Nenhum item em nível crítico no momento.
                 </td>
               </tr>
             ) : (
-              dashboard.lowStock.map((item) => (
+              lowStockSuggestions.map((item) => (
                 <tr key={item._id}>
                   <td>{item.name}</td>
                   <td>{item.sku}</td>
                   <td>{item.stock}</td>
                   <td>{item.minStock}</td>
+                  <td>{item.suggestedQty} un.</td>
+                  <td>
+                    <button type="button" className="ghost-btn" onClick={() => props.selectModule("compras")}>
+                      Repor estoque
+                    </button>
+                  </td>
                 </tr>
               ))
             )}
@@ -247,7 +324,7 @@ export default function DashboardPanel(props: DashboardPanelProps) {
           Explorar módulos
         </button>
       </section>
-    </>
+    </section>
   );
 }
 

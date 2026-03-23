@@ -835,6 +835,59 @@ th {
   border: 1px solid var(--border);
 }
 
+.dashboard-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+  background:
+    linear-gradient(
+      115deg,
+      color-mix(in srgb, var(--panel) 88%, transparent),
+      color-mix(in srgb, var(--panel-2) 78%, transparent)
+    );
+}
+
+.dashboard-hero h3 {
+  margin-bottom: 4px;
+}
+
+.dashboard-hero .theme-helper {
+  margin-bottom: 0;
+}
+
+.dashboard-hero-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.metric-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--panel));
+  font-size: 12px;
+  color: var(--title);
+  font-weight: 600;
+}
+
+.dashboard-kpi-grid .kpi-card {
+  border-top: 3px solid color-mix(in srgb, var(--accent) 38%, transparent);
+}
+
+.dashboard-kpi-grid .kpi-card strong {
+  letter-spacing: -0.01em;
+}
+
 /* Premium polish */
 .erp-layout {
   background: linear-gradient(
@@ -1314,6 +1367,14 @@ th {
   .order-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .dashboard-hero {
+    flex-direction: column;
+  }
+
+  .dashboard-hero-metrics {
+    justify-content: flex-start;
   }
 
   .prediction-grid {

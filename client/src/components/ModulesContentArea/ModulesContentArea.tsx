@@ -13,6 +13,16 @@ export type ModulesContentAreaProps = Omit<ActiveModuleRendererProps, "loading" 
   dashboard: DashboardPanelProps["dashboard"] | null;
   biInsights: BiInsights | null;
   biRefreshing: boolean;
+  realSalesCount: number;
+  realPurchasesCount: number;
+  realCriticalStockCount: number;
+  pendingReceivablesCount: number;
+  overdueExpensesCount: number;
+  overdueExpensesTotal: number;
+  opsReminderEnabled: boolean;
+  opsReminderSending: boolean;
+  opsReminderSentToday: boolean;
+  sendOpsReminder: () => Promise<void> | void;
   totalOpenReceivables: number;
   formatPct: DashboardPanelProps["formatPct"];
   maxTimeseriesValue: DashboardPanelProps["maxTimeseriesValue"];
@@ -29,6 +39,16 @@ export default function ModulesContentArea(props: ModulesContentAreaProps) {
     dashboard,
     biInsights,
     biRefreshing,
+    realSalesCount,
+    realPurchasesCount,
+    realCriticalStockCount,
+    pendingReceivablesCount,
+    overdueExpensesCount,
+    overdueExpensesTotal,
+    opsReminderEnabled,
+    opsReminderSending,
+    opsReminderSentToday,
+    sendOpsReminder,
     totalOpenReceivables,
     formatBRL,
     formatPct,
@@ -49,6 +69,16 @@ export default function ModulesContentArea(props: ModulesContentAreaProps) {
           dashboard={dashboard}
           biInsights={biInsights}
           biRefreshing={biRefreshing}
+          realSalesCount={realSalesCount}
+          realPurchasesCount={realPurchasesCount}
+          realCriticalStockCount={realCriticalStockCount}
+          pendingReceivablesCount={pendingReceivablesCount}
+          overdueExpensesCount={overdueExpensesCount}
+          overdueExpensesTotal={overdueExpensesTotal}
+          opsReminderEnabled={opsReminderEnabled}
+          opsReminderSending={opsReminderSending}
+          opsReminderSentToday={opsReminderSentToday}
+          sendOpsReminder={sendOpsReminder}
           totalOpenReceivables={totalOpenReceivables}
           formatBRL={formatBRL}
           formatPct={formatPct}
