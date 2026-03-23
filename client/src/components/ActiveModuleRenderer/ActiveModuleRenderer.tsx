@@ -80,8 +80,22 @@ export type ActiveModuleRendererProps = {
   setPixModalOpen: Dispatch<SetStateAction<boolean>>;
 
   // Compras
-  purchaseForm: { supplierId: string; productId: string; quantity: number; cost: number };
-  setPurchaseForm: Dispatch<SetStateAction<{ supplierId: string; productId: string; quantity: number; cost: number }>>;
+  purchaseForm: {
+    supplierId: string;
+    productId: string;
+    quantity: number;
+    cost: number;
+    items: Array<{ productId: string; description: string; quantity: number; cost: number }>;
+  };
+  setPurchaseForm: Dispatch<
+    SetStateAction<{
+      supplierId: string;
+      productId: string;
+      quantity: number;
+      cost: number;
+      items: Array<{ productId: string; description: string; quantity: number; cost: number }>;
+    }>
+  >;
   submitPurchase: (event: FormEvent) => Promise<void> | void;
   filteredProductsBySupplier: Product[];
   purchases: Purchase[];

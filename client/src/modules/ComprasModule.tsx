@@ -1,12 +1,13 @@
 import type { Expense, Product, Purchase, Supplier } from "../types";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
 type PurchaseFormState = {
   supplierId: string;
   productId: string;
   quantity: number;
   cost: number;
+  items: Array<{ productId: string; description: string; quantity: number; cost: number }>;
 };
 
 export type ComprasModuleProps = {
@@ -31,7 +32,6 @@ export default function ComprasModule(props: ComprasModuleProps) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [lineDrafts, setLineDrafts] = useState<Record<string, { quantity: string; cost: string }>>({});
-  const quickFormRef = useRef<HTMLFormElement | null>(null);
 
   const pageSize = 7;
   const todayIso = new Date().toISOString().slice(0, 10);
@@ -121,18 +121,47 @@ export default function ComprasModule(props: ComprasModuleProps) {
     const quantity = Number(draft?.quantity || 0);
     const cost = Number(draft?.cost || 0);
     if (!props.purchaseForm.supplierId || quantity <= 0 || !Number.isFinite(cost) || cost <= 0) return;
+    const product = props.filteredProductsBySupplier.find((item) => item._id === productId);
+    if (!product) return;
 
-    props.setPurchaseForm({
-      ...props.purchaseForm,
-      supplierId: props.purchaseForm.supplierId,
-      productId,
-      quantity,
-      cost,
+    props.setPurchaseForm((prev) => {
+      const existingIndex = prev.items.findIndex((item) => item.productId === productId);
+      const nextItems = [...prev.items];
+      if (existingIndex >= 0) {
+        const current = nextItems[existingIndex];
+        if (!current) return prev;
+        nextItems[existingIndex] = {
+          ...current,
+          quantity: current.quantity + quantity,
+          cost,
+        };
+      } else {
+        nextItems.push({
+          productId,
+          description: product.name,
+          quantity,
+          cost,
+        });
+      }
+      return {
+        ...prev,
+        productId,
+        quantity,
+        cost,
+        items: nextItems,
+      };
     });
+  }
 
-    window.setTimeout(() => {
-      quickFormRef.current?.requestSubmit();
-    }, 0);
+  function removeOrderItem(productId: string) {
+    props.setPurchaseForm((prev) => ({
+      ...prev,
+      items: prev.items.filter((item) => item.productId !== productId),
+    }));
+  }
+
+  function clearOrderItems() {
+    props.setPurchaseForm((prev) => ({ ...prev, items: [] }));
   }
 
   return (
@@ -325,7 +354,7 @@ export default function ComprasModule(props: ComprasModuleProps) {
             </div>
           </>
         ) : (
-          <form className="form-card order-form" ref={quickFormRef} onSubmit={props.submitPurchase}>
+          <form className="form-card order-form" onSubmit={props.submitPurchase}>
             <h3>Emitir nova ordem de compra</h3>
             <div className="order-toolbar">
               <div className="form-field">
@@ -337,6 +366,7 @@ export default function ComprasModule(props: ComprasModuleProps) {
                       ...props.purchaseForm,
                       supplierId: event.target.value,
                       productId: "",
+                      items: [],
                     });
                     setLineDrafts({});
                   }}
@@ -422,8 +452,55 @@ export default function ComprasModule(props: ComprasModuleProps) {
               </table>
             </div>
 
+            <div className="table-scroll" style={{ marginTop: 10 }}>
+              <table className="order-items-table">
+                <thead>
+                  <tr>
+                    <th>Itens da ordem</th>
+                    <th>Quantidade</th>
+                    <th>Custo (R$)</th>
+                    <th>Total</th>
+                    <th>Ação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {props.purchaseForm.items.length ? (
+                    props.purchaseForm.items.map((item) => (
+                      <tr key={item.productId}>
+                        <td>{item.description}</td>
+                        <td>{item.quantity}</td>
+                        <td>{props.formatBRL(item.cost)}</td>
+                        <td>{props.formatBRL(item.quantity * item.cost)}</td>
+                        <td>
+                          <button type="button" className="ghost-btn danger" onClick={() => removeOrderItem(item.productId)}>
+                            Remover
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="empty">
+                        Nenhum item adicionado na ordem.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
             <div className="table-actions">
-              <button type="submit">Lançar compra manual</button>
+              <button type="submit" disabled={!props.purchaseForm.items.length}>
+                Emitir ordem de compra
+              </button>
+              <button
+                type="button"
+                className="ghost-btn"
+                disabled={!props.purchaseForm.items.length}
+                onClick={clearOrderItems}
+              >
+                Limpar itens
+              </button>
               <button type="button" className="ghost-btn" onClick={resetToList}>
                 Voltar para lista
               </button>

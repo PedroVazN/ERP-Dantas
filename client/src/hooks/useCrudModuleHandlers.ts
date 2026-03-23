@@ -62,9 +62,21 @@ export function useCrudModuleHandlers(deps: {
   saleForm: { productId: string; quantity: number; paymentMethod: string };
   setSaleForm: Dispatch<SetStateAction<{ productId: string; quantity: number; paymentMethod: string }>>;
 
-  purchaseForm: { supplierId: string; productId: string; quantity: number; cost: number };
+  purchaseForm: {
+    supplierId: string;
+    productId: string;
+    quantity: number;
+    cost: number;
+    items: Array<{ productId: string; description: string; quantity: number; cost: number }>;
+  };
   setPurchaseForm: Dispatch<
-    SetStateAction<{ supplierId: string; productId: string; quantity: number; cost: number }>
+    SetStateAction<{
+      supplierId: string;
+      productId: string;
+      quantity: number;
+      cost: number;
+      items: Array<{ productId: string; description: string; quantity: number; cost: number }>;
+    }>
   >;
 
   supplierForm: {
@@ -302,28 +314,44 @@ export function useCrudModuleHandlers(deps: {
       return;
     }
 
-    const product = products.find((item) => item._id === purchaseForm.productId);
-    if (!product) return;
-
     const supplier = suppliers.find((item) => item._id === purchaseForm.supplierId);
     if (!supplier) {
       setError("Selecione um fornecedor cadastrado.");
       return;
     }
 
+    const normalizedItems =
+      purchaseForm.items.length > 0
+        ? purchaseForm.items
+        : (() => {
+            const product = products.find((item) => item._id === purchaseForm.productId);
+            if (!product) return [];
+            return [
+              {
+                productId: product._id,
+                description: product.name,
+                quantity: Number(purchaseForm.quantity),
+                cost: Number(purchaseForm.cost),
+              },
+            ];
+          })();
+
+    if (!normalizedItems.length) {
+      setError("Adicione pelo menos um produto na ordem de compra.");
+      return;
+    }
+
     await api.post<Purchase>(scopedPath("/purchases"), {
       supplier: supplier.name,
-      items: [
-        {
-          product: product._id,
-          description: product.name,
-          quantity: Number(purchaseForm.quantity),
-          cost: Number(purchaseForm.cost),
-        },
-      ],
+      items: normalizedItems.map((item) => ({
+        product: item.productId,
+        description: item.description,
+        quantity: Number(item.quantity),
+        cost: Number(item.cost),
+      })),
     });
 
-    setPurchaseForm({ supplierId: "", productId: "", quantity: 1, cost: 0 });
+    setPurchaseForm({ supplierId: "", productId: "", quantity: 1, cost: 0, items: [] });
     await loadAllData();
   }
 

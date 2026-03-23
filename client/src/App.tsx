@@ -247,6 +247,7 @@ function App() {
     productId: "",
     quantity: 1,
     cost: 0,
+    items: [] as Array<{ productId: string; description: string; quantity: number; cost: number }>,
   });
   const [supplierForm, setSupplierForm] = useState({
     name: "",
