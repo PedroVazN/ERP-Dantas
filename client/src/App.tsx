@@ -153,6 +153,7 @@ function App() {
   const [saleForm, setSaleForm] = useState({
     productId: "",
     quantity: 1,
+    unitPrice: 0,
     paymentMethod: "PIX",
   });
   const [whatsAppStatus, setWhatsAppStatus] = useState<WhatsAppStatus | null>(null);

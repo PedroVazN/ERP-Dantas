@@ -59,8 +59,10 @@ export function useCrudModuleHandlers(deps: {
   productPhotoFile: File | null;
   setProductPhotoFile: Dispatch<SetStateAction<File | null>>;
 
-  saleForm: { productId: string; quantity: number; paymentMethod: string };
-  setSaleForm: Dispatch<SetStateAction<{ productId: string; quantity: number; paymentMethod: string }>>;
+  saleForm: { productId: string; quantity: number; unitPrice: number; paymentMethod: string };
+  setSaleForm: Dispatch<
+    SetStateAction<{ productId: string; quantity: number; unitPrice: number; paymentMethod: string }>
+  >;
 
   purchaseForm: {
     supplierId: string;
@@ -263,19 +265,23 @@ export function useCrudModuleHandlers(deps: {
 
     try {
       setError("");
+      const unitPrice =
+        Number.isFinite(Number(saleForm.unitPrice)) && Number(saleForm.unitPrice) > 0
+          ? Number(saleForm.unitPrice)
+          : product.price;
       await api.post<Sale>(scopedPath("/sales"), {
         items: [
           {
             product: product._id,
             quantity: quantity,
-            unitPrice: product.price,
+            unitPrice,
           },
         ],
         paymentMethod: saleForm.paymentMethod,
         status: "PAGO",
         createdBy: "Admin",
       });
-      setSaleForm({ productId: "", quantity: 1, paymentMethod: "PIX" });
+      setSaleForm({ productId: "", quantity: 1, unitPrice: 0, paymentMethod: "PIX" });
       await loadAllData();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro ao lançar venda.";

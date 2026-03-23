@@ -5,6 +5,7 @@ import { useMemo, useRef, useState } from "react";
 type SaleFormState = {
   productId: string;
   quantity: number;
+  unitPrice: number;
   paymentMethod: string;
 };
 
@@ -27,7 +28,7 @@ export default function VendasModule(props: VendasModuleProps) {
   const [paymentFilter, setPaymentFilter] = useState("TODOS");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [lineDrafts, setLineDrafts] = useState<Record<string, { quantity: string }>>({});
+  const [lineDrafts, setLineDrafts] = useState<Record<string, { quantity: string; unitPrice: string }>>({});
   const quickFormRef = useRef<HTMLFormElement | null>(null);
 
   const pageSize = 7;
@@ -98,17 +99,27 @@ export default function VendasModule(props: VendasModuleProps) {
     setPage(1);
   }
 
-  function updateLineDraft(productId: string, quantity: string) {
-    setLineDrafts((prev) => ({ ...prev, [productId]: { quantity } }));
+  function updateLineDraft(productId: string, field: "quantity" | "unitPrice", value: string) {
+    setLineDrafts((prev) => ({
+      ...prev,
+      [productId]: {
+        quantity: prev[productId]?.quantity || "",
+        unitPrice: prev[productId]?.unitPrice || "",
+        [field]: value,
+      },
+    }));
   }
 
   function addSaleFromLine(product: Product) {
     const quantity = Number(lineDrafts[product._id]?.quantity || 0);
+    const unitPrice = Number(lineDrafts[product._id]?.unitPrice || product.price);
     if (quantity <= 0) return;
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0) return;
     props.setSaleForm({
       ...props.saleForm,
       productId: product._id,
       quantity,
+      unitPrice,
     });
     window.setTimeout(() => {
       quickFormRef.current?.requestSubmit();
@@ -311,6 +322,7 @@ export default function VendasModule(props: VendasModuleProps) {
                     <th>Produto</th>
                     <th>Estoque</th>
                     <th>Preço (R$)</th>
+                    <th>Preço customizado (R$)</th>
                     <th>Quantidade</th>
                     <th>Ação</th>
                   </tr>
@@ -325,10 +337,20 @@ export default function VendasModule(props: VendasModuleProps) {
                         <td>
                           <input
                             type="number"
+                            min={0}
+                            step="0.01"
+                            placeholder={item.price.toFixed(2)}
+                            value={lineDrafts[item._id]?.unitPrice ?? item.price.toFixed(2)}
+                            onChange={(event) => updateLineDraft(item._id, "unitPrice", event.target.value)}
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
                             min={1}
                             placeholder="Qtd."
                             value={lineDrafts[item._id]?.quantity || ""}
-                            onChange={(event) => updateLineDraft(item._id, event.target.value)}
+                            onChange={(event) => updateLineDraft(item._id, "quantity", event.target.value)}
                           />
                         </td>
                         <td>
@@ -340,7 +362,7 @@ export default function VendasModule(props: VendasModuleProps) {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={5} className="empty">
+                      <td colSpan={6} className="empty">
                         Nenhum produto disponível para venda.
                       </td>
                     </tr>

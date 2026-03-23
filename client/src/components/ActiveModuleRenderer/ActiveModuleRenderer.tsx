@@ -70,8 +70,10 @@ export type ActiveModuleRendererProps = {
   deleteProduct: (product: Product) => void;
 
   // Vendas
-  saleForm: { productId: string; quantity: number; paymentMethod: string };
-  setSaleForm: Dispatch<SetStateAction<{ productId: string; quantity: number; paymentMethod: string }>>;
+  saleForm: { productId: string; quantity: number; unitPrice: number; paymentMethod: string };
+  setSaleForm: Dispatch<
+    SetStateAction<{ productId: string; quantity: number; unitPrice: number; paymentMethod: string }>
+  >;
   submitSale: (event: FormEvent) => Promise<void> | void;
   sales: Sale[];
   editSale: (sale: Sale) => void;
