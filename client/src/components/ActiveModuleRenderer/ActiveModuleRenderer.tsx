@@ -223,6 +223,8 @@ export default function ActiveModuleRenderer(props: ActiveModuleRendererProps) {
         reviewPurchase={props.reviewPurchase}
         editPurchase={props.editPurchase}
         deletePurchase={props.deletePurchase}
+        products={props.products}
+        expenses={props.expenses}
         formatBRL={props.formatBRL}
       />
     );

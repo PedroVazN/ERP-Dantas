@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { api } from "./api";
 import type {
@@ -54,7 +54,6 @@ type ModuleKey =
 const moduleMeta: Record<ModuleKey, { label: string; short: string; helper: string }> = {
   ia: { label: "IA", short: "AI", helper: "Automatize compra/venda/cadastro" },
   dashboard: { label: "Dashboard", short: "DB", helper: "Visao geral do negocio" },
-  atualizacoes: { label: "Atualizações", short: "UP", helper: "Changelog e novidades da versão" },
   clientes: { label: "Clientes", short: "CL", helper: "Cadastro e relacionamento" },
   produtos: { label: "Produtos", short: "PR", helper: "Catalogo e estoque" },
   vendas: { label: "Vendas", short: "VD", helper: "PDV e faturamento" },
@@ -63,6 +62,7 @@ const moduleMeta: Record<ModuleKey, { label: string; short: string; helper: stri
   financeiro: { label: "Financeiro", short: "FN", helper: "Contas e despesas" },
   checklist: { label: "Checklist", short: "CK", helper: "Ideias e futuros implementos" },
   usuario: { label: "Usuario", short: "US", helper: "Perfil e preferências" },
+  atualizacoes: { label: "Atualizações", short: "UP", helper: "Changelog e novidades da versão" },
 };
 
 const themeOptions: Array<{ value: Theme; label: string; description: string }> = [
@@ -157,8 +157,6 @@ function App() {
   });
   const [whatsAppStatus, setWhatsAppStatus] = useState<WhatsAppStatus | null>(null);
   const [whatsAppForm, setWhatsAppForm] = useState({ phone: "", message: "" });
-  const [opsReminderSending, setOpsReminderSending] = useState(false);
-  const [lastOpsReminderAt, setLastOpsReminderAt] = useState("");
 
   const [aiMessages, setAiMessages] = useState<Array<{ id: string; role: "user" | "assistant"; content: string }>>(
     []
@@ -283,41 +281,6 @@ function App() {
         .reduce((acc, sale) => acc + sale.totalAmount, 0),
     [sales]
   );
-  const pendingReceivablesCount = useMemo(
-    () => sales.filter((sale) => sale.status === "PENDENTE").length,
-    [sales]
-  );
-  const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), []);
-  const overdueExpenses = useMemo(
-    () =>
-      expenses.filter((expense) => {
-        const dueDateIso = expense.dueDate.slice(0, 10);
-        return expense.status === "PENDENTE" && dueDateIso < todayIso;
-      }),
-    [expenses, todayIso]
-  );
-  const overdueExpensesCount = overdueExpenses.length;
-  const overdueExpensesTotal = useMemo(
-    () => overdueExpenses.reduce((acc, item) => acc + item.amount, 0),
-    [overdueExpenses]
-  );
-  const realCriticalStockCount = useMemo(
-    () => products.filter((item) => item.stock <= item.minStock).length,
-    [products]
-  );
-  const opsReminderStorageKey = useMemo(
-    () => `e_sentinel_ops_reminder_${workspaceId || "sem_workspace"}`,
-    [workspaceId]
-  );
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    setLastOpsReminderAt(window.localStorage.getItem(opsReminderStorageKey) || "");
-  }, [opsReminderStorageKey]);
-  const opsReminderSentToday = useMemo(
-    () => Boolean(lastOpsReminderAt) && lastOpsReminderAt.slice(0, 10) === todayIso,
-    [lastOpsReminderAt, todayIso]
-  );
-  const opsReminderEnabled = Boolean(whatsAppStatus?.configured && whatsAppStatus.notifyTo);
 
   const filteredProductsBySupplier = useMemo(() => {
     if (!purchaseForm.supplierId) {
@@ -364,58 +327,6 @@ function App() {
     if (!biInsights?.costByCategory.length) return 1;
     return Math.max(...biInsights.costByCategory.map((item) => item.total), 1);
   }, [biInsights]);
-
-  const sendOpsReminder = useCallback(async () => {
-    if (!opsReminderEnabled) {
-      setError("WhatsApp não configurado. Configure o número de notificação no módulo Usuário.");
-      return;
-    }
-
-    const targetPhone = whatsAppStatus?.notifyTo?.trim() || "";
-    if (!targetPhone) {
-      setError("Defina um telefone de notificação interna no WhatsApp.");
-      return;
-    }
-
-    const message = [
-      "Resumo operacional diário",
-      `- Estoque crítico: ${realCriticalStockCount}`,
-      `- Recebíveis pendentes: ${pendingReceivablesCount} (${formatBRL(totalOpenReceivables)})`,
-      `- Despesas vencidas: ${overdueExpensesCount} (${formatBRL(overdueExpensesTotal)})`,
-      `- Vendas registradas: ${sales.length}`,
-      `- Compras registradas: ${purchases.length}`,
-    ].join("\n");
-
-    try {
-      setOpsReminderSending(true);
-      setError("");
-      await api.post<{ sent: boolean; phone: string; provider: string }>("/integrations/whatsapp/send", {
-        phone: targetPhone,
-        message,
-      });
-      const sentAt = new Date().toISOString();
-      setLastOpsReminderAt(sentAt);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(opsReminderStorageKey, sentAt);
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Erro ao enviar resumo operacional.";
-      setError(message);
-    } finally {
-      setOpsReminderSending(false);
-    }
-  }, [
-    opsReminderEnabled,
-    opsReminderStorageKey,
-    overdueExpensesCount,
-    overdueExpensesTotal,
-    pendingReceivablesCount,
-    purchases.length,
-    realCriticalStockCount,
-    sales.length,
-    totalOpenReceivables,
-    whatsAppStatus?.notifyTo,
-  ]);
 
   const scopedPath = useCallback(
     (path: string) => {
@@ -726,14 +637,6 @@ function App() {
           biRefreshing={biRefreshing}
           realSalesCount={sales.length}
           realPurchasesCount={purchases.length}
-          realCriticalStockCount={realCriticalStockCount}
-          pendingReceivablesCount={pendingReceivablesCount}
-          overdueExpensesCount={overdueExpensesCount}
-          overdueExpensesTotal={overdueExpensesTotal}
-          opsReminderEnabled={opsReminderEnabled}
-          opsReminderSending={opsReminderSending}
-          opsReminderSentToday={opsReminderSentToday}
-          sendOpsReminder={sendOpsReminder}
           totalOpenReceivables={totalOpenReceivables}
           formatBRL={formatBRL}
           formatPct={formatPct}

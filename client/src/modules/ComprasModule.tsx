@@ -1,4 +1,4 @@
-import type { Product, Purchase, Supplier } from "../types";
+import type { Expense, Product, Purchase, Supplier } from "../types";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { useMemo, useRef, useState } from "react";
 
@@ -19,6 +19,8 @@ export type ComprasModuleProps = {
   reviewPurchase: (purchaseId: string, action: "aprovar" | "rejeitar") => void;
   editPurchase: (purchase: Purchase) => void;
   deletePurchase: (purchase: Purchase) => void;
+  products: Product[];
+  expenses: Expense[];
   formatBRL: (value: number) => string;
 };
 
@@ -32,6 +34,7 @@ export default function ComprasModule(props: ComprasModuleProps) {
   const quickFormRef = useRef<HTMLFormElement | null>(null);
 
   const pageSize = 7;
+  const todayIso = new Date().toISOString().slice(0, 10);
 
   const statusOptions = useMemo(() => {
     return ["TODOS", ...Array.from(new Set(props.purchases.map((item) => item.status)))];
@@ -60,6 +63,28 @@ export default function ComprasModule(props: ComprasModuleProps) {
     const start = (currentPage - 1) * pageSize;
     return filteredPurchases.slice(start, start + pageSize);
   }, [currentPage, filteredPurchases]);
+
+  const pendingPurchaseApprovals = useMemo(
+    () => props.purchases.filter((item) => item.status === "AGUARDANDO_APROVACAO").length,
+    [props.purchases]
+  );
+  const criticalStockCount = useMemo(
+    () => props.products.filter((item) => item.stock <= item.minStock).length,
+    [props.products]
+  );
+  const overdueExpenses = useMemo(
+    () =>
+      props.expenses.filter((expense) => {
+        const dueDateIso = expense.dueDate.slice(0, 10);
+        return expense.status === "PENDENTE" && dueDateIso < todayIso;
+      }),
+    [props.expenses, todayIso]
+  );
+  const overdueExpensesCount = overdueExpenses.length;
+  const overdueExpensesTotal = useMemo(
+    () => overdueExpenses.reduce((acc, item) => acc + item.amount, 0),
+    [overdueExpenses]
+  );
 
   function getPurchaseBadgeClass(status: Purchase["status"]) {
     if (status === "APROVADA" || status === "RECEBIDA") return "status-chip success";
@@ -135,6 +160,22 @@ export default function ComprasModule(props: ComprasModuleProps) {
         <p className="theme-helper">
           Workflow de compra: adiciona estoque e gera despesa após aprovação/recebimento.
         </p>
+        <div className="prediction-grid" style={{ marginBottom: 12 }}>
+          <div className="prediction-card">
+            <span>Estoque crítico</span>
+            <strong>{criticalStockCount}</strong>
+          </div>
+          <div className="prediction-card">
+            <span>Compras aguardando aprovação</span>
+            <strong>{pendingPurchaseApprovals}</strong>
+          </div>
+          <div className="prediction-card">
+            <span>Despesas vencidas</span>
+            <strong>
+              {overdueExpensesCount} ({props.formatBRL(overdueExpensesTotal)})
+            </strong>
+          </div>
+        </div>
 
         {screen === "lista" ? (
           <>

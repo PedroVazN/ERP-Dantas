@@ -65,6 +65,20 @@ export default function VendasModule(props: VendasModuleProps) {
     return filteredSales.slice(start, start + pageSize);
   }, [currentPage, filteredSales]);
 
+  const pendingReceivables = useMemo(
+    () => props.sales.filter((item) => item.status === "PENDENTE"),
+    [props.sales]
+  );
+  const pendingReceivablesCount = pendingReceivables.length;
+  const pendingReceivablesTotal = useMemo(
+    () => pendingReceivables.reduce((acc, item) => acc + item.totalAmount, 0),
+    [pendingReceivables]
+  );
+  const criticalStockCount = useMemo(
+    () => props.products.filter((item) => item.stock <= item.minStock).length,
+    [props.products]
+  );
+
   function getSaleStatusClass(status: string) {
     if (status === "CONCLUIDA" || status === "FATURADA") return "status-chip success";
     if (status === "AGUARDANDO_APROVACAO" || status === "PENDENTE") return "status-chip warning";
@@ -126,6 +140,22 @@ export default function VendasModule(props: VendasModuleProps) {
         <p className="theme-helper">
           Workflow de venda: reduz estoque e gera receita, com faturamento/NF-e.
         </p>
+        <div className="prediction-grid" style={{ marginBottom: 12 }}>
+          <div className="prediction-card">
+            <span>Recebíveis pendentes</span>
+            <strong>
+              {pendingReceivablesCount} ({props.formatBRL(pendingReceivablesTotal)})
+            </strong>
+          </div>
+          <div className="prediction-card">
+            <span>Produtos em estoque crítico</span>
+            <strong>{criticalStockCount}</strong>
+          </div>
+          <div className="prediction-card">
+            <span>Vendas registradas</span>
+            <strong>{props.sales.length}</strong>
+          </div>
+        </div>
 
         {screen === "lista" ? (
           <>

@@ -6,14 +6,6 @@ export type DashboardPanelProps = {
   biRefreshing: boolean;
   realSalesCount: number;
   realPurchasesCount: number;
-  realCriticalStockCount: number;
-  pendingReceivablesCount: number;
-  overdueExpensesCount: number;
-  overdueExpensesTotal: number;
-  opsReminderEnabled: boolean;
-  opsReminderSending: boolean;
-  opsReminderSentToday: boolean;
-  sendOpsReminder: () => Promise<void> | void;
   totalOpenReceivables: number;
   formatBRL: (value: number) => string;
   formatPct: (value: number) => string;
@@ -109,45 +101,6 @@ export default function DashboardPanel(props: DashboardPanelProps) {
           <h4>Fluxo financeiro</h4>
           <p>Controlar despesas e contas futuras</p>
         </button>
-      </section>
-
-      <section className="table-card animated">
-        <div className="order-header">
-          <h3>Automação Fase 1</h3>
-          <button
-            type="button"
-            className="ghost-btn"
-            disabled={!props.opsReminderEnabled || props.opsReminderSending}
-            onClick={() => void props.sendOpsReminder()}
-          >
-            {props.opsReminderSending
-              ? "Enviando resumo..."
-              : props.opsReminderSentToday
-                ? "Resumo enviado hoje"
-                : "Enviar resumo no WhatsApp"}
-          </button>
-        </div>
-        <p className="theme-helper">
-          Alertas operacionais baseados nos dados reais carregados do ERP para apoiar reposição e cobrança diária.
-        </p>
-        <div className="prediction-grid">
-          <div className="prediction-card">
-            <span>Estoque crítico</span>
-            <strong>{props.realCriticalStockCount}</strong>
-          </div>
-          <div className="prediction-card">
-            <span>Recebíveis pendentes</span>
-            <strong>
-              {props.pendingReceivablesCount} ({props.formatBRL(props.totalOpenReceivables)})
-            </strong>
-          </div>
-          <div className="prediction-card">
-            <span>Despesas vencidas</span>
-            <strong>
-              {props.overdueExpensesCount} ({props.formatBRL(props.overdueExpensesTotal)})
-            </strong>
-          </div>
-        </div>
       </section>
 
       <section className="module-grid animated bi-grid">
