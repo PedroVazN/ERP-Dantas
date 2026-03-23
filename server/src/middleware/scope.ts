@@ -1,16 +1,21 @@
 import type { Request, Response } from "express";
 
 export function getScopeContext(req: Request) {
-  const scope = String(req.query.scope || "negocio");
+  const scopeRaw = String(req.query.scope || "").trim().toLowerCase();
   const bodyBusinessId =
     req.body && typeof req.body === "object" && "businessId" in req.body
       ? String((req.body as { businessId?: string }).businessId || "").trim()
       : "";
   const queryBusinessId = String(req.query.businessId || "").trim();
   const businessId = queryBusinessId || bodyBusinessId || "geral";
+  const isGeneralScope =
+    scopeRaw === "geral" ||
+    scopeRaw === "all" ||
+    // fallback: requests sem `scope`, mas com businessId "geral", devem consolidar todos os ERPs
+    (!scopeRaw && businessId === "geral");
 
   return {
-    scope: scope === "geral" ? "geral" : "negocio",
+    scope: isGeneralScope ? "geral" : "negocio",
     businessId,
   };
 }
