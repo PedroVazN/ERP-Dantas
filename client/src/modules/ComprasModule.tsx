@@ -151,6 +151,7 @@ export default function ComprasModule(props: ComprasModuleProps) {
         items: nextItems,
       };
     });
+    setLineDrafts((prev) => ({ ...prev, [productId]: { quantity: "", cost: "" } }));
   }
 
   function removeOrderItem(productId: string) {
@@ -415,6 +416,9 @@ export default function ComprasModule(props: ComprasModuleProps) {
                               placeholder="Qtd."
                               value={lineDrafts[item._id]?.quantity || ""}
                               onChange={(event) => updateLineDraft(item._id, "quantity", event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") event.preventDefault();
+                              }}
                             />
                           </td>
                           <td>
@@ -425,11 +429,14 @@ export default function ComprasModule(props: ComprasModuleProps) {
                               placeholder="Custo"
                               value={lineDrafts[item._id]?.cost || ""}
                               onChange={(event) => updateLineDraft(item._id, "cost", event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") event.preventDefault();
+                              }}
                             />
                           </td>
                           <td>
                             <button type="button" onClick={() => addPurchaseFromLine(item._id)}>
-                              Adicionar
+                              Adicionar à ordem
                             </button>
                           </td>
                         </tr>
@@ -491,7 +498,7 @@ export default function ComprasModule(props: ComprasModuleProps) {
 
             <div className="table-actions">
               <button type="submit" disabled={!props.purchaseForm.items.length}>
-                Emitir ordem de compra
+                Finalizar ordem de compra
               </button>
               <button
                 type="button"

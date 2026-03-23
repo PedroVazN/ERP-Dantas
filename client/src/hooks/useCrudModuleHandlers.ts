@@ -320,30 +320,14 @@ export function useCrudModuleHandlers(deps: {
       return;
     }
 
-    const normalizedItems =
-      purchaseForm.items.length > 0
-        ? purchaseForm.items
-        : (() => {
-            const product = products.find((item) => item._id === purchaseForm.productId);
-            if (!product) return [];
-            return [
-              {
-                productId: product._id,
-                description: product.name,
-                quantity: Number(purchaseForm.quantity),
-                cost: Number(purchaseForm.cost),
-              },
-            ];
-          })();
-
-    if (!normalizedItems.length) {
+    if (!purchaseForm.items.length) {
       setError("Adicione pelo menos um produto na ordem de compra.");
       return;
     }
 
     await api.post<Purchase>(scopedPath("/purchases"), {
       supplier: supplier.name,
-      items: normalizedItems.map((item) => ({
+      items: purchaseForm.items.map((item) => ({
         product: item.productId,
         description: item.description,
         quantity: Number(item.quantity),
