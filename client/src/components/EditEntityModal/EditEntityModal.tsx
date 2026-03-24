@@ -16,6 +16,7 @@ export type EditCustomerFormState = {
   name: string;
   email: string;
   phone: string;
+  notes: string;
   status: "ATIVO" | "INATIVO";
 };
 
@@ -154,6 +155,15 @@ export default function EditEntityModal(props: EditEntityModalProps) {
             />
           </div>
           <div className="form-field">
+            <label>Observação</label>
+            <input
+              value={props.editCustomerForm.notes}
+              onChange={(event) =>
+                props.setEditCustomerForm((prev) => ({ ...prev, notes: event.target.value }))
+              }
+            />
+          </div>
+          <div className="form-field">
             <label>Status</label>
             <select
               value={props.editCustomerForm.status}
@@ -189,6 +199,7 @@ export default function EditEntityModal(props: EditEntityModalProps) {
                   name: props.editCustomerForm.name.trim(),
                   email: props.editCustomerForm.email.trim(),
                   phone: props.editCustomerForm.phone.trim(),
+                  notes: props.editCustomerForm.notes.trim(),
                   status: props.editCustomerForm.status,
                 });
                 props.closeEditModal();

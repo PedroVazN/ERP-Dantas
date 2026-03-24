@@ -126,7 +126,7 @@ function App() {
     password: "",
   });
 
-  const [customerForm, setCustomerForm] = useState({ name: "", email: "", phone: "" });
+  const [customerForm, setCustomerForm] = useState({ name: "", email: "", phone: "", notes: "" });
   const [productForm, setProductForm] = useState({
     name: "",
     sku: "",
@@ -154,6 +154,9 @@ function App() {
   }
   const [saleForm, setSaleForm] = useState({
     customerId: "",
+    customerName: "",
+    customerPhone: "",
+    customerNote: "",
     productId: "",
     quantity: 1,
     unitPrice: 0,
@@ -186,6 +189,7 @@ function App() {
     name: "",
     email: "",
     phone: "",
+    notes: "",
     status: "ATIVO" as "ATIVO" | "INATIVO",
   });
   const [editProductForm, setEditProductForm] = useState({
@@ -496,6 +500,7 @@ function App() {
     currentUser,
     formatBRL,
     products,
+    customers,
     suppliers,
     customerForm,
     setCustomerForm,

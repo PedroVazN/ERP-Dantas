@@ -5,6 +5,9 @@ import { useMemo, useRef, useState } from "react";
 
 type SaleFormState = {
   customerId: string;
+  customerName: string;
+  customerPhone: string;
+  customerNote: string;
   productId: string;
   quantity: number;
   unitPrice: number;
@@ -33,6 +36,7 @@ export default function VendasModule(props: VendasModuleProps) {
   const [page, setPage] = useState(1);
   const [lineDrafts, setLineDrafts] = useState<Record<string, { quantity: string; unitPrice: string }>>({});
   const quickFormRef = useRef<HTMLFormElement | null>(null);
+  const activeCustomers = useMemo(() => props.customers.filter((c) => c.status === "ATIVO"), [props.customers]);
 
   const pageSize = 7;
 
@@ -131,8 +135,24 @@ export default function VendasModule(props: VendasModuleProps) {
     }, 0);
   }
 
+  function normalizePhone(phone: string) {
+    return phone.replace(/\D/g, "");
+  }
+
+  function handlePhoneChange(value: string) {
+    const normalizedInput = normalizePhone(value);
+    const matched = activeCustomers.find((c) => normalizePhone(c.phone || "") === normalizedInput);
+    props.setSaleForm((prev) => ({
+      ...prev,
+      customerPhone: value,
+      customerId: matched?._id || "",
+      customerName: matched?.name || prev.customerName,
+      customerNote: matched?.notes || (matched ? prev.customerNote : ""),
+    }));
+  }
+
   return (
-    <section className="module-grid animated">
+    <section className="module-grid animated vendas-module">
       <section className="table-card" style={{ gridColumn: "1 / -1" }}>
         <div className="order-header">
           <h3>Ordens de venda</h3>
@@ -306,27 +326,36 @@ export default function VendasModule(props: VendasModuleProps) {
         ) : (
           <form className="form-card order-form" ref={quickFormRef} onSubmit={props.submitSale}>
             <h3>Emitir nova ordem de venda</h3>
-            <div className="form-field">
-              <label>Cliente</label>
-              <small className="field-help">
-                Selecione quem comprou (cadastre em Clientes, se necessário). Opcional para venda avulsa.
-              </small>
-              <select
-                value={props.saleForm.customerId}
-                onChange={(event) =>
-                  props.setSaleForm({ ...props.saleForm, customerId: event.target.value })
-                }
-              >
-                <option value="">Consumidor / não informado</option>
-                {props.customers
-                  .filter((c) => c.status === "ATIVO")
-                  .map((c) => (
-                    <option key={c._id} value={c._id}>
-                      {c.name}
-                      {c.phone ? ` — ${c.phone}` : ""}
-                    </option>
-                  ))}
-              </select>
+            <div className="order-toolbar">
+              <div className="form-field">
+                <label>Telefone do cliente</label>
+                <small className="field-help">
+                  Ao digitar, se já existir cadastro com esse telefone, o nome é preenchido automaticamente.
+                </small>
+                <input
+                  placeholder="ex.: (11) 99999-9999"
+                  value={props.saleForm.customerPhone}
+                  onChange={(event) => handlePhoneChange(event.target.value)}
+                />
+              </div>
+              <div className="form-field">
+                <label>Nome do cliente</label>
+                <input
+                  placeholder="ex.: Maria Silva"
+                  value={props.saleForm.customerName}
+                  onChange={(event) =>
+                    props.setSaleForm({ ...props.saleForm, customerName: event.target.value, customerId: "" })
+                  }
+                />
+              </div>
+              <div className="form-field">
+                <label>Observação do cliente</label>
+                <input
+                  placeholder="ex.: irmã da Ana, prefere entrega à tarde"
+                  value={props.saleForm.customerNote}
+                  onChange={(event) => props.setSaleForm({ ...props.saleForm, customerNote: event.target.value })}
+                />
+              </div>
             </div>
             <div className="form-field">
               <label>Forma de pagamento</label>

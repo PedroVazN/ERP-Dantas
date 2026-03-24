@@ -38,6 +38,7 @@ export function registerCustomerRoutes(app: Express) {
       name: string;
       email: string;
       phone: string;
+      notes: string;
       status: "ATIVO" | "INATIVO";
     }>;
 
@@ -45,6 +46,7 @@ export function registerCustomerRoutes(app: Express) {
     if (typeof payload.name === "string") update.name = payload.name.trim();
     if (typeof payload.email === "string") update.email = payload.email.trim();
     if (typeof payload.phone === "string") update.phone = payload.phone.trim();
+    if (typeof payload.notes === "string") update.notes = payload.notes.trim();
     if (payload.status === "ATIVO" || payload.status === "INATIVO") update.status = payload.status;
 
     const customer = await CustomerModel.findOneAndUpdate(

@@ -5,6 +5,7 @@ type CustomerFormState = {
   name: string;
   email: string;
   phone: string;
+  notes: string;
 };
 
 export type ClientesModuleProps = {
@@ -55,6 +56,17 @@ export default function ClientesModule(props: ClientesModuleProps) {
             }
           />
         </div>
+        <div className="form-field">
+          <label>Observação</label>
+          <small className="field-help">Use para lembrar detalhes do cliente (apelido, referência, bairro).</small>
+          <input
+            placeholder="ex.: mãe da Júlia / entrega no salão"
+            value={props.customerForm.notes}
+            onChange={(event) =>
+              props.setCustomerForm({ ...props.customerForm, notes: event.target.value })
+            }
+          />
+        </div>
         <button type="submit">Cadastrar</button>
       </form>
 
@@ -66,6 +78,7 @@ export default function ClientesModule(props: ClientesModuleProps) {
               <th>Nome</th>
               <th>E-mail</th>
               <th>Telefone</th>
+              <th>Observação</th>
               <th>Status</th>
               <th>Ações</th>
             </tr>
@@ -76,6 +89,7 @@ export default function ClientesModule(props: ClientesModuleProps) {
                 <td>{item.name}</td>
                 <td>{item.email || "-"}</td>
                 <td>{item.phone || "-"}</td>
+                <td>{item.notes || "-"}</td>
                 <td>{item.status}</td>
                 <td>
                   <div className="table-actions">

@@ -1,7 +1,9 @@
 import type { BiInsights, Dashboard } from "../../types";
+import type { Product } from "../../types";
 
 export type DashboardPanelProps = {
   dashboard: Dashboard;
+  products: Product[];
   biInsights: BiInsights;
   biRefreshing: boolean;
   realSalesCount: number;
@@ -18,6 +20,9 @@ export type DashboardPanelProps = {
 
 export default function DashboardPanel(props: DashboardPanelProps) {
   const { dashboard, biInsights } = props;
+  const estoqueContabil = props.products.reduce((acc, item) => acc + item.cost * item.stock, 0);
+  const potencialFaturamento = props.products.reduce((acc, item) => acc + item.price * item.stock, 0);
+  const balancoMensal = biInsights.kpis.revenue - biInsights.kpis.expenses;
   const lowStockSuggestions = dashboard.lowStock.map((item) => {
     const gapToMin = Math.max(item.minStock - item.stock, 0);
     const targetStock = Math.max(item.minStock * 2, item.minStock + 5);
@@ -60,9 +65,9 @@ export default function DashboardPanel(props: DashboardPanelProps) {
           <span>Resultado consolidado</span>
         </article>
         <article className="kpi-card animated delay-4">
-          <h3>Contas a receber</h3>
-          <strong>{props.formatBRL(props.totalOpenReceivables)}</strong>
-          <span>Valores pendentes</span>
+          <h3>Estoque contabil</h3>
+          <strong>{props.formatBRL(estoqueContabil)}</strong>
+          <span>Valor de custo do estoque</span>
         </article>
       </section>
 
@@ -73,14 +78,14 @@ export default function DashboardPanel(props: DashboardPanelProps) {
           <span>Eficiência sobre faturamento do mês</span>
         </article>
         <article className="kpi-card animated delay-2">
-          <h3>Crescimento de vendas</h3>
-          <strong>{props.formatPct(biInsights.kpis.revenueGrowth)}</strong>
-          <span>Comparativo com o mês anterior</span>
+          <h3>Balanço</h3>
+          <strong>{props.formatBRL(balancoMensal)}</strong>
+          <span>Vendas - despesas (mês)</span>
         </article>
         <article className="kpi-card animated delay-3">
-          <h3>Crescimento do lucro</h3>
-          <strong>{props.formatPct(biInsights.kpis.profitGrowth)}</strong>
-          <span>Variação mensal do resultado</span>
+          <h3>Potencial de faturamento</h3>
+          <strong>{props.formatBRL(potencialFaturamento)}</strong>
+          <span>Estoque x preco de venda da lista</span>
         </article>
         <article className="kpi-card animated delay-4">
           <h3>Ticket médio</h3>

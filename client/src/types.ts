@@ -24,6 +24,7 @@ export type Customer = {
   name: string;
   email?: string;
   phone?: string;
+  notes?: string;
   status: "ATIVO" | "INATIVO";
 };
 

@@ -29,10 +29,11 @@ export function useCrudModuleHandlers(deps: {
   currentUser: AuthUser | null;
   formatBRL: (value: number) => string;
   products: Product[];
+  customers: Customer[];
   suppliers: Supplier[];
 
-  customerForm: { name: string; email: string; phone: string };
-  setCustomerForm: Dispatch<SetStateAction<{ name: string; email: string; phone: string }>>;
+  customerForm: { name: string; email: string; phone: string; notes: string };
+  setCustomerForm: Dispatch<SetStateAction<{ name: string; email: string; phone: string; notes: string }>>;
 
   productForm: {
     name: string;
@@ -61,10 +62,22 @@ export function useCrudModuleHandlers(deps: {
   productPhotoFile: File | null;
   setProductPhotoFile: Dispatch<SetStateAction<File | null>>;
 
-  saleForm: { customerId: string; productId: string; quantity: number; unitPrice: number; paymentMethod: string };
+  saleForm: {
+    customerId: string;
+    customerName: string;
+    customerPhone: string;
+    customerNote: string;
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+    paymentMethod: string;
+  };
   setSaleForm: Dispatch<
     SetStateAction<{
       customerId: string;
+      customerName: string;
+      customerPhone: string;
+      customerNote: string;
       productId: string;
       quantity: number;
       unitPrice: number;
@@ -121,7 +134,7 @@ export function useCrudModuleHandlers(deps: {
 
   openEditModal: (kind: CrudEditModalKind, id: string, subtitle: string) => void;
   setEditCustomerForm: Dispatch<
-    SetStateAction<{ name: string; email: string; phone: string; status: "ATIVO" | "INATIVO" }>
+    SetStateAction<{ name: string; email: string; phone: string; notes: string; status: "ATIVO" | "INATIVO" }>
   >;
   setEditProductForm: Dispatch<
     SetStateAction<{
@@ -172,6 +185,7 @@ export function useCrudModuleHandlers(deps: {
     currentUser,
     formatBRL,
     products,
+    customers,
     suppliers,
 
     customerForm,
@@ -210,7 +224,7 @@ export function useCrudModuleHandlers(deps: {
       return;
     }
     await api.post<Customer>(scopedPath("/customers"), { ...customerForm, status: "ATIVO" });
-    setCustomerForm({ name: "", email: "", phone: "" });
+    setCustomerForm({ name: "", email: "", phone: "", notes: "" });
     await loadAllData();
   }
 
@@ -277,8 +291,31 @@ export function useCrudModuleHandlers(deps: {
         Number.isFinite(Number(saleForm.unitPrice)) && Number(saleForm.unitPrice) > 0
           ? Number(saleForm.unitPrice)
           : product.price;
+      const normalizedPhone = saleForm.customerPhone.trim();
+      const normalizedName = saleForm.customerName.trim();
+      const normalizedNote = saleForm.customerNote.trim();
+      let customerIdToUse = saleForm.customerId.trim();
+
+      if (!customerIdToUse && (normalizedPhone || normalizedName)) {
+        const phoneDigits = normalizedPhone.replace(/\D/g, "");
+        const matchedByPhone = phoneDigits
+          ? customers.find((c) => (c.phone || "").replace(/\D/g, "") === phoneDigits && c.status === "ATIVO")
+          : undefined;
+        if (matchedByPhone?._id) {
+          customerIdToUse = matchedByPhone._id;
+        } else if (normalizedName) {
+          const createdCustomer = await api.post<Customer>(scopedPath("/customers"), {
+            name: normalizedName,
+            phone: normalizedPhone || undefined,
+            notes: normalizedNote || undefined,
+            status: "ATIVO",
+          });
+          customerIdToUse = createdCustomer._id;
+        }
+      }
+
       await api.post<Sale>(scopedPath("/sales"), {
-        ...(saleForm.customerId.trim() ? { customer: saleForm.customerId.trim() } : {}),
+        ...(customerIdToUse ? { customer: customerIdToUse } : {}),
         items: [
           {
             product: product._id,
@@ -290,7 +327,16 @@ export function useCrudModuleHandlers(deps: {
         status: "PAGO",
         createdBy: "Admin",
       });
-      setSaleForm({ customerId: "", productId: "", quantity: 1, unitPrice: 0, paymentMethod: "PIX" });
+      setSaleForm({
+        customerId: "",
+        customerName: "",
+        customerPhone: "",
+        customerNote: "",
+        productId: "",
+        quantity: 1,
+        unitPrice: 0,
+        paymentMethod: "PIX",
+      });
       await loadAllData();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro ao lançar venda.";
@@ -423,6 +469,7 @@ export function useCrudModuleHandlers(deps: {
       name: item.name,
       email: item.email || "",
       phone: item.phone || "",
+      notes: item.notes || "",
       status: item.status,
     });
     openEditModal("customer", item._id, `Editar: ${item.name}`);

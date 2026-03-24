@@ -29,8 +29,8 @@ export type ActiveModuleRendererProps = {
     | "usuario";
 
   // Clientes
-  customerForm: { name: string; email: string; phone: string };
-  setCustomerForm: Dispatch<SetStateAction<{ name: string; email: string; phone: string }>>;
+  customerForm: { name: string; email: string; phone: string; notes: string };
+  setCustomerForm: Dispatch<SetStateAction<{ name: string; email: string; phone: string; notes: string }>>;
   submitCustomer: (event: FormEvent) => Promise<void> | void;
   customers: Customer[];
   editCustomer: (customer: Customer) => void;
@@ -72,6 +72,9 @@ export type ActiveModuleRendererProps = {
   // Vendas
   saleForm: {
     customerId: string;
+    customerName: string;
+    customerPhone: string;
+    customerNote: string;
     productId: string;
     quantity: number;
     unitPrice: number;
@@ -80,6 +83,9 @@ export type ActiveModuleRendererProps = {
   setSaleForm: Dispatch<
     SetStateAction<{
       customerId: string;
+      customerName: string;
+      customerPhone: string;
+      customerNote: string;
       productId: string;
       quantity: number;
       unitPrice: number;

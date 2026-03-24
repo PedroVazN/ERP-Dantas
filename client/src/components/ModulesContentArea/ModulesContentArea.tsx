@@ -36,6 +36,7 @@ export default function ModulesContentArea(props: ModulesContentAreaProps) {
     realPurchasesCount,
     viewerOnly,
     totalOpenReceivables,
+    products,
     formatBRL,
     formatPct,
     maxTimeseriesValue,
@@ -53,6 +54,7 @@ export default function ModulesContentArea(props: ModulesContentAreaProps) {
       {!loading && activeModule === "dashboard" && dashboard && biInsights ? (
         <DashboardPanel
           dashboard={dashboard}
+          products={products}
           biInsights={biInsights}
           biRefreshing={biRefreshing}
           realSalesCount={realSalesCount}
@@ -73,6 +75,7 @@ export default function ModulesContentArea(props: ModulesContentAreaProps) {
       <ActiveModuleRenderer
         loading={loading}
         activeModule={activeModule}
+        products={products}
         // `formatBRL` é necessário por vários módulos (ex.: ProdutosModule).
         formatBRL={formatBRL}
         {...(activeModuleRendererProps as any)}

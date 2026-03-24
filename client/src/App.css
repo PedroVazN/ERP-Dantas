@@ -291,6 +291,10 @@
   gap: 16px;
 }
 
+.module-grid > * {
+  min-width: 0;
+}
+
 /* IA no painel lateral: uma coluna */
 .ia-module-drawer {
   grid-template-columns: 1fr;
@@ -779,6 +783,9 @@ th {
 
 .table-scroll {
   overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 .list-footer {
@@ -1110,7 +1117,7 @@ th {
 }
 
 .table-scroll table {
-  min-width: 860px;
+  min-width: 640px;
 }
 
 .ai-messages {
@@ -1388,6 +1395,7 @@ th {
 
   .content {
     padding: 16px;
+    overflow-x: hidden;
   }
 
   .mobile-topbar {
@@ -1411,6 +1419,32 @@ th {
     border-radius: 14px;
     padding: 8px;
     box-shadow: 0 8px 20px var(--shadow-soft);
+  }
+
+  /* No mobile o menu usa fundo claro; força contraste de textos/ícones. */
+  .mobile-menu-panel .nav-button {
+    background: var(--panel);
+    border-color: var(--border);
+    color: var(--title);
+  }
+
+  .mobile-menu-panel .nav-button strong {
+    color: var(--title);
+  }
+
+  .mobile-menu-panel .nav-button small {
+    color: var(--muted);
+  }
+
+  .mobile-menu-panel .nav-icon {
+    background: color-mix(in srgb, var(--panel-2) 86%, transparent);
+    border-color: color-mix(in srgb, var(--border) 86%, transparent);
+    color: var(--accent);
+  }
+
+  .mobile-menu-panel .nav-button.active {
+    background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+    border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
   }
 
   .module-grid,
@@ -1445,7 +1479,13 @@ th {
 
   .header-actions {
     flex-wrap: wrap;
-    justify-content: flex-end;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  .header-actions .ghost-btn {
+    max-width: 100%;
+    white-space: normal;
   }
 
   .content-header {
@@ -1455,6 +1495,126 @@ th {
 
   .theme-cards {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .content {
+    padding: 12px;
+  }
+
+  .content-header h2 {
+    font-size: 22px;
+  }
+
+  .form-card,
+  .table-card,
+  .kpi-card,
+  .promo-card {
+    padding: 12px;
+  }
+
+  .view-switch {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .view-switch button {
+    width: 100%;
+  }
+
+  .table-scroll table {
+    min-width: 560px;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  .header-actions .ghost-btn {
+    flex: 1 1 120px;
+    min-width: 0;
+    text-align: center;
+    padding: 8px;
+    font-size: 12px;
+  }
+}
+
+/* Ajustes pontuais de responsividade para Vendas/Compras */
+@media (max-width: 900px) {
+  .vendas-module .table-scroll table {
+    min-width: 700px;
+  }
+
+  .compras-module .table-scroll table {
+    min-width: 660px;
+  }
+
+  .vendas-module .order-items-table input,
+  .compras-module .order-items-table input {
+    min-width: 84px;
+    max-width: 104px;
+    padding: 7px;
+  }
+}
+
+@media (max-width: 640px) {
+  .vendas-module .table-scroll table {
+    min-width: 620px;
+  }
+
+  .compras-module .table-scroll table {
+    min-width: 560px;
+  }
+
+  .vendas-module th,
+  .vendas-module td,
+  .compras-module th,
+  .compras-module td {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  .vendas-module .table-actions .ghost-btn,
+  .compras-module .table-actions .ghost-btn {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+
+  .vendas-module .list-footer,
+  .compras-module .list-footer {
+    gap: 6px;
+  }
+
+  .vendas-module .list-footer .ghost-btn,
+  .compras-module .list-footer .ghost-btn {
+    padding: 7px 9px;
+    font-size: 11px;
+  }
+
+  .compras-module .table-scroll {
+    max-width: 100%;
+  }
+
+  .compras-module .table-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .compras-module .table-actions > button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .compras-module td:first-child,
+  .compras-module th:first-child {
+    max-width: 180px;
+    white-space: normal;
+    word-break: break-word;
   }
 }
 

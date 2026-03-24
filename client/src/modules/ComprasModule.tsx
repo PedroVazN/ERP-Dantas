@@ -166,7 +166,7 @@ export default function ComprasModule(props: ComprasModuleProps) {
   }
 
   return (
-    <section className="module-grid animated">
+    <section className="module-grid animated compras-module">
       <section className="table-card" style={{ gridColumn: "1 / -1" }}>
         <div className="order-header">
           <h3>Ordens de compra</h3>
