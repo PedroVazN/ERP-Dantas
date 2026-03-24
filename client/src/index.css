@@ -188,6 +188,11 @@
   box-sizing: border-box;
 }
 
+html {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -196,6 +201,8 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 ::selection {
@@ -231,4 +238,7 @@ body {
 
 #root {
   min-height: 100vh;
+  max-width: 100%;
+  overflow-x: hidden;
+  position: relative;
 }

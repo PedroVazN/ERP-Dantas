@@ -238,38 +238,48 @@ export default function DashboardPanel(props: DashboardPanelProps) {
 
       <section className="table-card animated">
         <h3>Produtos com estoque crítico</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>Produto</th>
-              <th>SKU</th>
-              <th>Estoque</th>
-              <th>Mínimo</th>
-              <th>Sugestão de compra</th>
-              <th>Ação</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lowStockSuggestions.length === 0 ? (
+        <div className="table-scroll dashboard-table-scroll">
+          <table>
+            <thead>
               <tr>
-                <td colSpan={6} className="empty">
-                  Nenhum item em nível crítico no momento.
-                </td>
+                <th>Produto</th>
+                <th>SKU</th>
+                <th>Estoque</th>
+                <th>Mínimo</th>
+                <th>Sugestão de compra</th>
+                <th>Ação</th>
               </tr>
-            ) : (
-              lowStockSuggestions.map((item) => (
-                <tr key={item._id}>
-                  <td>{item.name}</td>
-                  <td>{item.sku}</td>
-                  <td>{item.stock}</td>
-                  <td>{item.minStock}</td>
-                  <td>{item.suggestedQty} un.</td>
-                  <td>{props.viewerOnly ? "—" : <button type="button" className="ghost-btn" onClick={() => props.selectModule("compras")}>Repor estoque</button>}</td>
+            </thead>
+            <tbody>
+              {lowStockSuggestions.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="empty">
+                    Nenhum item em nível crítico no momento.
+                  </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                lowStockSuggestions.map((item) => (
+                  <tr key={item._id}>
+                    <td>{item.name}</td>
+                    <td>{item.sku}</td>
+                    <td>{item.stock}</td>
+                    <td>{item.minStock}</td>
+                    <td>{item.suggestedQty} un.</td>
+                    <td>
+                      {props.viewerOnly ? (
+                        "—"
+                      ) : (
+                        <button type="button" className="ghost-btn" onClick={() => props.selectModule("compras")}>
+                          Repor estoque
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section className="promo-card animated">
