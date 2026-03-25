@@ -977,8 +977,8 @@ th {
 .sidebar {
   position: sticky;
   top: 0;
-  height: 100vh;
-  overflow-y: auto;
+  height: auto;
+  overflow-y: visible;
   border-right: 1px solid color-mix(in srgb, var(--sidebar-border) 88%, transparent);
   box-shadow:
     inset -1px 0 0 color-mix(in srgb, #fff 4%, transparent),
@@ -1673,6 +1673,106 @@ th {
   .promo-card {
     min-width: 0;
     max-width: 100%;
+  }
+}
+
+/* Catálogo de produtos (aba catálogo) */
+.catalog-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.catalog-tab {
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.catalog-tab.active {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+
+.catalog-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.catalog-photo-button {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+}
+
+.catalog-photo {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--panel-2);
+}
+
+.catalog-card-body {
+  padding: 12px 12px 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.catalog-title {
+  color: var(--title);
+  font-size: 13px;
+  letter-spacing: -0.01em;
+}
+
+.catalog-desc {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.catalog-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.catalog-price {
+  color: var(--title);
+  font-weight: 800;
+  font-size: 12.5px;
+}
+
+.catalog-stock {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.catalog-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 480px) {
+  .catalog-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

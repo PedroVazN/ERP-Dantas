@@ -75,9 +75,7 @@ export type ActiveModuleRendererProps = {
     customerName: string;
     customerPhone: string;
     customerNote: string;
-    productId: string;
-    quantity: number;
-    unitPrice: number;
+    items: Array<{ productId: string; quantity: number; unitPrice: number }>;
     paymentMethod: string;
   };
   setSaleForm: Dispatch<
@@ -86,9 +84,7 @@ export type ActiveModuleRendererProps = {
       customerName: string;
       customerPhone: string;
       customerNote: string;
-      productId: string;
-      quantity: number;
-      unitPrice: number;
+      items: Array<{ productId: string; quantity: number; unitPrice: number }>;
       paymentMethod: string;
     }>
   >;

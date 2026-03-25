@@ -1,16 +1,14 @@
 import type { Customer, Product, Sale } from "../types";
 import { saleCustomerLabel } from "../utils/saleCustomerLabel";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
 type SaleFormState = {
   customerId: string;
   customerName: string;
   customerPhone: string;
   customerNote: string;
-  productId: string;
-  quantity: number;
-  unitPrice: number;
+  items: Array<{ productId: string; quantity: number; unitPrice: number }>;
   paymentMethod: string;
 };
 
@@ -35,7 +33,6 @@ export default function VendasModule(props: VendasModuleProps) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [lineDrafts, setLineDrafts] = useState<Record<string, { quantity: string; unitPrice: string }>>({});
-  const quickFormRef = useRef<HTMLFormElement | null>(null);
   const activeCustomers = useMemo(() => props.customers.filter((c) => c.status === "ATIVO"), [props.customers]);
 
   const pageSize = 7;
@@ -121,18 +118,36 @@ export default function VendasModule(props: VendasModuleProps) {
 
   function addSaleFromLine(product: Product) {
     const quantity = Number(lineDrafts[product._id]?.quantity || 0);
-    const unitPrice = Number(lineDrafts[product._id]?.unitPrice || product.price);
-    if (quantity <= 0) return;
+    const draftUnitPrice = Number(lineDrafts[product._id]?.unitPrice || product.price);
+    if (!Number.isFinite(quantity) || quantity <= 0) return;
+
+    const unitPrice = Number.isFinite(draftUnitPrice) && draftUnitPrice > 0 ? draftUnitPrice : product.price;
     if (!Number.isFinite(unitPrice) || unitPrice <= 0) return;
-    props.setSaleForm({
-      ...props.saleForm,
-      productId: product._id,
-      quantity,
-      unitPrice,
+
+    props.setSaleForm((prev) => {
+      const existingIndex = prev.items.findIndex((it) => it.productId === product._id);
+      const nextItems = [...prev.items];
+      if (existingIndex >= 0) {
+        const current = nextItems[existingIndex];
+        nextItems[existingIndex] = {
+          ...current,
+          quantity: Number(current.quantity) + quantity,
+          unitPrice,
+        };
+      } else {
+        nextItems.push({
+          productId: product._id,
+          quantity,
+          unitPrice,
+        });
+      }
+      return { ...prev, items: nextItems };
     });
-    window.setTimeout(() => {
-      quickFormRef.current?.requestSubmit();
-    }, 0);
+
+    setLineDrafts((prev) => ({
+      ...prev,
+      [product._id]: { quantity: "", unitPrice: "" },
+    }));
   }
 
   function normalizePhone(phone: string) {
@@ -147,8 +162,23 @@ export default function VendasModule(props: VendasModuleProps) {
       customerPhone: value,
       customerId: matched?._id || "",
       customerName: matched?.name || prev.customerName,
-      customerNote: matched?.notes || (matched ? prev.customerNote : ""),
+      customerNote: matched?.notes || prev.customerNote,
     }));
+  }
+
+  function removeSaleItem(productId: string) {
+    props.setSaleForm((prev) => ({
+      ...prev,
+      items: prev.items.filter((it) => it.productId !== productId),
+    }));
+  }
+
+  function clearOrderItems() {
+    props.setSaleForm((prev) => ({ ...prev, items: [] }));
+  }
+
+  function findProductName(productId: string) {
+    return props.products.find((p) => p._id === productId)?.name || "Produto";
   }
 
   return (
@@ -324,7 +354,7 @@ export default function VendasModule(props: VendasModuleProps) {
             </div>
           </>
         ) : (
-          <form className="form-card order-form" ref={quickFormRef} onSubmit={props.submitSale}>
+          <form className="form-card order-form" onSubmit={props.submitSale}>
             <h3>Emitir nova ordem de venda</h3>
             <div className="order-toolbar">
               <div className="form-field">
@@ -413,7 +443,7 @@ export default function VendasModule(props: VendasModuleProps) {
                         </td>
                         <td>
                           <button type="button" onClick={() => addSaleFromLine(item)}>
-                            Adicionar
+                            Adicionar à ordem
                           </button>
                         </td>
                       </tr>
@@ -429,8 +459,59 @@ export default function VendasModule(props: VendasModuleProps) {
               </table>
             </div>
 
+            <div className="table-scroll" style={{ marginTop: 10 }}>
+              <table className="order-items-table">
+                <thead>
+                  <tr>
+                    <th>Produto</th>
+                    <th>Quantidade</th>
+                    <th>Preço (R$)</th>
+                    <th>Total</th>
+                    <th>Ação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {props.saleForm.items.length ? (
+                    props.saleForm.items.map((it) => (
+                      <tr key={it.productId}>
+                        <td>{findProductName(it.productId)}</td>
+                        <td>{it.quantity}</td>
+                        <td>{props.formatBRL(it.unitPrice)}</td>
+                        <td>{props.formatBRL(it.quantity * it.unitPrice)}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="ghost-btn danger"
+                            onClick={() => removeSaleItem(it.productId)}
+                          >
+                            Remover
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="empty">
+                        Nenhum item adicionado na ordem.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
             <div className="table-actions">
-              <button type="submit">Lançar venda manual</button>
+              <button type="submit" disabled={!props.saleForm.items.length}>
+                Finalizar venda
+              </button>
+              <button
+                type="button"
+                className="ghost-btn"
+                disabled={!props.saleForm.items.length}
+                onClick={clearOrderItems}
+              >
+                Limpar itens
+              </button>
               <button type="button" className="ghost-btn" onClick={() => props.setPixModalOpen(true)}>
                 Abrir PIX
               </button>

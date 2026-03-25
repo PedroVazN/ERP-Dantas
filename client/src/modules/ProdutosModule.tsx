@@ -1,6 +1,7 @@
 import type { Product, Supplier } from "../types";
 import { API_URL } from "../api";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
+import { useMemo, useState } from "react";
 
 type ProductFormState = {
   name: string;
@@ -29,6 +30,13 @@ export type ProdutosModuleProps = {
 };
 
 export default function ProdutosModule(props: ProdutosModuleProps) {
+  const [tab, setTab] = useState<"lista" | "catalogo">("lista");
+
+  const catalogProducts = useMemo(
+    () => props.products.filter((p) => p.hasPhoto),
+    [props.products]
+  );
+
   return (
     <section className="module-grid animated">
       <form className="form-card" onSubmit={props.submitProduct}>
@@ -170,66 +178,130 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
       </form>
 
       <section className="table-card">
-        <h3>Produtos</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>SKU</th>
-              <th>Código</th>
-              <th>Descrição</th>
-              <th>Preço</th>
-              <th>Custo</th>
-              <th>Estoque</th>
-              <th>Foto</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {props.products.map((item) => (
-              <tr key={item._id}>
-                <td>{item.name}</td>
-                <td>{item.sku}</td>
-                <td>{item.productCode || "-"}</td>
-                <td>{item.description || "-"}</td>
-                <td>{props.formatBRL(item.price)}</td>
-                <td>{props.formatBRL(item.cost)}</td>
-                <td>{item.stock}</td>
-                <td>
-                  {item.hasPhoto ? (
-                    <img
-                      className="product-photo-thumb"
-                      src={`${API_URL}${props.scopedPath(`/products/${item._id}/photo`)}`}
-                      alt={`Foto de ${item.name}`}
-                      title="Clique para ampliar"
+        <div className="catalog-tabs">
+          <button
+            type="button"
+            className={tab === "lista" ? "ghost-btn catalog-tab active" : "ghost-btn catalog-tab"}
+            onClick={() => setTab("lista")}
+          >
+            Lista
+          </button>
+          <button
+            type="button"
+            className={tab === "catalogo" ? "ghost-btn catalog-tab active" : "ghost-btn catalog-tab"}
+            onClick={() => setTab("catalogo")}
+          >
+            Catálogo
+          </button>
+        </div>
+
+        {tab === "lista" ? (
+          <>
+            <h3>Produtos</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>SKU</th>
+                  <th>Código</th>
+                  <th>Descrição</th>
+                  <th>Preço</th>
+                  <th>Custo</th>
+                  <th>Estoque</th>
+                  <th>Foto</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {props.products.map((item) => (
+                  <tr key={item._id}>
+                    <td>{item.name}</td>
+                    <td>{item.sku}</td>
+                    <td>{item.productCode || "-"}</td>
+                    <td>{item.description || "-"}</td>
+                    <td>{props.formatBRL(item.price)}</td>
+                    <td>{props.formatBRL(item.cost)}</td>
+                    <td>{item.stock}</td>
+                    <td>
+                      {item.hasPhoto ? (
+                        <img
+                          className="product-photo-thumb"
+                          src={`${API_URL}${props.scopedPath(`/products/${item._id}/photo`)}`}
+                          alt={`Foto de ${item.name}`}
+                          title="Clique para ampliar"
+                          onClick={() => props.openProductPhotoModal(item._id)}
+                        />
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td>
+                      <div className="table-actions">
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          onClick={() => props.editProduct(item)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-btn danger"
+                          onClick={() => props.deleteProduct(item)}
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        ) : (
+          <>
+            <h3>Catálogo (galeria)</h3>
+            {catalogProducts.length === 0 ? (
+              <p className="empty">Nenhum produto com foto cadastrada ainda.</p>
+            ) : (
+              <div className="catalog-grid">
+                {catalogProducts.map((item) => (
+                  <article className="catalog-card" key={item._id}>
+                    <button
+                      type="button"
+                      className="catalog-photo-button"
                       onClick={() => props.openProductPhotoModal(item._id)}
-                    />
-                  ) : (
-                    "-"
-                  )}
-                </td>
-                <td>
-                  <div className="table-actions">
-                    <button
-                      type="button"
-                      className="ghost-btn"
-                      onClick={() => props.editProduct(item)}
+                      aria-label={`Abrir foto de ${item.name}`}
                     >
-                      Editar
+                      <img
+                        className="catalog-photo"
+                        src={`${API_URL}${props.scopedPath(`/products/${item._id}/photo`)}`}
+                        alt={`Foto de ${item.name}`}
+                      />
                     </button>
-                    <button
-                      type="button"
-                      className="ghost-btn danger"
-                      onClick={() => props.deleteProduct(item)}
-                    >
-                      Excluir
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    <div className="catalog-card-body">
+                      <strong className="catalog-title">{item.name}</strong>
+                      <p className="catalog-desc">{item.description || "-"}</p>
+                      <div className="catalog-meta">
+                        <span className="catalog-price">{props.formatBRL(item.price)}</span>
+                        <span className="catalog-stock">Estoque: {item.stock}</span>
+                      </div>
+                      <div className="catalog-actions">
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          onClick={() => props.editProduct(item)}
+                        >
+                          Editar
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </section>
     </section>
   );

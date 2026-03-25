@@ -157,9 +157,7 @@ function App() {
     customerName: "",
     customerPhone: "",
     customerNote: "",
-    productId: "",
-    quantity: 1,
-    unitPrice: 0,
+    items: [] as Array<{ productId: string; quantity: number; unitPrice: number }>,
     paymentMethod: "PIX",
   });
   const [whatsAppStatus, setWhatsAppStatus] = useState<WhatsAppStatus | null>(null);

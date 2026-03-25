@@ -67,9 +67,7 @@ export function useCrudModuleHandlers(deps: {
     customerName: string;
     customerPhone: string;
     customerNote: string;
-    productId: string;
-    quantity: number;
-    unitPrice: number;
+    items: Array<{ productId: string; quantity: number; unitPrice: number }>;
     paymentMethod: string;
   };
   setSaleForm: Dispatch<
@@ -78,9 +76,7 @@ export function useCrudModuleHandlers(deps: {
       customerName: string;
       customerPhone: string;
       customerNote: string;
-      productId: string;
-      quantity: number;
-      unitPrice: number;
+      items: Array<{ productId: string; quantity: number; unitPrice: number }>;
       paymentMethod: string;
     }>
   >;
@@ -273,24 +269,32 @@ export function useCrudModuleHandlers(deps: {
       setError("No ERP Geral voce visualiza consolidado. Para lancar, selecione um ERP especifico.");
       return;
     }
-    const product = products.find((item) => item._id === saleForm.productId);
-    if (!product) {
-      setError("Selecione um produto válido.");
-      return;
-    }
-
-    const quantity = Number(saleForm.quantity);
-    if (quantity > product.stock) {
-      setError(`Estoque insuficiente para ${product.name}. Disponível: ${product.stock} unidades.`);
-      return;
-    }
 
     try {
       setError("");
-      const unitPrice =
-        Number.isFinite(Number(saleForm.unitPrice)) && Number(saleForm.unitPrice) > 0
-          ? Number(saleForm.unitPrice)
-          : product.price;
+      if (!saleForm.items?.length) {
+        setError("Adicione pelo menos um item na ordem de venda.");
+        return;
+      }
+
+      // Valida estoque e normaliza preço unitário por item
+      for (const item of saleForm.items) {
+        const product = products.find((p) => p._id === item.productId);
+        if (!product) {
+          setError("Produto da venda não encontrado.");
+          return;
+        }
+        const quantity = Number(item.quantity);
+        if (!Number.isFinite(quantity) || quantity <= 0) {
+          setError("Quantidade inválida em um item da venda.");
+          return;
+        }
+        if (quantity > product.stock) {
+          setError(`Estoque insuficiente para ${product.name}. Disponível: ${product.stock} unidades.`);
+          return;
+        }
+      }
+
       const normalizedPhone = saleForm.customerPhone.trim();
       const normalizedName = saleForm.customerName.trim();
       const normalizedNote = saleForm.customerNote.trim();
@@ -303,9 +307,15 @@ export function useCrudModuleHandlers(deps: {
           : undefined;
         if (matchedByPhone?._id) {
           customerIdToUse = matchedByPhone._id;
-        } else if (normalizedName) {
+        } else {
+          // Backend exige nome. Se o usuário só informou telefone, cria um nome derivado.
+          const derivedName = normalizedName || (normalizedPhone ? `Cliente ${normalizedPhone}` : "");
+          if (!derivedName) {
+            setError("Informe telefone e/ou nome do cliente.");
+            return;
+          }
           const createdCustomer = await api.post<Customer>(scopedPath("/customers"), {
-            name: normalizedName,
+            name: derivedName,
             phone: normalizedPhone || undefined,
             notes: normalizedNote || undefined,
             status: "ATIVO",
@@ -314,15 +324,21 @@ export function useCrudModuleHandlers(deps: {
         }
       }
 
+      const normalizedItems = saleForm.items.map((item) => {
+        const product = products.find((p) => p._id === item.productId)!;
+        const quantity = Number(item.quantity);
+        const unitPrice =
+          Number.isFinite(Number(item.unitPrice)) && Number(item.unitPrice) > 0 ? Number(item.unitPrice) : product.price;
+        return {
+          product: product._id,
+          quantity,
+          unitPrice,
+        };
+      });
+
       await api.post<Sale>(scopedPath("/sales"), {
         ...(customerIdToUse ? { customer: customerIdToUse } : {}),
-        items: [
-          {
-            product: product._id,
-            quantity: quantity,
-            unitPrice,
-          },
-        ],
+        items: normalizedItems,
         paymentMethod: saleForm.paymentMethod,
         status: "PAGO",
         createdBy: "Admin",
@@ -332,9 +348,7 @@ export function useCrudModuleHandlers(deps: {
         customerName: "",
         customerPhone: "",
         customerNote: "",
-        productId: "",
-        quantity: 1,
-        unitPrice: 0,
+        items: [],
         paymentMethod: "PIX",
       });
       await loadAllData();
