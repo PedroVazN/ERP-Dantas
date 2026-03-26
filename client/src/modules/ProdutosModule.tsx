@@ -3,6 +3,22 @@ import { API_URL } from "../api";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { useMemo, useState } from "react";
 
+async function fetchPhotoAsBase64(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 type ProductFormState = {
   name: string;
   sku: string;
@@ -31,11 +47,111 @@ export type ProdutosModuleProps = {
 
 export default function ProdutosModule(props: ProdutosModuleProps) {
   const [tab, setTab] = useState<"lista" | "catalogo">("lista");
+  const [exportingPDF, setExportingPDF] = useState(false);
 
   const catalogProducts = useMemo(
     () => props.products.filter((p) => p.hasPhoto),
     [props.products]
   );
+
+  async function exportCatalogPDF() {
+    setExportingPDF(true);
+    try {
+      const allProducts = props.products;
+
+      const photosMap: Record<string, string> = {};
+      await Promise.all(
+        allProducts
+          .filter((p) => p.hasPhoto)
+          .map(async (p) => {
+            const url = `${API_URL}${props.scopedPath(`/products/${p._id}/photo`)}`;
+            const b64 = await fetchPhotoAsBase64(url);
+            if (b64) photosMap[p._id] = b64;
+          })
+      );
+
+      const cards = allProducts
+        .map((p) => {
+          const photoHtml = photosMap[p._id]
+            ? `<img src="${photosMap[p._id]}" alt="${p.name}" />`
+            : `<div class="no-photo">📷</div>`;
+          const desc = p.description
+            ? `<p class="desc">${p.description}</p>`
+            : "";
+          const stockClass = p.stock <= (p.minStock ?? 0) ? "stock low" : "stock";
+          return `
+<div class="card">
+  <div class="photo-wrap">${photoHtml}</div>
+  <div class="info">
+    <h3>${p.name}</h3>
+    ${p.sku ? `<small class="sku">SKU: ${p.sku}${p.productCode ? " · Cód: " + p.productCode : ""}</small>` : ""}
+    ${desc}
+    <div class="meta">
+      <span class="price">${props.formatBRL(p.price)}</span>
+      <span class="${stockClass}">Estoque: ${p.stock} un.${p.minStock ? " (mín " + String(p.minStock) + ")" : ""}</span>
+    </div>
+  </div>
+</div>`;
+        })
+        .join("\n");
+
+      const now = new Date().toLocaleString("pt-BR");
+      const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<title>Catálogo de Produtos</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,Helvetica,sans-serif;background:#f4f4f4;color:#111;padding:24px}
+  header{text-align:center;margin-bottom:24px}
+  header h1{font-size:22px;color:#1a1a2e}
+  header p{font-size:11px;color:#666;margin-top:4px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
+  .card{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.10);display:flex;flex-direction:column;break-inside:avoid}
+  .photo-wrap{width:100%;height:180px;background:#eee;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .photo-wrap img{width:100%;height:100%;object-fit:cover}
+  .no-photo{font-size:36px;color:#bbb}
+  .info{padding:10px 12px 12px;display:flex;flex-direction:column;gap:5px;flex:1}
+  .info h3{font-size:14px;font-weight:700;color:#1a1a2e;line-height:1.3}
+  .sku{font-size:10px;color:#888}
+  .desc{font-size:12px;color:#444;line-height:1.4;flex:1}
+  .meta{display:flex;flex-direction:column;gap:3px;margin-top:auto;padding-top:8px;border-top:1px dashed #ddd}
+  .price{font-size:15px;font-weight:700;color:#16a34a}
+  .stock{font-size:11px;color:#555}
+  .stock.low{color:#dc2626;font-weight:600}
+  footer{text-align:center;font-size:10px;color:#999;margin-top:24px}
+  @media print{
+    body{background:#fff;padding:12px}
+    .card{box-shadow:none;border:1px solid #ddd}
+    @page{margin:1.5cm}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Catálogo de Produtos</h1>
+  <p>Gerado em ${now} · ${String(allProducts.length)} produto(s)</p>
+</header>
+<div class="grid">
+${cards}
+</div>
+<footer>E-Sentinel ERP · Catálogo gerado automaticamente</footer>
+<script>window.onload=function(){window.print();}<\/script>
+</body>
+</html>`;
+
+      const win = window.open("", "_blank", "width=900,height=780");
+      if (!win) {
+        alert("Permita pop-ups para exportar o PDF.");
+        return;
+      }
+      win.document.write(html);
+      win.document.close();
+    } finally {
+      setExportingPDF(false);
+    }
+  }
 
   return (
     <section className="module-grid animated">
@@ -192,6 +308,15 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
             onClick={() => setTab("catalogo")}
           >
             Catálogo
+          </button>
+          <button
+            type="button"
+            className="ghost-btn catalog-tab catalog-export-btn"
+            onClick={() => void exportCatalogPDF()}
+            disabled={exportingPDF}
+            title="Exportar todos os produtos como PDF"
+          >
+            {exportingPDF ? "Gerando…" : "⬇ Exportar PDF"}
           </button>
         </div>
 
