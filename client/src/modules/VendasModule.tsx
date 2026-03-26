@@ -1,7 +1,7 @@
-import type { Customer, Product, Sale } from "../types";
+import type { Customer, Product, Sale, SaleItem } from "../types";
 import { saleCustomerLabel } from "../utils/saleCustomerLabel";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 type SaleFormState = {
   customerId: string;
@@ -33,7 +33,33 @@ export default function VendasModule(props: VendasModuleProps) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [lineDrafts, setLineDrafts] = useState<Record<string, { quantity: string; unitPrice: string }>>({});
+  const [receiptSale, setReceiptSale] = useState<Sale | null>(null);
+  const receiptRef = useRef<HTMLDivElement>(null);
   const activeCustomers = useMemo(() => props.customers.filter((c) => c.status === "ATIVO"), [props.customers]);
+
+  function printReceipt() {
+    const content = receiptRef.current;
+    if (!content) return;
+    const win = window.open("", "_blank", "width=400,height=600");
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>
+<title>Cupom Fiscal</title>
+<style>
+  body{font-family:monospace;font-size:13px;margin:0;padding:20px;background:#fff;color:#111;}
+  h2{text-align:center;margin:0 0 4px;font-size:15px;}
+  .subtitle{text-align:center;font-size:11px;color:#555;margin-bottom:10px;}
+  hr{border:none;border-top:1px dashed #aaa;margin:8px 0;}
+  table{width:100%;border-collapse:collapse;}
+  th,td{text-align:left;padding:2px 0;font-size:12px;}
+  th{border-bottom:1px dashed #aaa;}
+  td.right,th.right{text-align:right;}
+  .total-row td{font-weight:bold;border-top:1px dashed #aaa;padding-top:4px;}
+  .footer{text-align:center;font-size:11px;color:#555;margin-top:12px;}
+  @media print{@page{margin:0.5cm}body{padding:0}}
+</style></head><body>${content.innerHTML}
+<script>window.onload=()=>{window.print();window.close();}<\/script></body></html>`);
+    win.document.close();
+  }
 
   const pageSize = 7;
 
@@ -306,6 +332,14 @@ export default function VendasModule(props: VendasModuleProps) {
                         <td>{item.invoice?.number || "Gerando..."}</td>
                         <td>
                           <div className="table-actions">
+                            <button
+                              type="button"
+                              className="ghost-btn"
+                              title="Ver cupom"
+                              onClick={() => setReceiptSale(item)}
+                            >
+                              Cupom
+                            </button>
                             <button type="button" className="ghost-btn" onClick={() => props.editSale(item)}>
                               Editar
                             </button>
@@ -522,6 +556,82 @@ export default function VendasModule(props: VendasModuleProps) {
           </form>
         )}
       </section>
+
+      {receiptSale ? (
+        <div className="receipt-overlay" onClick={() => setReceiptSale(null)}>
+          <div className="receipt-modal" onClick={(e) => e.stopPropagation()}>
+            <div ref={receiptRef}>
+              <h2>Cupom Fiscal</h2>
+              <p className="receipt-subtitle">
+                OV-{String(receiptSale._id).slice(-4).toUpperCase()}
+                {" · "}
+                {new Date(receiptSale.createdAt).toLocaleString("pt-BR")}
+              </p>
+              <hr className="receipt-dashed" />
+              {(() => {
+                const c = receiptSale.customer;
+                const clientName =
+                  c == null || c === ""
+                    ? null
+                    : typeof c === "object"
+                    ? (c as { name?: string }).name || "Cliente"
+                    : null;
+                return clientName ? (
+                  <p className="receipt-client">
+                    <strong>Cliente:</strong> {clientName}
+                  </p>
+                ) : null;
+              })()}
+              <table className="receipt-table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th className="receipt-right">Qtd</th>
+                    <th className="receipt-right">Unit.</th>
+                    <th className="receipt-right">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(receiptSale.items ?? []).map((it: SaleItem, idx: number) => (
+                    <tr key={idx}>
+                      <td>{it.name}</td>
+                      <td className="receipt-right">{it.quantity}</td>
+                      <td className="receipt-right">{props.formatBRL(it.unitPrice)}</td>
+                      <td className="receipt-right">{props.formatBRL(it.total)}</td>
+                    </tr>
+                  ))}
+                  {(!receiptSale.items || receiptSale.items.length === 0) && (
+                    <tr>
+                      <td colSpan={4} style={{ textAlign: "center", opacity: 0.6 }}>
+                        Detalhes de itens não disponíveis
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr className="receipt-total-row">
+                    <td colSpan={3}>
+                      <strong>TOTAL</strong>
+                    </td>
+                    <td className="receipt-right">
+                      <strong>{props.formatBRL(receiptSale.totalAmount)}</strong>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+              <hr className="receipt-dashed" />
+              <p className="receipt-footer">Pagamento: {receiptSale.paymentMethod}</p>
+              <p className="receipt-footer">Status: {receiptSale.status}</p>
+            </div>
+            <div className="receipt-actions">
+              <button type="button" onClick={printReceipt}>Imprimir / Salvar PDF</button>
+              <button type="button" className="ghost-btn" onClick={() => setReceiptSale(null)}>
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {props.pixModalOpen ? (
         <div className="pix-modal-overlay" onClick={() => props.setPixModalOpen(false)}>

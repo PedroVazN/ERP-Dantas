@@ -66,6 +66,14 @@ export type SaleCustomerRef =
       phone?: string;
     };
 
+export type SaleItem = {
+  product?: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+};
+
 export type Sale = {
   _id: string;
   totalAmount: number;
@@ -74,6 +82,7 @@ export type Sale = {
   createdAt: string;
   /** Cliente que comprou (ObjectId ou documento populado pela API). */
   customer?: SaleCustomerRef | null;
+  items?: SaleItem[];
   billingStatus?: "PENDENTE" | "FATURADO" | "CANCELADO";
   invoice?: {
     number?: string;
