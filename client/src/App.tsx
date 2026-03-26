@@ -429,6 +429,7 @@ function App() {
     setAiBusy,
     aiPlan,
     setAiPlan,
+    aiMessages,
     setAiMessages,
     setError,
   });

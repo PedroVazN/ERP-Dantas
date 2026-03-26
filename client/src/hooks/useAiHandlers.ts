@@ -19,6 +19,7 @@ export function useAiHandlers(deps: {
   aiPlan: AiPlanState;
   setAiPlan: Dispatch<SetStateAction<AiPlanState>>;
 
+  aiMessages: AiMessage[];
   setAiMessages: Dispatch<SetStateAction<AiMessage[]>>;
   setError: Dispatch<SetStateAction<string>>;
 }) {
@@ -37,6 +38,11 @@ export function useAiHandlers(deps: {
     deps.setError("");
 
     try {
+      // Memória curta: envia as últimas mensagens para manter contexto.
+      const recentHistory = deps.aiMessages.slice(-12).map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
       const response = await api.post<{
         planId: string;
         status: "READY" | "NEEDS_INFO" | "ERROR" | "CHAT";
@@ -48,7 +54,10 @@ export function useAiHandlers(deps: {
         actionsPreview?: string[];
         productDraft?: AiPlan["productDraft"];
         purchaseDraft?: AiPlan["purchaseDraft"];
-      }>(deps.scopedPath("/ai/plan"), { message: text });
+      }>(deps.scopedPath("/ai/plan"), {
+        message: text,
+        history: recentHistory,
+      });
 
       if (response.status === "CHAT") {
         // Resposta conversacional do Gemini — só mostra na conversa, sem plano de ação

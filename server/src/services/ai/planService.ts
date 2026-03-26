@@ -14,11 +14,13 @@ export async function createAiPlan(params: {
   scope: "geral" | "negocio";
   businessId: string;
   message: string;
+  history?: Array<{ role: "user" | "assistant"; content: string }>;
   purchaseApprovalThreshold: number;
   aiPlanTtlMs: number;
   autoApprovePurchasesForAi: boolean;
 }) {
-  const { scope, businessId, message, purchaseApprovalThreshold, aiPlanTtlMs, autoApprovePurchasesForAi } = params;
+  const { scope, businessId, message, history, purchaseApprovalThreshold, aiPlanTtlMs, autoApprovePurchasesForAi } =
+    params;
 
   // Cleanup de planos expirados
   const now = Date.now();
@@ -79,9 +81,19 @@ Produtos (${products.length}): ${productsSummary || "nenhum cadastrado"}
 Vendas recentes: ${salesSummary || "nenhuma"}
 Responda em português, de forma útil e direta. Máximo 3 parágrafos.`;
 
+        const chatHistory = (history || [])
+          .slice(-12)
+          .map(
+            (h): { role: "assistant" | "user"; content: string } => ({
+            role: h.role === "assistant" ? "assistant" : "user",
+            content: h.content,
+            })
+          );
+
         chatReply = await groqChat(
           [
             { role: "system", content: systemPrompt },
+            ...chatHistory,
             { role: "user", content: message },
           ],
           { temperature: 0.4, maxTokens: 900 }

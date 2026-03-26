@@ -29,7 +29,10 @@ export function registerAiRoutes(
       return;
     }
 
-    const payload = req.body as { message?: string };
+    const payload = req.body as {
+      message?: string;
+      history?: Array<{ role?: string; content?: string }>;
+    };
     const message = payload.message?.trim() || "";
     if (!message) {
       return res.status(400).json({ message: "Informe uma mensagem para a IA." });
@@ -39,6 +42,9 @@ export function registerAiRoutes(
       scope: scope as "geral" | "negocio",
       businessId,
       message,
+      history: (payload.history || [])
+        .filter((h) => (h.role === "user" || h.role === "assistant") && typeof h.content === "string")
+        .map((h) => ({ role: h.role as "user" | "assistant", content: String(h.content) })),
       purchaseApprovalThreshold: deps.purchaseApprovalThreshold,
       aiPlanTtlMs: deps.aiPlanTtlMs,
       autoApprovePurchasesForAi: deps.autoApprovePurchasesForAi,
