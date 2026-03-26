@@ -31,9 +31,33 @@ export function registerBiInsightsRoutes(
       monthlyPeriods.push(formatPeriodKey(date));
     }
 
+    const cogsLookupPipeline = (matchStage: object) => [
+      { $match: matchStage },
+      { $unwind: "$items" },
+      {
+        $lookup: {
+          from: "products",
+          localField: "items.product",
+          foreignField: "_id",
+          as: "prod",
+        },
+      },
+      { $unwind: { path: "$prod", preserveNullAndEmptyArrays: true } },
+      {
+        $group: {
+          _id: null,
+          cogs: {
+            $sum: { $multiply: ["$items.quantity", { $ifNull: ["$prod.cost", 0] }] },
+          },
+        },
+      },
+    ];
+
     const [
       currentRevenueAgg,
       previousRevenueAgg,
+      currentCogsAgg,
+      previousCogsAgg,
       currentExpenseAgg,
       previousExpenseAgg,
       monthlySalesAgg,
@@ -63,6 +87,22 @@ export function registerBiInsightsRoutes(
         },
         { $group: { _id: null, total: { $sum: "$totalAmount" } } },
       ]),
+      // CPV mês atual
+      SaleModel.aggregate(
+        cogsLookupPipeline({
+          ...businessFilter,
+          status: { $ne: "CANCELADO" },
+          createdAt: { $gte: monthStart, $lt: nextMonthStart },
+        })
+      ),
+      // CPV mês anterior
+      SaleModel.aggregate(
+        cogsLookupPipeline({
+          ...businessFilter,
+          status: { $ne: "CANCELADO" },
+          createdAt: { $gte: previousMonthStart, $lt: previousMonthEnd },
+        })
+      ),
       ExpenseModel.aggregate([
         {
           $match: {
@@ -156,13 +196,19 @@ export function registerBiInsightsRoutes(
 
     const currentRevenue = currentRevenueAgg[0]?.total || 0;
     const previousRevenue = previousRevenueAgg[0]?.total || 0;
+    const currentCogs = currentCogsAgg[0]?.cogs || 0;
+    const previousCogs = previousCogsAgg[0]?.cogs || 0;
     const currentExpenses = currentExpenseAgg[0]?.total || 0;
     const previousExpenses = previousExpenseAgg[0]?.total || 0;
-    const currentProfit = currentRevenue - currentExpenses;
-    const previousProfit = previousRevenue - previousExpenses;
+
+    // Lucro bruto = receita - CPV (somente sobre o que foi vendido)
+    const currentProfit = currentRevenue - currentCogs;
+    const previousProfit = previousRevenue - previousCogs;
+
+    // Margem bruta = (lucro_bruto / receita) × 100
     const margin = currentRevenue > 0 ? (currentProfit / currentRevenue) * 100 : 0;
     const avgTicket = currentSalesCount > 0 ? currentRevenue / currentSalesCount : 0;
-    const costRatio = currentRevenue > 0 ? (currentExpenses / currentRevenue) * 100 : 0;
+    const costRatio = currentRevenue > 0 ? (currentCogs / currentRevenue) * 100 : 0;
 
     const salesMap = new Map<string, number>();
     monthlySalesAgg.forEach((row: any) => salesMap.set(row._id, row.total));

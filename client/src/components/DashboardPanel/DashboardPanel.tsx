@@ -60,9 +60,9 @@ export default function DashboardPanel(props: DashboardPanelProps) {
           <span>Custos operacionais lançados</span>
         </article>
         <article className="kpi-card animated delay-3">
-          <h3>Lucro</h3>
+          <h3>Lucro bruto</h3>
           <strong>{props.formatBRL(dashboard.profit)}</strong>
-          <span>Resultado consolidado</span>
+          <span>Receita − custo dos itens vendidos</span>
         </article>
         <article className="kpi-card animated delay-4">
           <h3>Estoque contabil</h3>
@@ -73,9 +73,9 @@ export default function DashboardPanel(props: DashboardPanelProps) {
 
       <section className="kpi-grid kpi-grid-bi dashboard-kpi-grid">
         <article className="kpi-card animated delay-1">
-          <h3>Margem líquida</h3>
+          <h3>Margem bruta</h3>
           <strong>{biInsights.kpis.margin.toFixed(1)}%</strong>
-          <span>Eficiência sobre faturamento do mês</span>
+          <span>Lucro bruto ÷ receita do mês</span>
         </article>
         <article className="kpi-card animated delay-2">
           <h3>Balanço</h3>

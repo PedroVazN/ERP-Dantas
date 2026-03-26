@@ -6,7 +6,7 @@ import { getBusinessFilter } from "../middleware/scope";
 export function registerDashboardRoutes(app: Express) {
   app.get("/api/dashboard", async (req: Request, res: Response) => {
     const businessFilter = getBusinessFilter(req);
-    const [revenueAgg, expenseAgg, lowStock, salesCount, purchaseCount] = await Promise.all([
+    const [revenueAgg, expenseAgg, cogsAgg, lowStock, salesCount, purchaseCount] = await Promise.all([
       SaleModel.aggregate([
         { $match: { ...businessFilter, status: { $ne: "CANCELADO" } } },
         { $group: { _id: null, total: { $sum: "$totalAmount" } } },
@@ -14,6 +14,28 @@ export function registerDashboardRoutes(app: Express) {
       ExpenseModel.aggregate([
         { $match: { ...businessFilter, status: { $in: ["PAGO", "PENDENTE", "AGUARDANDO_APROVACAO"] } } },
         { $group: { _id: null, total: { $sum: "$amount" } } },
+      ]),
+      // CPV: custo real dos itens vendidos via lookup no cadastro de produtos
+      SaleModel.aggregate([
+        { $match: { ...businessFilter, status: { $ne: "CANCELADO" } } },
+        { $unwind: "$items" },
+        {
+          $lookup: {
+            from: "products",
+            localField: "items.product",
+            foreignField: "_id",
+            as: "prod",
+          },
+        },
+        { $unwind: { path: "$prod", preserveNullAndEmptyArrays: true } },
+        {
+          $group: {
+            _id: null,
+            cogs: {
+              $sum: { $multiply: ["$items.quantity", { $ifNull: ["$prod.cost", 0] }] },
+            },
+          },
+        },
       ]),
       ProductModel.find({
         ...businessFilter,
@@ -28,10 +50,13 @@ export function registerDashboardRoutes(app: Express) {
 
     const revenue = revenueAgg[0]?.total || 0;
     const expenses = expenseAgg[0]?.total || 0;
+    const cogs = cogsAgg[0]?.cogs || 0;
+    // Lucro bruto = receita - CPV (custo dos produtos efetivamente vendidos)
+    const profit = revenue - cogs;
     res.json({
       revenue,
       expenses,
-      profit: revenue - expenses,
+      profit,
       salesCount,
       purchaseCount,
       lowStock,
