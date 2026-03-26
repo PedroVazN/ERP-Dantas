@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { escapeRegExp, slugify } from "../../lib/normalizers";
 import { extractAiIntent } from "./extractAiIntent";
 import { geminiExtractIntent, geminiGenerateProductDetails } from "./geminiIntentExtractor";
-import { getGeminiClient, GEMINI_MODEL } from "./geminiClient";
+import { getGeminiClient, isGeminiAvailable, GEMINI_MODEL } from "./geminiClient";
 import { aiPlanStore } from "./aiPlanStore";
 import type { AiPlanAction, AiPlanRecord } from "./types";
 import type { AiProductDraft, AiPurchaseDraft } from "./types";
@@ -27,7 +27,14 @@ export async function createAiPlan(params: {
 
   // Tenta Gemini primeiro, fallback para regras
   const geminiResult = await geminiExtractIntent(message);
-  const extracted = geminiResult ?? extractAiIntent(message);
+  let extracted = geminiResult ?? extractAiIntent(message);
+
+  // Se Gemini está disponível e a intenção continua desconhecida,
+  // redireciona para chat em vez de mostrar mensagem de erro genérica
+  if (extracted.intent === "unknown" && isGeminiAvailable()) {
+    extracted = { intent: "chat" };
+  }
+
   const warnings: string[] = [];
   const questions: string[] = [];
   const actions: AiPlanAction[] = [];

@@ -13,27 +13,23 @@ export type GeminiExtractedIntent = {
   paymentMethod?: "PIX" | "DINHEIRO" | "CARTAO" | "BOLETO" | "TRANSFERENCIA";
 };
 
-const SYSTEM_PROMPT = `Você é o interpretador de intenções do sistema ERP E-Sentinel.
-Analise a mensagem do usuário e retorne um JSON com a seguinte estrutura:
-{
-  "intent": "purchase" | "sale" | "customer_create" | "chat",
-  "quantity": número (se aplicável),
-  "productName": "nome do produto" (se aplicável),
-  "customerName": "nome" (se aplicável),
-  "customerEmail": "email" (se aplicável),
-  "customerPhone": "telefone" (se aplicável),
-  "unitCost": número (custo unitário, se mencionado),
-  "unitPrice": número (preço de venda, se mencionado),
-  "paymentMethod": "PIX" | "DINHEIRO" | "CARTAO" | "BOLETO" | "TRANSFERENCIA" (se mencionado)
-}
+const CLASSIFY_PROMPT = `Você é um classificador de intenções para um sistema ERP.
 
-Regras:
-- "purchase" = comprar, repor estoque, pedir ao fornecedor
-- "sale" = vender, registrar venda, dar saída
-- "customer_create" = cadastrar cliente, criar cliente, novo cliente
-- "chat" = qualquer outra coisa: perguntas, sugestões, dúvidas, análises
-- Retorne APENAS o JSON puro, sem markdown, sem explicações.
-- Se for "chat", inclua apenas { "intent": "chat" }.`;
+Classifique a mensagem do usuário retornando APENAS um JSON puro (sem markdown):
+
+Para COMPRA (comprar, repor, pedir produto):
+{"intent":"purchase","quantity":NUMERO,"productName":"NOME"}
+
+Para VENDA (vender, registrar venda):
+{"intent":"sale","quantity":NUMERO,"productName":"NOME","paymentMethod":"PIX|DINHEIRO|CARTAO|BOLETO|TRANSFERENCIA"}
+
+Para CADASTRO DE CLIENTE:
+{"intent":"customer_create","customerName":"NOME","customerPhone":"FONE","customerEmail":"EMAIL"}
+
+Para TUDO MAIS (perguntas, análises, sugestões, clima, dúvidas gerais):
+{"intent":"chat"}
+
+IMPORTANTE: Se a mensagem for uma pergunta, análise ou não for claramente um dos 3 primeiros tipos, use "chat".`;
 
 export async function geminiExtractIntent(message: string): Promise<GeminiExtractedIntent | null> {
   const client = getGeminiClient();
@@ -41,14 +37,25 @@ export async function geminiExtractIntent(message: string): Promise<GeminiExtrac
 
   try {
     const model = client.getGenerativeModel({ model: GEMINI_MODEL });
-    const result = await model.generateContent(`${SYSTEM_PROMPT}\n\nMensagem: "${message}"`);
+    const result = await model.generateContent(
+      `${CLASSIFY_PROMPT}\n\nMensagem do usuário: "${message}"\n\nJSON:`
+    );
     const text = result.response.text().trim();
 
-    // Remove blocos markdown se presentes
-    const clean = text.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-    const parsed = JSON.parse(clean) as GeminiExtractedIntent;
+    // Remove blocos markdown se o modelo insistir em enviar
+    const clean = text
+      .replace(/^```(?:json)?/im, "")
+      .replace(/```$/m, "")
+      .trim();
+
+    // Extrai primeiro objeto JSON válido do texto
+    const jsonMatch = clean.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+
+    const parsed = JSON.parse(jsonMatch[0]) as GeminiExtractedIntent;
     return parsed;
-  } catch {
+  } catch (err) {
+    console.warn("[Gemini] Falha na extração de intenção:", err instanceof Error ? err.message : err);
     return null;
   }
 }
