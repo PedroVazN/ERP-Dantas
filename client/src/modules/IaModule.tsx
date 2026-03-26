@@ -192,32 +192,61 @@ export default function IaModule(props: IaModuleProps) {
 
   return (
     <section className={layoutClass}>
-      <section className="form-card">
-        <h3>IA operacional</h3>
-        <p className="theme-helper">
-          Digite o que você quer fazer. Exemplos: <strong>compre 20 sabonetes de cidreira</strong>,
-          <strong> vender 5 sabonete X</strong> ou <strong>cadastrar cliente Maria</strong>.
-        </p>
+      <section className="form-card ia-chat-card">
+        <div className="ia-chat-header">
+          <div>
+            <h3>IA Gemini · E-Sentinel</h3>
+            <small className="theme-helper">Pergunte qualquer coisa ou dê comandos ao ERP</small>
+          </div>
+          <span className="ia-gemini-badge">Gemini</span>
+        </div>
 
         <div className="ai-chat">
           <div className="ai-messages">
             {props.aiMessages.length === 0 ? (
-              <div className="empty">Nenhuma mensagem ainda.</div>
+              <div className="ia-welcome">
+                <p className="ia-welcome-title">Olá! Sou sua IA de negócios.</p>
+                <p className="ia-welcome-sub">Posso executar ações no ERP ou responder qualquer pergunta sobre seu negócio.</p>
+                <div className="ia-suggestions">
+                  {[
+                    "Quais produtos estão com estoque baixo?",
+                    "Qual minha margem de lucro?",
+                    "Compre 10 sabonetes de lavanda",
+                    "Cadastrar cliente João Silva",
+                  ].map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      className="ia-suggestion-chip"
+                      onClick={() => { props.setAiInput(s); }}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ) : (
               props.aiMessages.map((m) => (
                 <div
                   key={m.id}
                   className={m.role === "user" ? "ai-bubble ai-user" : "ai-bubble ai-assistant"}
                 >
-                  {m.content}
+                  {m.content.split("\n").map((line, i) => (
+                    <span key={i}>{line}{i < m.content.split("\n").length - 1 ? <br /> : null}</span>
+                  ))}
                 </div>
               ))
+            )}
+            {props.aiBusy && (
+              <div className="ai-bubble ai-assistant ia-typing">
+                <span className="ia-dot" /><span className="ia-dot" /><span className="ia-dot" />
+              </div>
             )}
           </div>
 
           <div className="ai-compose">
             <input
-              placeholder="Ex.: compre 20 sabonetes de cidreira"
+              placeholder="Pergunte algo ou dê um comando…"
               value={props.aiInput}
               onChange={(event) => props.setAiInput(event.target.value)}
               onKeyDown={(e) => {
@@ -230,20 +259,19 @@ export default function IaModule(props: IaModuleProps) {
             {voiceSupported ? (
               <button
                 type="button"
-                className="ghost-btn"
+                className={`ghost-btn ${voiceListening ? "ia-voice-active" : ""}`}
                 onClick={toggleVoiceCapture}
                 disabled={props.aiBusy}
-                title={voiceListening ? "Parar captura de voz" : "Falar no microfone"}
+                title={voiceListening ? "Parar voz" : "Falar"}
               >
-                {voiceListening ? "Parar voz" : "Falar"}
+                {voiceListening ? "🔴" : "🎙️"}
               </button>
             ) : null}
-            <button type="button" onClick={() => void props.handleAiSend()} disabled={props.aiBusy}>
-              {props.aiBusy ? "Processando..." : "Enviar"}
+            <button type="button" onClick={() => void props.handleAiSend()} disabled={props.aiBusy || !props.aiInput.trim()}>
+              {props.aiBusy ? "…" : "Enviar"}
             </button>
           </div>
-          {voiceSupported ? <small className="theme-helper">Use "Falar" para ditar o comando.</small> : null}
-          {voiceError ? <small className="theme-helper">{voiceError}</small> : null}
+          {voiceError ? <small className="theme-helper" style={{ color: "var(--danger, #ef4444)" }}>{voiceError}</small> : null}
         </div>
       </section>
 

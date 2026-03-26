@@ -3,6 +3,8 @@ import type { Express, Request, Response } from "express";
 import { getScopeContext } from "../middleware/scope";
 import { createAiPlan } from "../services/ai/planService";
 import { executeAiPlan } from "../services/ai/executeService";
+import { getGeminiClient, GEMINI_MODEL } from "../services/ai/geminiClient";
+import { ExpenseModel, ProductModel, SaleModel } from "../models";
 
 export function registerAiRoutes(
   app: Express,
@@ -76,6 +78,105 @@ export function registerAiRoutes(
     );
 
     res.status(result.statusCode).json(result.body);
+  });
+
+  // ── Endpoint conversacional: perguntas, sugestões, análises ──
+  app.post("/api/ai/chat", async (req: Request, res: Response) => {
+    const { scope, businessId } = getScopeContext(req);
+    if (scope === "geral") {
+      return res.status(400).json({ message: "Selecione um ERP específico para usar o chat de IA." });
+    }
+
+    const { message, history } = req.body as {
+      message?: string;
+      history?: Array<{ role: "user" | "model"; text: string }>;
+    };
+
+    if (!message?.trim()) {
+      return res.status(400).json({ message: "Mensagem vazia." });
+    }
+
+    const client = getGeminiClient();
+    if (!client) {
+      return res.status(503).json({ message: "IA não configurada. Adicione GEMINI_API_KEY no servidor." });
+    }
+
+    // Coleta contexto do negócio para o Gemini pensar sobre o negócio real
+    const [products, recentSales, recentExpenses] = await Promise.all([
+      ProductModel.find({ businessId, active: true }).select("name sku price cost stock minStock description").limit(50),
+      SaleModel.find({ businessId, status: { $ne: "CANCELADO" } })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .select("totalAmount paymentMethod status createdAt items"),
+      ExpenseModel.find({ businessId })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .select("description amount status category"),
+    ]);
+
+    const productsSummary = products
+      .map((p) => `- ${p.name} (SKU: ${p.sku}) | Preço: R$${p.price} | Custo: R$${p.cost} | Estoque: ${p.stock}${p.minStock ? ` (mín ${p.minStock})` : ""}${p.description ? ` | ${p.description}` : ""}`)
+      .join("\n");
+
+    const salesSummary = recentSales
+      .map((s) => `- R$${s.totalAmount} via ${s.paymentMethod} [${s.status}] em ${new Date(s.createdAt as unknown as string).toLocaleDateString("pt-BR")}`)
+      .join("\n");
+
+    const expensesSummary = recentExpenses
+      .map((e) => `- ${e.description}: R$${e.amount} [${e.status}] categoria: ${e.category || "geral"}`)
+      .join("\n");
+
+    const systemPrompt = `Você é a IA integrada ao ERP E-Sentinel, um assistente empresarial inteligente para pequenas empresas no Brasil.
+
+CONTEXTO DO NEGÓCIO (dados reais do banco de dados):
+
+PRODUTOS CADASTRADOS (${products.length}):
+${productsSummary || "Nenhum produto cadastrado ainda."}
+
+VENDAS RECENTES:
+${salesSummary || "Nenhuma venda registrada."}
+
+DESPESAS RECENTES:
+${expensesSummary || "Nenhuma despesa registrada."}
+
+SUAS CAPACIDADES:
+- Analisar o negócio com base nos dados reais acima
+- Sugerir produtos para comprar quando o estoque está baixo
+- Identificar produtos mais rentáveis (maior margem: preço - custo)
+- Sugerir estratégias de precificação e promoções
+- Responder dúvidas sobre gestão, vendas, finanças
+- Fazer análises e previsões com base nos dados
+- Criar conteúdo (descrições de produtos, mensagens para clientes)
+- Responder qualquer pergunta de negócios ou geral
+
+REGRAS:
+- Responda sempre em português brasileiro
+- Seja direto, útil e profissional
+- Quando mencionar produtos ou valores, use os dados reais acima
+- Se não souber algo específico do negócio, diga claramente
+- Para executar ações (comprar, vender, cadastrar), instrua o usuário a usar os comandos do ERP`;
+
+    try {
+      const model = client.getGenerativeModel({
+        model: GEMINI_MODEL,
+        systemInstruction: systemPrompt,
+      });
+
+      // Monta histórico de conversa
+      const chatHistory = (history || []).map((h) => ({
+        role: h.role as "user" | "model",
+        parts: [{ text: h.text }],
+      }));
+
+      const chat = model.startChat({ history: chatHistory });
+      const result = await chat.sendMessage(message.trim());
+      const reply = result.response.text();
+
+      return res.json({ reply, model: GEMINI_MODEL });
+    } catch (err: any) {
+      const errorMsg = err?.message || "Erro na IA";
+      return res.status(500).json({ message: `Erro ao consultar Gemini: ${errorMsg}` });
+    }
   });
 }
 

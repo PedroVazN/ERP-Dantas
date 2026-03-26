@@ -1,4 +1,4 @@
-export type AiIntent = "purchase" | "sale" | "customer_create" | "unknown";
+export type AiIntent = "purchase" | "sale" | "customer_create" | "unknown" | "chat";
 
 export type AiPlanAction =
   | {
@@ -52,7 +52,7 @@ export type AiPlanRecord = {
   executed: boolean;
   scope: { scope: "geral" | "negocio"; businessId: string };
   status: "READY" | "NEEDS_INFO" | "ERROR";
-  source: "rules" | "openrouter";
+  source: "rules" | "openrouter" | "gemini";
   summary: string;
   warnings: string[];
   requiresConfirmation: boolean;

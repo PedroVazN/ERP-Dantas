@@ -2,10 +2,12 @@ import crypto from "node:crypto";
 
 import { escapeRegExp, slugify } from "../../lib/normalizers";
 import { extractAiIntent } from "./extractAiIntent";
+import { geminiExtractIntent, geminiGenerateProductDetails } from "./geminiIntentExtractor";
+import { getGeminiClient, GEMINI_MODEL } from "./geminiClient";
 import { aiPlanStore } from "./aiPlanStore";
 import type { AiPlanAction, AiPlanRecord } from "./types";
 import type { AiProductDraft, AiPurchaseDraft } from "./types";
-import { ProductModel, SupplierModel } from "../../models";
+import { ExpenseModel, ProductModel, SaleModel, SupplierModel } from "../../models";
 
 export async function createAiPlan(params: {
   scope: "geral" | "negocio";
@@ -23,7 +25,9 @@ export async function createAiPlan(params: {
     if (record.expiresAt <= now) aiPlanStore.delete(id);
   }
 
-  const extracted = extractAiIntent(message);
+  // Tenta Gemini primeiro, fallback para regras
+  const geminiResult = await geminiExtractIntent(message);
+  const extracted = geminiResult ?? extractAiIntent(message);
   const warnings: string[] = [];
   const questions: string[] = [];
   const actions: AiPlanAction[] = [];
@@ -31,11 +35,75 @@ export async function createAiPlan(params: {
   let status: AiPlanRecord["status"] = "READY";
   let summary = "";
   let actionsPreview: string[] = [];
-  let source: AiPlanRecord["source"] = "rules";
+  let source: AiPlanRecord["source"] = geminiResult ? "gemini" : "rules";
   let productDraft: AiProductDraft | undefined;
   let purchaseDraft: AiPurchaseDraft | undefined;
 
   const intent = extracted.intent;
+
+  // Intent "chat": responde conversacionalmente com contexto do negócio
+  if (intent === "chat") {
+    const geminiClient = getGeminiClient();
+    let chatReply = "Olá! Posso ajudar com análises do seu negócio, sugestões de compra, precificação e muito mais. O que você precisa?";
+
+    if (geminiClient) {
+      try {
+        const [products, recentSales] = await Promise.all([
+          ProductModel.find({ businessId, active: true }).select("name price cost stock minStock").limit(30),
+          SaleModel.find({ businessId, status: { $ne: "CANCELADO" } }).sort({ createdAt: -1 }).limit(5).select("totalAmount paymentMethod createdAt"),
+        ]);
+
+        const productsSummary = products
+          .map((p) => `${p.name}: R$${p.price} (custo R$${p.cost}, estoque ${p.stock})`)
+          .join("; ");
+
+        const salesSummary = recentSales
+          .map((s) => `R$${s.totalAmount} via ${s.paymentMethod}`)
+          .join("; ");
+
+        const systemPrompt = `Você é a IA do ERP E-Sentinel para pequenas empresas no Brasil.
+
+Dados do negócio:
+Produtos: ${productsSummary || "nenhum"}
+Vendas recentes: ${salesSummary || "nenhuma"}
+
+Responda em português de forma útil, direta e profissional. Máximo 3 parágrafos.`;
+
+        const model = geminiClient.getGenerativeModel({ model: GEMINI_MODEL, systemInstruction: systemPrompt });
+        const result = await model.generateContent(message);
+        chatReply = result.response.text();
+      } catch {
+        chatReply = "Desculpe, ocorreu um erro ao consultar a IA. Tente novamente.";
+      }
+    }
+
+    const planId = newPlanId();
+    const record: AiPlanRecord = {
+      planId,
+      createdAt: new Date().toISOString(),
+      expiresAt: now + aiPlanTtlMs,
+      executed: false,
+      scope: { scope: scope as "geral" | "negocio", businessId },
+      status: "NEEDS_INFO",
+      source,
+      summary: chatReply,
+      warnings: [],
+      requiresConfirmation: false,
+      questions: [],
+    };
+    aiPlanStore.set(planId, record);
+    return {
+      planId,
+      status: "CHAT" as any,
+      source: record.source,
+      summary: chatReply,
+      warnings: [],
+      requiresConfirmation: false,
+      questions: [],
+      actionsPreview: [],
+    };
+  }
+
   if (intent === "unknown") {
     status = "NEEDS_INFO";
     questions.push(
@@ -183,18 +251,12 @@ export async function createAiPlan(params: {
           const sku = `${slugify(productName)}-${Date.now().toString().slice(-6)}`;
           const suggestedProductCode = slugify(productName).replace(/-/g, "").slice(0, 12);
           const costToUse = unitCost ?? 0;
-          const arnicaDesc = "extrato de arnica + bucha";
-          const camomilaDesc = "camomila + bucha";
-          const alecrimDesc = "alecrim + bucha";
-          const lower = productName.toLowerCase();
-          const suggestedDescription = lower.includes("camom")
-            ? camomilaDesc
-            : lower.includes("arnica")
-              ? arnicaDesc
-              : lower.includes("alecrim")
-                ? alecrimDesc
-                : arnicaDesc;
-          const suggestedPrice = 5;
+
+          // Gemini gera descrição e preço inteligentes para o produto
+          const geminiDetails = await geminiGenerateProductDetails(productName);
+          const suggestedDescription = geminiDetails?.description ?? `${productName} — produto cadastrado via IA`;
+          const suggestedPrice = geminiDetails?.suggestedPrice ?? 10;
+          const suggestedMinStock = geminiDetails?.minStock ?? 10;
 
           productDraft = {
             kind: "createProduct",
@@ -208,7 +270,7 @@ export async function createAiPlan(params: {
               price: suggestedPrice,
               cost: costToUse,
               stock: 0,
-              minStock: 10,
+              minStock: suggestedMinStock,
               active: true,
             },
             requiredFields: ["name", "sku", "productCode", "description", "price"],
@@ -219,9 +281,8 @@ export async function createAiPlan(params: {
                 suggestedProductCode,
                 `${suggestedProductCode.slice(0, 8)}${sku.slice(-4)}`.slice(0, 12),
               ],
-              // Nao sugerir "descricao = nome passado" para evitar descricoes genericas.
-              description: [arnicaDesc, camomilaDesc, alecrimDesc],
-              price: [5, 10, 15, 20],
+              description: [suggestedDescription, `${productName} — item de reposição`, `${productName}`],
+              price: [suggestedPrice, Math.round(suggestedPrice * 1.2), Math.round(suggestedPrice * 0.85)].filter((v, i, a) => a.indexOf(v) === i),
             },
           };
 
@@ -236,7 +297,7 @@ export async function createAiPlan(params: {
               price: suggestedPrice,
               cost: costToUse,
               stock: 0,
-              minStock: 10,
+              minStock: suggestedMinStock,
               active: true,
             },
             outputKey: "productId",

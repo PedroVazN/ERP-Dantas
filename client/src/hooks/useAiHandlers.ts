@@ -39,7 +39,7 @@ export function useAiHandlers(deps: {
     try {
       const response = await api.post<{
         planId: string;
-        status: "READY" | "NEEDS_INFO" | "ERROR";
+        status: "READY" | "NEEDS_INFO" | "ERROR" | "CHAT";
         source: string;
         summary: string;
         warnings: string[];
@@ -50,9 +50,18 @@ export function useAiHandlers(deps: {
         purchaseDraft?: AiPlan["purchaseDraft"];
       }>(deps.scopedPath("/ai/plan"), { message: text });
 
+      if (response.status === "CHAT") {
+        // Resposta conversacional do Gemini — só mostra na conversa, sem plano de ação
+        deps.setAiMessages((prev) => [
+          ...prev,
+          { id: `${id}-a`, role: "assistant", content: response.summary },
+        ]);
+        return;
+      }
+
       deps.setAiPlan({
         planId: response.planId,
-        status: response.status,
+        status: response.status as "READY" | "NEEDS_INFO" | "ERROR",
         source: response.source,
         summary: response.summary,
         warnings: response.warnings || [],
