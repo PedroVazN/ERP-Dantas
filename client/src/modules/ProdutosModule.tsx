@@ -3,9 +3,36 @@ import { API_URL } from "../api";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { useMemo, useState } from "react";
 
+/** Converte URL de imagem em base64 usando canvas (crossOrigin) com fallback para fetch */
 async function fetchPhotoAsBase64(url: string): Promise<string | null> {
+  // Método 1: canvas com crossOrigin (não exige segundo request se imagem já em cache)
+  const canvasResult = await new Promise<string | null>((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { resolve(null); return; }
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL("image/jpeg", 0.88));
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    // Cache-bust para forçar CORS no novo request
+    img.src = url.includes("?") ? `${url}&_cb=${Date.now()}` : `${url}?_cb=${Date.now()}`;
+    // Timeout de segurança
+    setTimeout(() => resolve(null), 8000);
+  });
+  if (canvasResult) return canvasResult;
+
+  // Método 2: fetch direto
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) return null;
     const blob = await res.blob();
     return await new Promise<string>((resolve, reject) => {
@@ -61,23 +88,26 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
     setExportingPDF(true);
     try {
       const allProducts = props.products;
+      const withPhoto = allProducts.filter((p) => p.hasPhoto);
 
       const photosMap: Record<string, string> = {};
-      await Promise.all(
-        allProducts
-          .filter((p) => p.hasPhoto)
-          .map(async (p) => {
+      // Busca fotos em lotes de 4 para não sobrecarregar o servidor
+      for (let i = 0; i < withPhoto.length; i += 4) {
+        const batch = withPhoto.slice(i, i + 4);
+        await Promise.all(
+          batch.map(async (p) => {
             const url = `${API_URL}${props.scopedPath(`/products/${p._id}/photo`)}`;
             const b64 = await fetchPhotoAsBase64(url);
             if (b64) photosMap[p._id] = b64;
           })
-      );
+        );
+      }
 
       const cards = allProducts
         .map((p) => {
           const photoHtml = photosMap[p._id]
             ? `<img src="${photosMap[p._id]}" alt="${p.name}" />`
-            : `<div class="no-photo">📷</div>`;
+            : `<div class="no-photo"><span>Sem foto</span></div>`;
           const desc = p.description
             ? `<p class="desc">${p.description}</p>`
             : "";
@@ -319,7 +349,7 @@ ${cards}
             disabled={exportingPDF}
             title="Exportar todos os produtos como PDF"
           >
-            {exportingPDF ? "Gerando…" : "⬇ Exportar PDF"}
+            {exportingPDF ? `⏳ Carregando fotos…` : "⬇ Exportar PDF"}
           </button>
         </div>
 

@@ -47,6 +47,9 @@ export function registerProductRoutes(app: Express) {
     } else {
       res.setHeader("Content-Type", product.photoContentType);
     }
+    // Permite que o browser leia a imagem via fetch/canvas (necessário para export PDF)
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
 
     return res.send(product.photoData);
   });
