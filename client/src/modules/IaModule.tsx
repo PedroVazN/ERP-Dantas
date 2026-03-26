@@ -195,10 +195,10 @@ export default function IaModule(props: IaModuleProps) {
       <section className="form-card ia-chat-card">
         <div className="ia-chat-header">
           <div>
-            <h3>IA Gemini · E-Sentinel</h3>
+            <h3>IA Groq · E-Sentinel</h3>
             <small className="theme-helper">Pergunte qualquer coisa ou dê comandos ao ERP</small>
           </div>
-          <span className="ia-gemini-badge">Gemini</span>
+          <span className="ia-gemini-badge">Groq</span>
         </div>
 
         <div className="ai-chat">

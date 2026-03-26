@@ -52,7 +52,7 @@ export type AiPlanRecord = {
   executed: boolean;
   scope: { scope: "geral" | "negocio"; businessId: string };
   status: "READY" | "NEEDS_INFO" | "ERROR";
-  source: "rules" | "openrouter" | "gemini";
+  source: "rules" | "openrouter" | "groq";
   summary: string;
   warnings: string[];
   requiresConfirmation: boolean;

@@ -2,8 +2,8 @@ import crypto from "node:crypto";
 
 import { escapeRegExp, slugify } from "../../lib/normalizers";
 import { extractAiIntent } from "./extractAiIntent";
-import { geminiExtractIntent, geminiGenerateProductDetails } from "./geminiIntentExtractor";
-import { getGeminiClient, isGeminiAvailable, GEMINI_MODEL } from "./geminiClient";
+import { groqExtractIntent, groqGenerateProductDetails } from "./groqIntentExtractor";
+import { groqChat, isGroqAvailable } from "./groqClient";
 import { aiPlanStore } from "./aiPlanStore";
 import type { AiPlanAction, AiPlanRecord } from "./types";
 import type { AiProductDraft, AiPurchaseDraft } from "./types";
@@ -26,13 +26,13 @@ export async function createAiPlan(params: {
     if (record.expiresAt <= now) aiPlanStore.delete(id);
   }
 
-  // Tenta Gemini primeiro, fallback para regras
-  const geminiResult = await geminiExtractIntent(message);
-  let extracted = geminiResult ?? extractAiIntent(message);
+  // Tenta Groq primeiro, fallback para regras
+  const groqResult = await groqExtractIntent(message);
+  let extracted = groqResult ?? extractAiIntent(message);
 
-  // Se Gemini está disponível e a intenção continua desconhecida,
+  // Se Groq está disponível e a intenção continua desconhecida,
   // redireciona para chat em vez de mostrar mensagem de erro genérica
-  if (extracted.intent === "unknown" && isGeminiAvailable()) {
+  if (extracted.intent === "unknown" && isGroqAvailable()) {
     extracted = { intent: "chat" };
   }
 
@@ -43,7 +43,7 @@ export async function createAiPlan(params: {
   let status: AiPlanRecord["status"] = "READY";
   let summary = "";
   let actionsPreview: string[] = [];
-  let source: AiPlanRecord["source"] = geminiResult ? "gemini" : "rules";
+  let source: AiPlanRecord["source"] = groqResult ? "groq" : "rules";
   let productDraft: AiProductDraft | undefined;
   let purchaseDraft: AiPurchaseDraft | undefined;
 
@@ -51,8 +51,6 @@ export async function createAiPlan(params: {
 
   // Intent "chat": responde conversacionalmente com contexto do negócio
   if (intent === "chat") {
-    const geminiClient = getGeminiClient();
-
     // Sempre carrega dados do negócio (usados pelo Gemini ou pelo fallback local)
     const [products, recentSales] = await Promise.all([
       ProductModel.find({ businessId, active: true })
@@ -66,7 +64,7 @@ export async function createAiPlan(params: {
 
     let chatReply: string | null = null;
 
-    if (geminiClient) {
+    if (isGroqAvailable()) {
       try {
         const productsSummary = products
           .map((p) => `${p.name}: R$${p.price} (custo R$${p.cost}, estoque ${p.stock}, mín ${p.minStock})`)
@@ -81,18 +79,19 @@ Produtos (${products.length}): ${productsSummary || "nenhum cadastrado"}
 Vendas recentes: ${salesSummary || "nenhuma"}
 Responda em português, de forma útil e direta. Máximo 3 parágrafos.`;
 
-        const model = geminiClient.getGenerativeModel({
-          model: GEMINI_MODEL,
-          systemInstruction: systemPrompt,
-        });
-        const result = await model.generateContent(message);
-        chatReply = result.response.text();
+        chatReply = await groqChat(
+          [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: message },
+          ],
+          { temperature: 0.4, maxTokens: 900 }
+        );
       } catch (err: any) {
         const msg = String(err?.message || "");
-        const isQuota = msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED");
+        const isQuota = msg.includes("429") || msg.toLowerCase().includes("quota");
         if (!isQuota) {
           // Erro inesperado — loga mas continua para fallback
-          console.error("[Gemini chat error]", msg.slice(0, 200));
+          console.error("[Groq chat error]", msg.slice(0, 200));
         }
         // chatReply permanece null → usa fallback local abaixo
       }
@@ -292,11 +291,11 @@ Responda em português, de forma útil e direta. Máximo 3 parágrafos.`;
           const suggestedProductCode = slugify(productName).replace(/-/g, "").slice(0, 12);
           const costToUse = unitCost ?? 0;
 
-          // Gemini gera descrição e preço inteligentes para o produto
-          const geminiDetails = await geminiGenerateProductDetails(productName);
-          const suggestedDescription = geminiDetails?.description ?? `${productName} — produto cadastrado via IA`;
-          const suggestedPrice = geminiDetails?.suggestedPrice ?? 10;
-          const suggestedMinStock = geminiDetails?.minStock ?? 10;
+          // Groq gera descrição e preço inteligentes para o produto
+          const groqDetails = await groqGenerateProductDetails(productName);
+          const suggestedDescription = groqDetails?.description ?? `${productName} — produto cadastrado via IA`;
+          const suggestedPrice = groqDetails?.suggestedPrice ?? 10;
+          const suggestedMinStock = groqDetails?.minStock ?? 10;
 
           productDraft = {
             kind: "createProduct",

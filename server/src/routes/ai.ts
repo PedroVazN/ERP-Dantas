@@ -3,7 +3,7 @@ import type { Express, Request, Response } from "express";
 import { getScopeContext } from "../middleware/scope";
 import { createAiPlan } from "../services/ai/planService";
 import { executeAiPlan } from "../services/ai/executeService";
-import { getGeminiClient, GEMINI_MODEL } from "../services/ai/geminiClient";
+import { GROQ_MODEL, groqChat, isGroqAvailable } from "../services/ai/groqClient";
 import { ExpenseModel, ProductModel, SaleModel } from "../models";
 
 export function registerAiRoutes(
@@ -96,12 +96,11 @@ export function registerAiRoutes(
       return res.status(400).json({ message: "Mensagem vazia." });
     }
 
-    const client = getGeminiClient();
-    if (!client) {
-      return res.status(503).json({ message: "IA não configurada. Adicione GEMINI_API_KEY no servidor." });
+    if (!isGroqAvailable()) {
+      return res.status(503).json({ message: "IA não configurada. Adicione GROQ_API_KEY no servidor." });
     }
 
-    // Coleta contexto do negócio para o Gemini pensar sobre o negócio real
+    // Coleta contexto do negócio para a IA pensar sobre o negócio real
     const [products, recentSales, recentExpenses] = await Promise.all([
       ProductModel.find({ businessId, active: true }).select("name sku price cost stock minStock description").limit(50),
       SaleModel.find({ businessId, status: { $ne: "CANCELADO" } })
@@ -157,25 +156,25 @@ REGRAS:
 - Para executar ações (comprar, vender, cadastrar), instrua o usuário a usar os comandos do ERP`;
 
     try {
-      const model = client.getGenerativeModel({
-        model: GEMINI_MODEL,
-        systemInstruction: systemPrompt,
-      });
-
-      // Monta histórico de conversa
-      const chatHistory = (history || []).map((h) => ({
-        role: h.role as "user" | "model",
-        parts: [{ text: h.text }],
-      }));
-
-      const chat = model.startChat({ history: chatHistory });
-      const result = await chat.sendMessage(message.trim());
-      const reply = result.response.text();
-
-      return res.json({ reply, model: GEMINI_MODEL });
+      const mappedHistory = (history || []).map(
+        (h): { role: "assistant" | "user"; content: string } => ({
+          role: h.role === "model" ? "assistant" : "user",
+          content: h.text,
+        })
+      );
+      const reply =
+        (await groqChat(
+          [
+            { role: "system", content: systemPrompt },
+            ...mappedHistory,
+            { role: "user", content: message.trim() },
+          ],
+          { temperature: 0.4, maxTokens: 900 }
+        )) || "";
+      return res.json({ reply, model: GROQ_MODEL });
     } catch (err: any) {
       const errorMsg = err?.message || "Erro na IA";
-      return res.status(500).json({ message: `Erro ao consultar Gemini: ${errorMsg}` });
+      return res.status(500).json({ message: `Erro ao consultar Groq: ${errorMsg}` });
     }
   });
 }
