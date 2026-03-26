@@ -8,6 +8,7 @@ import { aiPlanStore } from "./aiPlanStore";
 import type { AiPlanAction, AiPlanRecord } from "./types";
 import type { AiProductDraft, AiPurchaseDraft } from "./types";
 import { ExpenseModel, ProductModel, SaleModel, SupplierModel } from "../../models";
+import { buildLocalChatReply } from "./localChatResponder";
 
 export async function createAiPlan(params: {
   scope: "geral" | "negocio";
@@ -51,37 +52,69 @@ export async function createAiPlan(params: {
   // Intent "chat": responde conversacionalmente com contexto do negócio
   if (intent === "chat") {
     const geminiClient = getGeminiClient();
-    let chatReply = "Olá! Posso ajudar com análises do seu negócio, sugestões de compra, precificação e muito mais. O que você precisa?";
+
+    // Sempre carrega dados do negócio (usados pelo Gemini ou pelo fallback local)
+    const [products, recentSales] = await Promise.all([
+      ProductModel.find({ businessId, active: true })
+        .select("name price cost stock minStock description")
+        .limit(50),
+      SaleModel.find({ businessId, status: { $ne: "CANCELADO" } })
+        .sort({ createdAt: -1 })
+        .limit(15)
+        .select("totalAmount paymentMethod"),
+    ]);
+
+    let chatReply: string | null = null;
 
     if (geminiClient) {
       try {
-        const [products, recentSales] = await Promise.all([
-          ProductModel.find({ businessId, active: true }).select("name price cost stock minStock").limit(30),
-          SaleModel.find({ businessId, status: { $ne: "CANCELADO" } }).sort({ createdAt: -1 }).limit(5).select("totalAmount paymentMethod createdAt"),
-        ]);
-
         const productsSummary = products
-          .map((p) => `${p.name}: R$${p.price} (custo R$${p.cost}, estoque ${p.stock})`)
+          .map((p) => `${p.name}: R$${p.price} (custo R$${p.cost}, estoque ${p.stock}, mín ${p.minStock})`)
           .join("; ");
-
         const salesSummary = recentSales
           .map((s) => `R$${s.totalAmount} via ${s.paymentMethod}`)
           .join("; ");
 
-        const systemPrompt = `Você é a IA do ERP E-Sentinel para pequenas empresas no Brasil.
-
-Dados do negócio:
-Produtos: ${productsSummary || "nenhum"}
+        const systemPrompt = `Você é a IA do ERP E-Sentinel para pequenas empresas brasileiras.
+Dados reais do negócio — use-os nas respostas:
+Produtos (${products.length}): ${productsSummary || "nenhum cadastrado"}
 Vendas recentes: ${salesSummary || "nenhuma"}
+Responda em português, de forma útil e direta. Máximo 3 parágrafos.`;
 
-Responda em português de forma útil, direta e profissional. Máximo 3 parágrafos.`;
-
-        const model = geminiClient.getGenerativeModel({ model: GEMINI_MODEL, systemInstruction: systemPrompt });
+        const model = geminiClient.getGenerativeModel({
+          model: GEMINI_MODEL,
+          systemInstruction: systemPrompt,
+        });
         const result = await model.generateContent(message);
         chatReply = result.response.text();
-      } catch {
-        chatReply = "Desculpe, ocorreu um erro ao consultar a IA. Tente novamente.";
+      } catch (err: any) {
+        const msg = String(err?.message || "");
+        const isQuota = msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED");
+        if (!isQuota) {
+          // Erro inesperado — loga mas continua para fallback
+          console.error("[Gemini chat error]", msg.slice(0, 200));
+        }
+        // chatReply permanece null → usa fallback local abaixo
       }
+    }
+
+    // Fallback local: responde com dados reais do banco sem IA externa
+    if (!chatReply) {
+      chatReply = buildLocalChatReply(
+        message,
+        products.map((p) => ({
+          name: p.name as string,
+          price: p.price as number,
+          cost: p.cost as number,
+          stock: p.stock as number,
+          minStock: p.minStock as number,
+          description: p.description as string | undefined,
+        })),
+        recentSales.map((s) => ({
+          totalAmount: s.totalAmount as number,
+          paymentMethod: s.paymentMethod as string,
+        }))
+      );
     }
 
     const planId = newPlanId();

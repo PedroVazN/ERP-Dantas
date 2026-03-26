@@ -13,5 +13,5 @@ export function isGeminiAvailable(): boolean {
   return Boolean(process.env.GEMINI_API_KEY?.trim());
 }
 
-/** Modelo padrão — flash é rápido e suficiente para ERP */
-export const GEMINI_MODEL = "gemini-1.5-flash";
+/** Modelo padrão */
+export const GEMINI_MODEL = "gemini-2.0-flash";
