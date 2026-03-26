@@ -48,11 +48,14 @@ export type ProdutosModuleProps = {
 export default function ProdutosModule(props: ProdutosModuleProps) {
   const [tab, setTab] = useState<"lista" | "catalogo">("lista");
   const [exportingPDF, setExportingPDF] = useState(false);
+  const [catalogSearch, setCatalogSearch] = useState("");
 
-  const catalogProducts = useMemo(
-    () => props.products.filter((p) => p.hasPhoto),
-    [props.products]
-  );
+  const catalogProducts = useMemo(() => {
+    const q = catalogSearch.trim().toLowerCase();
+    return props.products.filter(
+      (p) => p.hasPhoto && (!q || p.name.toLowerCase().includes(q) || (p.description || "").toLowerCase().includes(q))
+    );
+  }, [props.products, catalogSearch]);
 
   async function exportCatalogPDF() {
     setExportingPDF(true);
@@ -384,37 +387,74 @@ ${cards}
             </table>
           </>
         ) : (
-          <>
-            <h3>Catálogo (galeria)</h3>
+          <div className="catalog-shell">
+            <div className="catalog-hero">
+              <div className="catalog-hero-text">
+                <h2 className="catalog-hero-title">Catálogo de Produtos</h2>
+                <p className="catalog-hero-sub">
+                  {props.products.filter((p) => p.hasPhoto).length} produto
+                  {props.products.filter((p) => p.hasPhoto).length !== 1 ? "s" : ""} com foto
+                </p>
+              </div>
+              <div className="catalog-search-wrap">
+                <span className="catalog-search-icon">⌕</span>
+                <input
+                  className="catalog-search-input"
+                  placeholder="Buscar produto…"
+                  value={catalogSearch}
+                  onChange={(e) => setCatalogSearch(e.target.value)}
+                />
+              </div>
+            </div>
+
             {catalogProducts.length === 0 ? (
-              <p className="empty">Nenhum produto com foto cadastrada ainda.</p>
+              <div className="catalog-empty">
+                <span className="catalog-empty-icon">📷</span>
+                <p>{catalogSearch ? "Nenhum produto encontrado." : "Adicione fotos aos produtos para exibi-los aqui."}</p>
+              </div>
             ) : (
               <div className="catalog-grid">
                 {catalogProducts.map((item) => (
                   <article className="catalog-card" key={item._id}>
                     <button
                       type="button"
-                      className="catalog-photo-button"
+                      className="catalog-photo-wrap"
                       onClick={() => props.openProductPhotoModal(item._id)}
-                      aria-label={`Abrir foto de ${item.name}`}
+                      aria-label={`Ver foto de ${item.name}`}
                     >
                       <img
                         className="catalog-photo"
                         src={`${API_URL}${props.scopedPath(`/products/${item._id}/photo`)}`}
-                        alt={`Foto de ${item.name}`}
+                        alt={item.name}
+                        loading="lazy"
                       />
-                    </button>
-                    <div className="catalog-card-body">
-                      <strong className="catalog-title">{item.name}</strong>
-                      <p className="catalog-desc">{item.description || "-"}</p>
-                      <div className="catalog-meta">
-                        <span className="catalog-price">{props.formatBRL(item.price)}</span>
-                        <span className="catalog-stock">Estoque: {item.stock}</span>
+                      <div className="catalog-photo-overlay">
+                        <span className="catalog-overlay-zoom">🔍 Ampliar</span>
                       </div>
-                      <div className="catalog-actions">
+                      {item.stock <= (item.minStock ?? 0) && item.minStock > 0 && (
+                        <span className="catalog-badge-low">Estoque baixo</span>
+                      )}
+                    </button>
+
+                    <div className="catalog-card-body">
+                      <div className="catalog-card-top">
+                        {item.sku && <span className="catalog-sku">{item.sku}</span>}
+                        <strong className="catalog-title">{item.name}</strong>
+                        {item.description ? (
+                          <p className="catalog-desc">{item.description}</p>
+                        ) : null}
+                      </div>
+
+                      <div className="catalog-card-footer">
+                        <div className="catalog-pricing">
+                          <span className="catalog-price">{props.formatBRL(item.price)}</span>
+                          <span className="catalog-stock-badge">
+                            {item.stock} un.
+                          </span>
+                        </div>
                         <button
                           type="button"
-                          className="ghost-btn"
+                          className="catalog-edit-btn"
                           onClick={() => props.editProduct(item)}
                         >
                           Editar
@@ -425,7 +465,7 @@ ${cards}
                 ))}
               </div>
             )}
-          </>
+          </div>
         )}
       </section>
     </section>
