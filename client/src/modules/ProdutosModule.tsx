@@ -115,8 +115,6 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
       const cards = allProducts
         .map((p) => {
           const safeName = escapeHtml(p.name);
-          const safeSku = escapeHtml(p.sku || "");
-          const safeCode = escapeHtml(p.productCode || "");
           const safeDesc = escapeHtml(p.description || "");
           const photoHtml = photosMap[p._id]
             ? `<img src="${photosMap[p._id]}" alt="${safeName}" />`
@@ -130,14 +128,13 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
   <div class="photo-wrap">${photoHtml}</div>
   <div class="info">
     <h3>${safeName}</h3>
-    ${safeSku ? `<small class="sku">SKU: ${safeSku}${safeCode ? " · Cód: " + safeCode : ""}</small>` : ""}
     ${desc}
     <div class="meta-row">
       <span class="price">${props.formatBRL(p.price)}</span>
       <span class="buy-icon">🛒</span>
     </div>
     <div class="stock-line">
-      <span class="${stockClass}">Estoque: ${p.stock} un.${p.minStock ? " (mín " + String(p.minStock) + ")" : ""}</span>
+      <span class="${stockClass}">Estoque: ${p.stock} un.</span>
     </div>
   </div>
 </article>`;
@@ -149,7 +146,7 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/>
-<title>Catálogo de Produtos</title>
+<title>Nature Saboaria - Catálogo de Produtos</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:Inter,Arial,Helvetica,sans-serif;background:#eef1f4;color:#111;padding:18px}
@@ -183,7 +180,6 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
   .no-photo{width:100%;height:100%;display:grid;place-items:center;color:#8a939c;font-size:15px}
   .info{padding:18px 18px 16px;display:flex;flex-direction:column;justify-content:center}
   .info h3{font-size:38px;font-weight:800;color:#121418;line-height:1.08;letter-spacing:-.02em}
-  .sku{font-size:14px;color:#5f6770;margin-top:8px;display:block}
   .desc{font-size:14px;color:#3f4750;line-height:1.45;margin-top:10px}
   .meta-row{display:flex;align-items:center;gap:10px;margin-top:14px}
   .price{font-size:42px;font-weight:900;color:#151a1f;letter-spacing:-.03em}
@@ -213,7 +209,7 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
 <div class="sheet">
   <header>
     <div class="brand">✿</div>
-    <div class="brand-name">ESSÊNCIA DA NATUREZA</div>
+    <div class="brand-name">NATURE SABOARIA</div>
     <div class="brand-sub">SABONETES ARTESANAIS</div>
     <h1>Catálogo de Produtos</h1>
     <p>Gerado em ${now} · ${String(allProducts.length)} produto(s)</p>
@@ -223,10 +219,15 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
   </div>
 </div>
 <div class="footer">
-  <span>https://je-sentinel.vercel.app/</span>
+  <span>Nature Saboaria</span>
   <span class="page-number"></span>
 </div>
-<script>window.onload=function(){window.print();}<\/script>
+<script>
+  window.onload=function(){
+    try { document.title = "Nature Saboaria - Catalogo"; } catch(e) {}
+    window.print();
+  }
+<\/script>
 </body>
 </html>`;
 
