@@ -46,6 +46,15 @@ async function fetchPhotoAsBase64(url: string): Promise<string | null> {
   }
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 type ProductFormState = {
   name: string;
   sku: string;
@@ -105,26 +114,33 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
 
       const cards = allProducts
         .map((p) => {
+          const safeName = escapeHtml(p.name);
+          const safeSku = escapeHtml(p.sku || "");
+          const safeCode = escapeHtml(p.productCode || "");
+          const safeDesc = escapeHtml(p.description || "");
           const photoHtml = photosMap[p._id]
-            ? `<img src="${photosMap[p._id]}" alt="${p.name}" />`
+            ? `<img src="${photosMap[p._id]}" alt="${safeName}" />`
             : `<div class="no-photo"><span>Sem foto</span></div>`;
-          const desc = p.description
-            ? `<p class="desc">${p.description}</p>`
+          const desc = safeDesc
+            ? `<p class="desc">${safeDesc}</p>`
             : "";
           const stockClass = p.stock <= (p.minStock ?? 0) ? "stock low" : "stock";
           return `
-<div class="card">
+<article class="card">
   <div class="photo-wrap">${photoHtml}</div>
   <div class="info">
-    <h3>${p.name}</h3>
-    ${p.sku ? `<small class="sku">SKU: ${p.sku}${p.productCode ? " · Cód: " + p.productCode : ""}</small>` : ""}
+    <h3>${safeName}</h3>
+    ${safeSku ? `<small class="sku">SKU: ${safeSku}${safeCode ? " · Cód: " + safeCode : ""}</small>` : ""}
     ${desc}
-    <div class="meta">
+    <div class="meta-row">
       <span class="price">${props.formatBRL(p.price)}</span>
+      <span class="buy-icon">🛒</span>
+    </div>
+    <div class="stock-line">
       <span class="${stockClass}">Estoque: ${p.stock} un.${p.minStock ? " (mín " + String(p.minStock) + ")" : ""}</span>
     </div>
   </div>
-</div>`;
+</article>`;
         })
         .join("\n");
 
@@ -136,40 +152,80 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
 <title>Catálogo de Produtos</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:Arial,Helvetica,sans-serif;background:#f4f4f4;color:#111;padding:24px}
-  header{text-align:center;margin-bottom:24px}
-  header h1{font-size:22px;color:#1a1a2e}
-  header p{font-size:11px;color:#666;margin-top:4px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
-  .card{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.10);display:flex;flex-direction:column;break-inside:avoid}
-  .photo-wrap{width:100%;height:180px;background:#eee;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  body{font-family:Inter,Arial,Helvetica,sans-serif;background:#eef1f4;color:#111;padding:18px}
+  .sheet{
+    max-width:900px;margin:0 auto;background:#fff;border-radius:20px;padding:20px 24px 56px;
+    box-shadow:0 10px 28px rgba(0,0,0,.12);position:relative;overflow:hidden;
+    background-image:linear-gradient(180deg,rgba(240,242,245,.7),rgba(255,255,255,0));
+  }
+  .sheet::before{
+    content:"";position:absolute;inset:0;pointer-events:none;opacity:.22;
+    background-image:radial-gradient(circle at 8% 12%, #dbe9d0 0 8px, transparent 9px),
+      radial-gradient(circle at 94% 10%, #f5f0c8 0 7px, transparent 8px),
+      radial-gradient(circle at 92% 85%, #dbe9d0 0 9px, transparent 10px),
+      radial-gradient(circle at 7% 82%, #f5f0c8 0 6px, transparent 7px);
+  }
+  header{text-align:center;margin-bottom:18px;position:relative;z-index:1}
+  .brand{font-size:30px;line-height:1;margin-bottom:4px}
+  .brand-name{font-size:24px;font-weight:600;letter-spacing:.02em;color:#273037}
+  .brand-sub{font-size:11px;color:#4a545c;letter-spacing:.12em;text-transform:uppercase}
+  header h1{font-size:37px;margin-top:10px;color:#111;font-weight:800;letter-spacing:-.02em}
+  header p{font-size:12px;color:#666;margin-top:6px}
+  .grid{display:flex;flex-direction:column;gap:14px;position:relative;z-index:1}
+  .card{
+    display:grid;grid-template-columns: 44% 56%;background:rgba(255,255,255,.94);
+    border:1px solid #e4e7eb;border-radius:16px;overflow:hidden;break-inside:avoid;
+  }
+  .card:nth-child(even){grid-template-columns:56% 44%}
+  .card:nth-child(even) .photo-wrap{order:2}
+  .photo-wrap{min-height:200px;background:#eceff3;display:flex;align-items:center;justify-content:center}
   .photo-wrap img{width:100%;height:100%;object-fit:cover}
-  .no-photo{font-size:36px;color:#bbb}
-  .info{padding:10px 12px 12px;display:flex;flex-direction:column;gap:5px;flex:1}
-  .info h3{font-size:14px;font-weight:700;color:#1a1a2e;line-height:1.3}
-  .sku{font-size:10px;color:#888}
-  .desc{font-size:12px;color:#444;line-height:1.4;flex:1}
-  .meta{display:flex;flex-direction:column;gap:3px;margin-top:auto;padding-top:8px;border-top:1px dashed #ddd}
-  .price{font-size:15px;font-weight:700;color:#16a34a}
-  .stock{font-size:11px;color:#555}
-  .stock.low{color:#dc2626;font-weight:600}
-  footer{text-align:center;font-size:10px;color:#999;margin-top:24px}
+  .no-photo{width:100%;height:100%;display:grid;place-items:center;color:#8a939c;font-size:15px}
+  .info{padding:18px 18px 16px;display:flex;flex-direction:column;justify-content:center}
+  .info h3{font-size:38px;font-weight:800;color:#121418;line-height:1.08;letter-spacing:-.02em}
+  .sku{font-size:14px;color:#5f6770;margin-top:8px;display:block}
+  .desc{font-size:14px;color:#3f4750;line-height:1.45;margin-top:10px}
+  .meta-row{display:flex;align-items:center;gap:10px;margin-top:14px}
+  .price{font-size:42px;font-weight:900;color:#151a1f;letter-spacing:-.03em}
+  .buy-icon{
+    display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;
+    border-radius:8px;border:1px solid #c8ccd1;font-size:15px
+  }
+  .stock-line{margin-top:8px}
+  .stock{font-size:16px;color:#49515a}
+  .stock.low{color:#b91c1c;font-weight:700}
+  .footer{
+    position:fixed;left:0;right:0;bottom:0;padding:7px 22px;background:#fff;
+    border-top:1px solid #dfe3e7;display:flex;justify-content:space-between;
+    font-size:11px;color:#5d6670
+  }
+  .page-number::after{content: "Página " counter(page);}
   @media print{
-    body{background:#fff;padding:12px}
-    .card{box-shadow:none;border:1px solid #ddd}
-    @page{margin:1.5cm}
+    @page{size:A4;margin:12mm}
+    body{background:#fff;padding:0}
+    .sheet{box-shadow:none;border-radius:0;max-width:none;padding:10px 8px 40px}
+    .footer{position:fixed}
+    .card{page-break-inside:avoid}
   }
 </style>
 </head>
 <body>
-<header>
-  <h1>Catálogo de Produtos</h1>
-  <p>Gerado em ${now} · ${String(allProducts.length)} produto(s)</p>
-</header>
-<div class="grid">
-${cards}
+<div class="sheet">
+  <header>
+    <div class="brand">✿</div>
+    <div class="brand-name">ESSÊNCIA DA NATUREZA</div>
+    <div class="brand-sub">SABONETES ARTESANAIS</div>
+    <h1>Catálogo de Produtos</h1>
+    <p>Gerado em ${now} · ${String(allProducts.length)} produto(s)</p>
+  </header>
+  <div class="grid">
+  ${cards}
+  </div>
 </div>
-<footer>E-Sentinel ERP · Catálogo gerado automaticamente</footer>
+<div class="footer">
+  <span>https://je-sentinel.vercel.app/</span>
+  <span class="page-number"></span>
+</div>
 <script>window.onload=function(){window.print();}<\/script>
 </body>
 </html>`;
