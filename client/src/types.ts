@@ -67,7 +67,8 @@ export type SaleCustomerRef =
     };
 
 export type SaleItem = {
-  product?: string;
+  /** ObjectId em string ou produto populado pela API. */
+  product?: string | { _id: string; name?: string };
   name: string;
   quantity: number;
   unitPrice: number;

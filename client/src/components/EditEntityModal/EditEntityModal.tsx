@@ -1,6 +1,6 @@
 import type { Customer, Expense, ChecklistItem, Product, Purchase, Sale, Supplier } from "../../types";
 import { api, API_URL } from "../../api";
-import type { Dispatch, SetStateAction } from "react";
+import { useMemo, type Dispatch, type SetStateAction } from "react";
 import AppModal from "../AppModal";
 
 export type EditModalKind =
@@ -44,11 +44,19 @@ export type EditSupplierFormState = {
   status: "ATIVO" | "INATIVO";
 };
 
+export type EditSaleItemLine = {
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+};
+
 export type EditSaleFormState = {
   paymentMethod: string;
   status: string;
-  /** Somente leitura — comprador registrado na venda */
+  customerId: string;
+  /** Exibição auxiliar (nome + contato) */
   customerDisplay: string;
+  items: EditSaleItemLine[];
 };
 
 export type EditPurchaseFormState = {
@@ -80,6 +88,9 @@ export type EditEntityModalProps = {
   loadAllData: () => Promise<void>;
 
   suppliers: Supplier[];
+  products: Product[];
+  customers: Customer[];
+  formatBRL: (value: number) => string;
 
   editCustomerForm: EditCustomerFormState;
   setEditCustomerForm: Dispatch<SetStateAction<EditCustomerFormState>>;
@@ -107,6 +118,11 @@ export type EditEntityModalProps = {
 };
 
 export default function EditEntityModal(props: EditEntityModalProps) {
+  const activeCustomersForSale = useMemo(
+    () => props.customers.filter((c) => c.status === "ATIVO"),
+    [props.customers]
+  );
+
   const title =
     props.editModalKind === "customer"
       ? "Editar cliente"
@@ -564,10 +580,147 @@ export default function EditEntityModal(props: EditEntityModalProps) {
       {props.editModalKind === "sale" ? (
         <>
           <div className="form-field">
-            <label>Cliente</label>
-            <input type="text" readOnly value={props.editSaleForm.customerDisplay || "—"} />
-            <small className="field-help">Dados do comprador vinculados a esta venda.</small>
+            <label>Cliente (cotação / ordem)</label>
+            <select
+              value={props.editSaleForm.customerId}
+              onChange={(event) =>
+                props.setEditSaleForm((prev) => ({ ...prev, customerId: event.target.value }))
+              }
+            >
+              <option value="">Sem cliente vinculado</option>
+              {activeCustomersForSale.map((c) => (
+                <option key={c._id} value={c._id}>
+                  {c.name}
+                  {c.phone ? ` · ${c.phone}` : ""}
+                </option>
+              ))}
+            </select>
+            <small className="field-help">
+              Referência anterior: {props.editSaleForm.customerDisplay || "—"}
+            </small>
           </div>
+
+          <div className="table-scroll" style={{ marginBottom: 12 }}>
+            <table className="order-items-table">
+              <thead>
+                <tr>
+                  <th>Produto</th>
+                  <th>Estoque</th>
+                  <th>Preço (R$)</th>
+                  <th>Qtd.</th>
+                  <th>Total</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {props.editSaleForm.items.map((line, index) => {
+                  const product = props.products.find((p) => p._id === line.productId);
+                  const lineTotal = line.quantity * line.unitPrice;
+                  return (
+                    <tr key={`${line.productId}-${index}`}>
+                      <td>
+                        <select
+                          value={line.productId}
+                          onChange={(event) => {
+                            const productId = event.target.value;
+                            const p = props.products.find((x) => x._id === productId);
+                            props.setEditSaleForm((prev) => {
+                              const next = [...prev.items];
+                              next[index] = {
+                                ...next[index],
+                                productId,
+                                unitPrice: p ? p.price : next[index].unitPrice,
+                              };
+                              return { ...prev, items: next };
+                            });
+                          }}
+                        >
+                          <option value="">Selecione…</option>
+                          {props.products.map((p) => (
+                            <option key={p._id} value={p._id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>{product ? product.stock : "—"}</td>
+                      <td>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={line.unitPrice || ""}
+                          onChange={(event) => {
+                            const v = Number(event.target.value);
+                            props.setEditSaleForm((prev) => {
+                              const next = [...prev.items];
+                              next[index] = { ...next[index], unitPrice: Number.isFinite(v) ? v : 0 };
+                              return { ...prev, items: next };
+                            });
+                          }}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          min={1}
+                          step={1}
+                          value={line.quantity || ""}
+                          onChange={(event) => {
+                            const v = parseInt(event.target.value, 10);
+                            props.setEditSaleForm((prev) => {
+                              const next = [...prev.items];
+                              next[index] = {
+                                ...next[index],
+                                quantity: Number.isFinite(v) && v >= 1 ? v : 1,
+                              };
+                              return { ...prev, items: next };
+                            });
+                          }}
+                        />
+                      </td>
+                      <td>{props.formatBRL(lineTotal)}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="ghost-btn danger"
+                          disabled={props.editSaleForm.items.length <= 1}
+                          onClick={() =>
+                            props.setEditSaleForm((prev) => ({
+                              ...prev,
+                              items: prev.items.filter((_, i) => i !== index),
+                            }))
+                          }
+                        >
+                          Remover
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <button
+              type="button"
+              className="ghost-btn"
+              style={{ marginTop: 8 }}
+              onClick={() =>
+                props.setEditSaleForm((prev) => ({
+                  ...prev,
+                  items: [...prev.items, { productId: "", quantity: 1, unitPrice: 0 }],
+                }))
+              }
+            >
+              Adicionar linha
+            </button>
+            <p style={{ marginTop: 8, fontWeight: 600 }}>
+              Total da proposta:{" "}
+              {props.formatBRL(
+                props.editSaleForm.items.reduce((s, it) => s + it.quantity * it.unitPrice, 0)
+              )}
+            </p>
+          </div>
+
           <div className="form-field">
             <label>Forma de pagamento</label>
             <select
@@ -609,10 +762,30 @@ export default function EditEntityModal(props: EditEntityModalProps) {
                   );
                   return;
                 }
-                await api.patch<Sale>(props.scopedPath(`/sales/${props.editingId}`), {
-                  paymentMethod: props.editSaleForm.paymentMethod,
-                  status: props.editSaleForm.status,
-                });
+                if (props.editSaleForm.status === "CANCELADO") {
+                  await api.patch<Sale>(props.scopedPath(`/sales/${props.editingId}`), {
+                    paymentMethod: props.editSaleForm.paymentMethod,
+                    status: "CANCELADO",
+                  });
+                } else {
+                  const lines = props.editSaleForm.items.filter(
+                    (it) => it.productId && it.quantity >= 1 && it.unitPrice >= 0
+                  );
+                  if (!lines.length) {
+                    props.setError("Informe ao menos um produto com quantidade e preço válidos.");
+                    return;
+                  }
+                  await api.patch<Sale>(props.scopedPath(`/sales/${props.editingId}`), {
+                    paymentMethod: props.editSaleForm.paymentMethod,
+                    status: props.editSaleForm.status,
+                    customer: props.editSaleForm.customerId || null,
+                    items: lines.map((it) => ({
+                      product: it.productId,
+                      quantity: it.quantity,
+                      unitPrice: it.unitPrice,
+                    })),
+                  });
+                }
                 props.closeEditModal();
                 await props.loadAllData();
               }}

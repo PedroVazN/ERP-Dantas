@@ -29,6 +29,7 @@ import { useWorkspaceSession } from "./hooks/useWorkspaceSession";
 import { useWhatsAppStatusEffect } from "./hooks/useWhatsAppStatusEffect";
 import { useDocumentThemeEffect } from "./hooks/useDocumentThemeEffect";
 import { useUserFormFromSettingsEffect } from "./hooks/useUserFormFromSettingsEffect";
+import type { EditSaleFormState } from "./components/EditEntityModal/EditEntityModal";
 import GlobalModalsRenderer from "./components/GlobalModalsRenderer/GlobalModalsRenderer";
 import SidebarNavigation from "./components/SidebarNavigation/SidebarNavigation";
 import AppHeader from "./components/AppHeader/AppHeader";
@@ -773,6 +774,9 @@ function App() {
           setError={setError}
           loadAllData={loadAllData}
           suppliers={suppliers}
+          products={products}
+          customers={customers}
+          formatBRL={formatBRL}
 
           editCustomerForm={editCustomerForm}
           setEditCustomerForm={setEditCustomerForm}

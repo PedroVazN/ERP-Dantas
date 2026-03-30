@@ -107,6 +107,8 @@ export function registerSalesRoutes(
     const payload = req.body as Partial<{
       status: "PAGO" | "PENDENTE" | "CANCELADO";
       paymentMethod: "DINHEIRO" | "PIX" | "CARTAO" | "BOLETO" | "TRANSFERENCIA";
+      customer: string | null;
+      items: Array<{ product: string; quantity: number; unitPrice: number }>;
     }>;
 
     const sale = await SaleModel.findOne({ _id: id, businessId });
@@ -117,7 +119,80 @@ export function registerSalesRoutes(
       return res.status(400).json({ message: "Venda cancelada não pode ser alterada." });
     }
 
+    const hasItems = Array.isArray(payload.items);
     const nextStatus = payload.status;
+
+    if (hasItems && nextStatus === "CANCELADO") {
+      return res.status(400).json({
+        message:
+          "Não envie itens ao cancelar. Remova o campo itens ou cancele a venda em uma alteração separada.",
+      });
+    }
+
+    if (hasItems) {
+      if (!payload.items!.length) {
+        return res.status(400).json({ message: "Informe ao menos um item da venda." });
+      }
+      for (const row of payload.items!) {
+        if (
+          !isValidObjectId(row.product) ||
+          row.quantity < 1 ||
+          row.unitPrice < 0 ||
+          !Number.isFinite(row.unitPrice)
+        ) {
+          return res.status(400).json({ message: "Itens da venda inválidos." });
+        }
+      }
+
+      const oldItems = sale.items || [];
+      for (const item of oldItems) {
+        if (!item.product) continue;
+        await ProductModel.updateOne(
+          { _id: item.product, businessId },
+          { $inc: { stock: item.quantity } }
+        );
+      }
+
+      let normalizedItems: Awaited<ReturnType<typeof deps.normalizeSaleItemsAndApplyStock>>;
+      try {
+        normalizedItems = await deps.normalizeSaleItemsAndApplyStock(
+          businessId,
+          payload.items!.map((row) => ({
+            product: new Types.ObjectId(row.product),
+            quantity: row.quantity,
+            unitPrice: row.unitPrice,
+          }))
+        );
+      } catch (error) {
+        for (const item of oldItems) {
+          if (!item.product) continue;
+          const product = await ProductModel.findOne({ _id: item.product, businessId });
+          if (product) {
+            product.stock -= item.quantity;
+            await product.save();
+          }
+        }
+        const message = error instanceof Error ? error.message : "Falha ao atualizar itens da venda.";
+        if (message.includes("não encontrado")) {
+          return res.status(404).json({ message });
+        }
+        return res.status(400).json({ message });
+      }
+
+      sale.set("items", normalizedItems);
+      sale.totalAmount = normalizedItems.reduce((sum, item) => sum + item.total, 0);
+    }
+
+    if (payload.customer !== undefined) {
+      if (payload.customer === "" || payload.customer === null) {
+        sale.set("customer", null);
+      } else if (isValidObjectId(payload.customer)) {
+        sale.customer = new Types.ObjectId(payload.customer);
+      } else {
+        return res.status(400).json({ message: "Cliente inválido." });
+      }
+    }
+
     const nextPayment =
       payload.paymentMethod === "DINHEIRO" ||
       payload.paymentMethod === "PIX" ||

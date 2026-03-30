@@ -13,7 +13,8 @@ import type {
   Settings,
 } from "../types";
 
-import { saleCustomerLabel } from "../utils/saleCustomerLabel";
+import type { EditSaleFormState } from "../components/EditEntityModal/EditEntityModal";
+import { saleCustomerLabel, saleCustomerId, saleItemProductId } from "../utils/saleCustomerLabel";
 
 export type CrudEditModalKind = "customer" | "product" | "supplier" | "sale" | "purchase" | "expense" | "checklist";
 
@@ -160,7 +161,7 @@ export function useCrudModuleHandlers(deps: {
       status: "ATIVO" | "INATIVO";
     }>
   >;
-  setEditSaleForm: Dispatch<SetStateAction<{ paymentMethod: string; status: string; customerDisplay: string }>>;
+  setEditSaleForm: Dispatch<SetStateAction<EditSaleFormState>>;
   setEditPurchaseForm: Dispatch<SetStateAction<{ status: Purchase["status"] }>>;
   setEditExpenseForm: Dispatch<
     SetStateAction<{
@@ -572,10 +573,20 @@ export function useCrudModuleHandlers(deps: {
       setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar vendas.");
       return;
     }
+    const itemLines =
+      item.items && item.items.length
+        ? item.items.map((it) => ({
+            productId: saleItemProductId(it),
+            quantity: it.quantity,
+            unitPrice: it.unitPrice,
+          }))
+        : [{ productId: "", quantity: 1, unitPrice: 0 }];
     setEditSaleForm({
       paymentMethod: item.paymentMethod || "PIX",
       status: item.status || "PAGO",
+      customerId: saleCustomerId(item),
       customerDisplay: saleCustomerLabel(item),
+      items: itemLines,
     });
     openEditModal("sale", item._id, `Editar venda: ${formatBRL(item.totalAmount)}`);
   }

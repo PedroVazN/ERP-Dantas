@@ -12,7 +12,7 @@ import type {
 
 import EditEntityModal, { type EditProductFormState } from "../EditEntityModal/EditEntityModal";
 import ProductPhotoModal from "../ProductPhotoModal";
-import type { Supplier } from "../../types";
+import type { Customer, Product, Supplier } from "../../types";
 
 export type GlobalModalsRendererProps = {
   // Edit modal
@@ -27,6 +27,9 @@ export type GlobalModalsRendererProps = {
   setError: Dispatch<SetStateAction<string>>;
   loadAllData: () => Promise<void>;
   suppliers: Supplier[];
+  products: Product[];
+  customers: Customer[];
+  formatBRL: (value: number) => string;
 
   editCustomerForm: EditCustomerFormState;
   setEditCustomerForm: Dispatch<SetStateAction<EditCustomerFormState>>;
@@ -67,6 +70,9 @@ export default function GlobalModalsRenderer(props: GlobalModalsRendererProps) {
             setError={props.setError}
             loadAllData={props.loadAllData}
             suppliers={props.suppliers}
+            products={props.products}
+            customers={props.customers}
+            formatBRL={props.formatBRL}
 
             editCustomerForm={props.editCustomerForm}
             setEditCustomerForm={props.setEditCustomerForm}
