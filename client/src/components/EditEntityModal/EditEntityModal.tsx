@@ -839,7 +839,6 @@ export default function EditEntityModal(props: EditEntityModalProps) {
               </thead>
               <tbody>
                 {props.editPurchaseForm.items.map((line, index) => {
-                  const product = props.products.find((p) => p._id === line.productId);
                   const lineTotal = line.quantity * line.cost;
                   return (
                     <tr key={`${line.productId}-${index}`}>
