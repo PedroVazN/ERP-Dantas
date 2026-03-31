@@ -131,6 +131,8 @@ export function registerPurchaseRoutes(
         | "RECEBIDA"
         | "REJEITADA"
         | "CANCELADA";
+      supplier: string;
+      items: Array<{ product?: string; description: string; quantity: number; cost: number }>;
     }>;
 
     const purchase = await PurchaseModel.findOne({ _id: id, businessId });
@@ -141,7 +143,68 @@ export function registerPurchaseRoutes(
       return res.status(400).json({ message: "Compra cancelada não pode ser alterada." });
     }
 
+    const hasItems = Array.isArray(payload.items);
     const nextStatus = payload.status;
+
+    if (hasItems && nextStatus === "CANCELADA") {
+      return res.status(400).json({
+        message:
+          "Não envie itens ao cancelar a compra. Altere os itens em uma requisição separada ou remova o campo items.",
+      });
+    }
+
+    if (hasItems) {
+      if (!payload.items!.length) {
+        return res.status(400).json({ message: "Informe ao menos um item da compra." });
+      }
+
+      const normalizedItems: Array<{
+        product?: Types.ObjectId;
+        description: string;
+        quantity: number;
+        cost: number;
+        total: number;
+      }> = [];
+
+      for (const item of payload.items!) {
+        if (!item.description?.trim() || item.quantity <= 0 || !Number.isFinite(item.cost) || item.cost < 0) {
+          return res.status(400).json({ message: "Itens da compra inválidos." });
+        }
+
+        normalizedItems.push({
+          product: item.product && isValidObjectId(item.product) ? new Types.ObjectId(item.product) : undefined,
+          description: item.description,
+          quantity: item.quantity,
+          cost: item.cost,
+          total: item.quantity * item.cost,
+        });
+      }
+
+      // Se o estoque já foi aplicado para esta compra, precisamos reverter os itens antigos
+      // e aplicar novamente com base nos novos itens.
+      if (purchase.stockApplied) {
+        for (const item of purchase.items || []) {
+          if (!item.product) continue;
+          await ProductModel.updateOne(
+            { _id: item.product, businessId },
+            { $inc: { stock: -item.quantity } }
+          );
+        }
+
+        await deps.applyPurchaseStock(businessId, normalizedItems);
+        purchase.stockApplied = true;
+      }
+
+      purchase.set("items", normalizedItems);
+      purchase.totalAmount = normalizedItems.reduce((sum, item) => sum + item.total, 0);
+    }
+
+    if (payload.supplier !== undefined) {
+      if (!payload.supplier.trim()) {
+        return res.status(400).json({ message: "Fornecedor não pode ser vazio." });
+      }
+      purchase.supplier = payload.supplier.trim();
+    }
 
     if (nextStatus === "CANCELADA") {
       if (purchase.stockApplied) {

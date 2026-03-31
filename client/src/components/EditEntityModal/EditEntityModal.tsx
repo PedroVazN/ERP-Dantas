@@ -61,6 +61,13 @@ export type EditSaleFormState = {
 
 export type EditPurchaseFormState = {
   status: Purchase["status"];
+  supplier: string;
+  items: Array<{
+    productId: string;
+    description: string;
+    quantity: number;
+    cost: number;
+  }>;
 };
 
 export type EditExpenseFormState = {
@@ -799,6 +806,166 @@ export default function EditEntityModal(props: EditEntityModalProps) {
       {props.editModalKind === "purchase" ? (
         <>
           <div className="form-field">
+            <label>Fornecedor</label>
+            <select
+              value={props.editPurchaseForm.supplier}
+              onChange={(event) =>
+                props.setEditPurchaseForm((prev) => ({
+                  ...prev,
+                  supplier: event.target.value,
+                }))
+              }
+            >
+              <option value="">Selecione o fornecedor</option>
+              {props.suppliers.map((s) => (
+                <option key={s._id} value={s.name}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="table-scroll" style={{ marginBottom: 12 }}>
+            <table className="order-items-table">
+              <thead>
+                <tr>
+                  <th>Produto</th>
+                  <th>Descrição</th>
+                  <th>Quantidade</th>
+                  <th>Custo (R$)</th>
+                  <th>Total</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {props.editPurchaseForm.items.map((line, index) => {
+                  const product = props.products.find((p) => p._id === line.productId);
+                  const lineTotal = line.quantity * line.cost;
+                  return (
+                    <tr key={`${line.productId}-${index}`}>
+                      <td>
+                        <select
+                          value={line.productId}
+                          onChange={(event) => {
+                            const productId = event.target.value;
+                            const p = props.products.find((x) => x._id === productId);
+                            props.setEditPurchaseForm((prev) => {
+                              const next = [...prev.items];
+                              next[index] = {
+                                ...next[index],
+                                productId,
+                                description: p ? p.name : next[index].description,
+                              };
+                              return { ...prev, items: next };
+                            });
+                          }}
+                        >
+                          <option value="">Sem vínculo</option>
+                          {props.products.map((p) => (
+                            <option key={p._id} value={p._id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>
+                        <input
+                          type="text"
+                          value={line.description}
+                          onChange={(event) => {
+                            const v = event.target.value;
+                            props.setEditPurchaseForm((prev) => {
+                              const next = [...prev.items];
+                              next[index] = { ...next[index], description: v };
+                              return { ...prev, items: next };
+                            });
+                          }}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          min={1}
+                          step={1}
+                          value={line.quantity || ""}
+                          onChange={(event) => {
+                            const v = parseInt(event.target.value, 10);
+                            props.setEditPurchaseForm((prev) => {
+                              const next = [...prev.items];
+                              next[index] = {
+                                ...next[index],
+                                quantity: Number.isFinite(v) && v >= 1 ? v : 1,
+                              };
+                              return { ...prev, items: next };
+                            });
+                          }}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={line.cost || ""}
+                          onChange={(event) => {
+                            const v = Number(event.target.value);
+                            props.setEditPurchaseForm((prev) => {
+                              const next = [...prev.items];
+                              next[index] = { ...next[index], cost: Number.isFinite(v) ? v : 0 };
+                              return { ...prev, items: next };
+                            });
+                          }}
+                        />
+                      </td>
+                      <td>{props.formatBRL(lineTotal)}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="ghost-btn danger"
+                          disabled={props.editPurchaseForm.items.length <= 1}
+                          onClick={() =>
+                            props.setEditPurchaseForm((prev) => ({
+                              ...prev,
+                              items: prev.items.filter((_, i) => i !== index),
+                            }))
+                          }
+                        >
+                          Remover
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <button
+              type="button"
+              className="ghost-btn"
+              style={{ marginTop: 8 }}
+              onClick={() =>
+                props.setEditPurchaseForm((prev) => ({
+                  ...prev,
+                  items: [
+                    ...prev.items,
+                    { productId: "", description: "", quantity: 1, cost: 0 },
+                  ],
+                }))
+              }
+            >
+              Adicionar linha
+            </button>
+            <p style={{ marginTop: 8, fontWeight: 600 }}>
+              Total do pedido:{" "}
+              {props.formatBRL(
+                props.editPurchaseForm.items.reduce(
+                  (sum, it) => sum + it.quantity * it.cost,
+                  0
+                )
+              )}
+            </p>
+          </div>
+
+          <div className="form-field">
             <label>Status</label>
             <select
               value={props.editPurchaseForm.status}
@@ -830,9 +997,31 @@ export default function EditEntityModal(props: EditEntityModalProps) {
                   );
                   return;
                 }
-                await api.patch<Purchase>(props.scopedPath(`/purchases/${props.editingId}`), {
-                  status: props.editPurchaseForm.status,
-                });
+                if (props.editPurchaseForm.status === "CANCELADA") {
+                  await api.patch<Purchase>(props.scopedPath(`/purchases/${props.editingId}`), {
+                    status: "CANCELADA",
+                  });
+                } else {
+                  const lines = props.editPurchaseForm.items.filter(
+                    (it) => it.description.trim() && it.quantity > 0 && it.cost >= 0
+                  );
+                  if (!props.editPurchaseForm.supplier || !lines.length) {
+                    props.setError(
+                      "Informe fornecedor e pelo menos um item com quantidade e custo válidos."
+                    );
+                    return;
+                  }
+                  await api.patch<Purchase>(props.scopedPath(`/purchases/${props.editingId}`), {
+                    status: props.editPurchaseForm.status,
+                    supplier: props.editPurchaseForm.supplier,
+                    items: lines.map((it) => ({
+                      product: it.productId || undefined,
+                      description: it.description,
+                      quantity: it.quantity,
+                      cost: it.cost,
+                    })),
+                  });
+                }
                 props.closeEditModal();
                 await props.loadAllData();
               }}

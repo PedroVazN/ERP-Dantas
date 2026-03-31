@@ -100,6 +100,13 @@ export type Purchase = {
   totalAmount: number;
   status: "ABERTA" | "AGUARDANDO_APROVACAO" | "APROVADA" | "RECEBIDA" | "REJEITADA" | "CANCELADA";
   createdAt: string;
+  items?: Array<{
+    product?: string | { _id: string; name?: string };
+    description: string;
+    quantity: number;
+    cost: number;
+    total: number;
+  }>;
   approval?: {
     required?: boolean;
     status?: "PENDENTE" | "APROVADA" | "REJEITADA";

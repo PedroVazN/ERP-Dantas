@@ -222,6 +222,8 @@ function App() {
   });
   const [editPurchaseForm, setEditPurchaseForm] = useState({
     status: "RECEBIDA" as Purchase["status"],
+    supplier: "",
+    items: [] as Array<{ productId: string; description: string; quantity: number; cost: number }>,
   });
   const [editExpenseForm, setEditExpenseForm] = useState({
     description: "",

@@ -162,7 +162,13 @@ export function useCrudModuleHandlers(deps: {
     }>
   >;
   setEditSaleForm: Dispatch<SetStateAction<EditSaleFormState>>;
-  setEditPurchaseForm: Dispatch<SetStateAction<{ status: Purchase["status"] }>>;
+  setEditPurchaseForm: Dispatch<
+    SetStateAction<{
+      status: Purchase["status"];
+      supplier: string;
+      items: Array<{ productId: string; description: string; quantity: number; cost: number }>;
+    }>
+  >;
   setEditExpenseForm: Dispatch<
     SetStateAction<{
       description: string;
@@ -609,7 +615,29 @@ export function useCrudModuleHandlers(deps: {
       setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar compras.");
       return;
     }
-    setEditPurchaseForm({ status: item.status });
+    const rawItems = (item as any).items as
+      | Array<{ product?: string | { _id: string }; description: string; quantity: number; cost: number }>
+      | undefined;
+    const lines =
+      rawItems && rawItems.length
+        ? rawItems.map((it) => ({
+            productId:
+              typeof it.product === "string"
+                ? it.product
+                : it.product && typeof it.product === "object" && "_id" in it.product
+                  ? String((it.product as { _id: string })._id)
+                  : "",
+            description: it.description,
+            quantity: it.quantity,
+            cost: it.cost,
+          }))
+        : [{ productId: "", description: "", quantity: 1, cost: 0 }];
+
+    setEditPurchaseForm({
+      status: item.status,
+      supplier: item.supplier,
+      items: lines,
+    });
     openEditModal("purchase", item._id, `Editar compra: ${formatBRL(item.totalAmount)}`);
   }
 
