@@ -215,10 +215,12 @@ function App() {
     paymentCondition: "PIX" as "BOLETO" | "PIX" | "DINHEIRO" | "CREDITO",
     status: "ATIVO" as "ATIVO" | "INATIVO",
   });
-  const [editSaleForm, setEditSaleForm] = useState({
+  const [editSaleForm, setEditSaleForm] = useState<EditSaleFormState>({
     paymentMethod: "PIX",
     status: "PAGO",
+    customerId: "",
     customerDisplay: "",
+    items: [{ productId: "", quantity: 1, unitPrice: 0 }],
   });
   const [editPurchaseForm, setEditPurchaseForm] = useState({
     status: "RECEBIDA" as Purchase["status"],
