@@ -719,6 +719,7 @@ function App() {
           filteredProductsBySupplier={filteredProductsBySupplier}
           purchases={purchases}
           reviewPurchase={crudHandlers.reviewPurchase}
+          markPurchaseReceived={crudHandlers.markPurchaseReceived}
           editPurchase={crudHandlers.editPurchase}
           deletePurchase={crudHandlers.deletePurchase}
 

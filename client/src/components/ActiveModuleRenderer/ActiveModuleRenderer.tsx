@@ -116,6 +116,7 @@ export type ActiveModuleRendererProps = {
   filteredProductsBySupplier: Product[];
   purchases: Purchase[];
   reviewPurchase: (purchaseId: string, action: "aprovar" | "rejeitar") => void;
+  markPurchaseReceived: (purchaseId: string) => void;
   editPurchase: (purchase: Purchase) => void;
   deletePurchase: (purchase: Purchase) => void;
 
@@ -253,6 +254,7 @@ export default function ActiveModuleRenderer(props: ActiveModuleRendererProps) {
         filteredProductsBySupplier={props.filteredProductsBySupplier}
         purchases={props.purchases}
         reviewPurchase={props.reviewPurchase}
+        markPurchaseReceived={props.markPurchaseReceived}
         editPurchase={props.editPurchase}
         deletePurchase={props.deletePurchase}
         products={props.products}

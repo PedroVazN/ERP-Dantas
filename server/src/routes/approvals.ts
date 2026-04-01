@@ -50,14 +50,9 @@ export function registerApprovalsRoutes(
     }
 
     if (action === "aprovar") {
-      if (!purchase.stockApplied) {
-        await deps.applyPurchaseStock(
-          businessId,
-          purchase.items as Array<{ product?: Types.ObjectId; quantity: number; cost: number }>
-        );
-        purchase.stockApplied = true;
-      }
-      purchase.status = "RECEBIDA";
+      // Aprovação: muda status para APROVADA e gera a despesa financeira (aguardando pagamento).
+      // O estoque só entra quando a compra for marcada como RECEBIDA.
+      purchase.status = "APROVADA";
       purchase.approval = {
         required: true,
         status: "APROVADA",
@@ -66,8 +61,29 @@ export function registerApprovalsRoutes(
           purchase.approval?.requestedAt || purchase.createdAt || new Date(),
         reviewedBy: reviewedBy || "Gestor",
         reviewedAt: new Date(),
-        reason: reason?.trim() || "Aprovacao automatizada via fluxo de compras.",
+        reason: reason?.trim() || "Aprovacao registrada no fluxo de compras.",
       };
+
+      await purchase.save();
+
+      // Gera despesa no financeiro com status PENDENTE (aguardando pagamento).
+      await ExpenseModel.create({
+        businessId,
+        description: `OC-${String(purchase._id).slice(-6).toUpperCase()} - ${purchase.supplier}`,
+        category: "COMPRAS",
+        amount: purchase.totalAmount,
+        dueDate: new Date(),
+        status: "PENDENTE",
+        approval: {
+          required: false,
+          status: "APROVADA",
+          requestedBy: "Sistema",
+          requestedAt: new Date(),
+          reviewedBy: reviewedBy || "Gestor",
+          reviewedAt: new Date(),
+          reason: "Despesa gerada automaticamente após aprovação da ordem de compra.",
+        },
+      });
     } else {
       purchase.status = "REJEITADA";
       purchase.approval = {
@@ -80,9 +96,9 @@ export function registerApprovalsRoutes(
         reviewedAt: new Date(),
         reason: reason?.trim() || "Rejeicao registrada no fluxo de aprovacao.",
       };
-    }
 
-    await purchase.save();
+      await purchase.save();
+    }
     await deps.notifySystemWhatsApp(
       [
         "Compra revisada no fluxo de aprovação",

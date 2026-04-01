@@ -698,6 +698,15 @@ export function useCrudModuleHandlers(deps: {
     await loadAllData();
   }
 
+  async function markPurchaseReceived(purchaseId: string) {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico.");
+      return;
+    }
+    await api.patch<Purchase>(scopedPath(`/purchases/${purchaseId}`), { status: "RECEBIDA" });
+    await loadAllData();
+  }
+
   async function reviewExpense(expenseId: string, action: "aprovar" | "rejeitar" | "pagar") {
     if (isGeneralWorkspace) {
       setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para aprovar.");
@@ -744,6 +753,7 @@ export function useCrudModuleHandlers(deps: {
     deleteExpense,
     submitUserProfile,
     reviewPurchase,
+    markPurchaseReceived,
     reviewExpense,
     updateExpensePaymentStatus,
   };

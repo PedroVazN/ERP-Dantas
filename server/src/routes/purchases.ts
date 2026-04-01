@@ -56,59 +56,34 @@ export function registerPurchaseRoutes(
     }
 
     const totalAmount = normalizedItems.reduce((sum, item) => sum + item.total, 0);
-    const needsApproval = totalAmount >= deps.purchaseApprovalThreshold;
 
-    if (!needsApproval) {
-      await deps.applyPurchaseStock(businessId, normalizedItems);
-    }
-
+    // Toda ordem de compra nasce como AGUARDANDO_APROVACAO.
+    // Estoque só é aplicado quando marcada como RECEBIDA.
+    // Despesa financeira só é gerada após a aprovação.
     const purchase = await PurchaseModel.create({
       businessId,
       supplier,
       items: normalizedItems,
-      status: needsApproval ? "AGUARDANDO_APROVACAO" : status || "RECEBIDA",
+      status: "AGUARDANDO_APROVACAO",
       approval: {
-        required: needsApproval,
-        status: needsApproval ? "PENDENTE" : "APROVADA",
+        required: true,
+        status: "PENDENTE",
         requestedBy: "Sistema",
         requestedAt: new Date(),
       },
-      stockApplied: !needsApproval,
+      stockApplied: false,
       totalAmount,
     });
 
-    // Ao gerar ordem de compra, lança automaticamente no financeiro como pendente.
-    await ExpenseModel.create({
-      businessId,
-      description: `Ordem de compra ${String(purchase._id).slice(-6).toUpperCase()} - ${supplier}`,
-      category: "COMPRAS",
-      amount: totalAmount,
-      dueDate: new Date(),
-      status: "PENDENTE",
-      approval: {
-        required: false,
-        status: "APROVADA",
-        requestedBy: "Sistema",
-        requestedAt: new Date(),
-        reviewedBy: "Sistema",
-        reviewedAt: new Date(),
-        reason: "Despesa gerada automaticamente a partir da ordem de compra.",
-      },
-    });
-
-    if (needsApproval) {
-      await deps.notifySystemWhatsApp(
-        [
-          "Atenção: nova compra aguardando aprovação",
-          `ERP: ${businessId}`,
-          `Fornecedor: ${supplier}`,
-          `Valor: ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
-            totalAmount
-          )}`,
-          `ID: ${String(purchase._id)}`,
-        ].join("\n")
-      );
-    }
+    await deps.notifySystemWhatsApp(
+      [
+        "Nova ordem de compra aguardando aprovação",
+        `ERP: ${businessId}`,
+        `Fornecedor: ${supplier}`,
+        `Valor: ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalAmount)}`,
+        `OC: ${String(purchase._id).slice(-6).toUpperCase()}`,
+      ].join("\n")
+    );
 
     res.status(201).json(purchase);
   });
@@ -221,11 +196,20 @@ export function registerPurchaseRoutes(
       if (purchase.approval) {
         purchase.approval.status = "REJEITADA";
       }
+    } else if (nextStatus === "RECEBIDA") {
+      // Ao marcar como recebida, aplica o estoque se ainda não foi aplicado.
+      if (!purchase.stockApplied) {
+        await deps.applyPurchaseStock(
+          businessId,
+          purchase.items as Array<{ product?: Types.ObjectId; quantity: number; cost: number }>
+        );
+        purchase.stockApplied = true;
+      }
+      purchase.status = "RECEBIDA";
     } else if (
       nextStatus === "ABERTA" ||
       nextStatus === "AGUARDANDO_APROVACAO" ||
       nextStatus === "APROVADA" ||
-      nextStatus === "RECEBIDA" ||
       nextStatus === "REJEITADA"
     ) {
       purchase.status = nextStatus;

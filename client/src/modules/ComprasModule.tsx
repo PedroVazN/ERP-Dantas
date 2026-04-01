@@ -18,6 +18,7 @@ export type ComprasModuleProps = {
   filteredProductsBySupplier: Product[];
   purchases: Purchase[];
   reviewPurchase: (purchaseId: string, action: "aprovar" | "rejeitar") => void;
+  markPurchaseReceived: (purchaseId: string) => void;
   editPurchase: (purchase: Purchase) => void;
   deletePurchase: (purchase: Purchase) => void;
   products: Product[];
@@ -306,6 +307,15 @@ export default function ComprasModule(props: ComprasModuleProps) {
                                   Rejeitar
                                 </button>
                               </>
+                            ) : null}
+                            {item.status === "APROVADA" ? (
+                              <button
+                                type="button"
+                                className="ghost-btn"
+                                onClick={() => props.markPurchaseReceived(item._id)}
+                              >
+                                Marcar Recebida
+                              </button>
                             ) : null}
                             <button type="button" className="ghost-btn" onClick={() => props.editPurchase(item)}>
                               Editar
