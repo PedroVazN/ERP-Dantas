@@ -419,7 +419,6 @@ registerWhatsAppRoutes(app, {
 });
 
 registerPurchaseRoutes(app, {
-  purchaseApprovalThreshold,
   applyPurchaseStock,
   notifySystemWhatsApp,
 });

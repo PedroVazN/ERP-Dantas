@@ -69,6 +69,7 @@ export function registerApprovalsRoutes(
       // Gera despesa no financeiro com status PENDENTE (aguardando pagamento).
       await ExpenseModel.create({
         businessId,
+        purchaseId: purchase._id,
         description: `OC-${String(purchase._id).slice(-6).toUpperCase()} - ${purchase.supplier}`,
         category: "COMPRAS",
         amount: purchase.totalAmount,

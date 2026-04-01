@@ -120,6 +120,8 @@ export type Purchase = {
 
 export type Expense = {
   _id: string;
+  /** Presente quando a despesa foi gerada por uma ordem de compra aprovada. */
+  purchaseId?: string;
   description: string;
   category: string;
   amount: number;

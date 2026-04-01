@@ -7,7 +7,6 @@ import { blockWriteInGeneralScope, getBusinessFilter, getScopeContext } from "..
 export function registerPurchaseRoutes(
   app: Express,
   deps: {
-    purchaseApprovalThreshold: number;
     applyPurchaseStock: (businessId: string, items: any[]) => Promise<void>;
     notifySystemWhatsApp: (message: string) => Promise<any>;
   }
@@ -27,10 +26,9 @@ export function registerPurchaseRoutes(
       return;
     }
     const { businessId } = getScopeContext(req);
-    const { supplier, items, status } = req.body as {
+    const { supplier, items } = req.body as {
       supplier: string;
       items: Array<{ product?: string; description: string; quantity: number; cost: number }>;
-      status?: string;
     };
 
     if (!supplier || !items?.length) {
@@ -172,6 +170,31 @@ export function registerPurchaseRoutes(
 
       purchase.set("items", normalizedItems);
       purchase.totalAmount = normalizedItems.reduce((sum, item) => sum + item.total, 0);
+
+      // Se a ordem já gerou despesa (após aprovação), mantém o financeiro alinhado ao total recalculado.
+      if (purchase.status === "APROVADA" || purchase.status === "RECEBIDA") {
+        const expenseUpdate = await ExpenseModel.updateOne(
+          {
+            businessId,
+            purchaseId: purchase._id,
+            category: "COMPRAS",
+            status: "PENDENTE",
+          },
+          { $set: { amount: purchase.totalAmount } }
+        );
+        if (expenseUpdate.matchedCount === 0) {
+          const ocSuffix = String(purchase._id).slice(-6).toUpperCase();
+          await ExpenseModel.updateOne(
+            {
+              businessId,
+              category: "COMPRAS",
+              status: "PENDENTE",
+              description: new RegExp(`^OC-${ocSuffix}`),
+            },
+            { $set: { amount: purchase.totalAmount } }
+          );
+        }
+      }
     }
 
     if (payload.supplier !== undefined) {
