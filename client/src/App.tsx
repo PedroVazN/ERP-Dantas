@@ -170,6 +170,7 @@ function App() {
   const [aiInput, setAiInput] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiPlan, setAiPlan] = useState<AiPlan | null>(null);
+  const [dashboardMonth, setDashboardMonth] = useState<string>("");
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editModalKind, setEditModalKind] = useState<
     | "customer"
@@ -391,6 +392,7 @@ function App() {
     setBiInsights,
     setBiRefreshing,
     setError,
+    selectedMonth: dashboardMonth,
   });
 
   const { loadAllData, loadBusinesses } = useWorkspaceData({
@@ -685,6 +687,8 @@ function App() {
           maxTopProductValue={maxTopProductValue}
           maxCostCategoryValue={maxCostCategoryValue}
           selectModule={(key) => selectModule(key as any)}
+          dashboardMonth={dashboardMonth}
+          setDashboardMonth={setDashboardMonth}
 
           customerForm={customerForm}
           setCustomerForm={setCustomerForm}

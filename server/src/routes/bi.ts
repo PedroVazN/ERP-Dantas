@@ -18,16 +18,27 @@ export function registerBiInsightsRoutes(
     const { monthBounds, formatPeriodKey, formatPeriodLabel, linearForecast, safeGrowth } = deps;
 
     const businessFilter = getBusinessFilter(req);
-    const now = new Date();
-    const { start: monthStart, end: nextMonthStart } = monthBounds(now);
-    const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+    const monthParamRaw = String(req.query.month || "").trim();
+    let baseDate = new Date();
+    const monthMatch = monthParamRaw.match(/^(\d{4})-(\d{2})$/);
+    if (monthMatch) {
+      const year = Number(monthMatch[1]);
+      const monthIndex = Number(monthMatch[2]) - 1;
+      if (Number.isFinite(year) && Number.isFinite(monthIndex) && monthIndex >= 0 && monthIndex <= 11) {
+        baseDate = new Date(year, monthIndex, 1);
+      }
+    }
+
+    const { start: monthStart, end: nextMonthStart } = monthBounds(baseDate);
+    const previousMonthDate = new Date(baseDate.getFullYear(), baseDate.getMonth() - 1, 1);
     const { start: previousMonthStart, end: previousMonthEnd } = monthBounds(previousMonthDate);
-    const last30Start = new Date(now);
-    last30Start.setDate(now.getDate() - 30);
+    const last30Start = new Date(baseDate);
+    last30Start.setDate(baseDate.getDate() - 30);
 
     const monthlyPeriods: string[] = [];
     for (let i = 5; i >= 0; i -= 1) {
-      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const date = new Date(baseDate.getFullYear(), baseDate.getMonth() - i, 1);
       monthlyPeriods.push(formatPeriodKey(date));
     }
 
@@ -128,7 +139,7 @@ export function registerBiInsightsRoutes(
           $match: {
             ...businessFilter,
             status: { $ne: "CANCELADO" },
-            createdAt: { $gte: new Date(now.getFullYear(), now.getMonth() - 5, 1) },
+            createdAt: { $gte: new Date(baseDate.getFullYear(), baseDate.getMonth() - 5, 1) },
           },
         },
         {
@@ -143,7 +154,7 @@ export function registerBiInsightsRoutes(
           $match: {
             ...businessFilter,
             status: { $in: ["PAGO", "PENDENTE", "AGUARDANDO_APROVACAO"] },
-            dueDate: { $gte: new Date(now.getFullYear(), now.getMonth() - 5, 1) },
+            dueDate: { $gte: new Date(baseDate.getFullYear(), baseDate.getMonth() - 5, 1) },
           },
         },
         {
@@ -264,7 +275,7 @@ export function registerBiInsightsRoutes(
       .slice(0, 5);
 
     res.json({
-      updatedAt: now.toISOString(),
+      updatedAt: baseDate.toISOString(),
       kpis: {
         revenue: currentRevenue,
         expenses: currentExpenses,

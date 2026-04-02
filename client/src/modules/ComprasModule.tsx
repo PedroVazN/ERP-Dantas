@@ -166,6 +166,110 @@ export default function ComprasModule(props: ComprasModuleProps) {
     props.setPurchaseForm((prev) => ({ ...prev, items: [] }));
   }
 
+  function generatePurchasePdf(purchase: Purchase) {
+    const items = purchase.items || [];
+    const rows = items
+      .map(
+        (it) => `
+        <tr>
+          <td>${it.description}</td>
+          <td style="text-align:right">${it.quantity}</td>
+          <td style="text-align:right">${props.formatBRL(it.cost)}</td>
+          <td style="text-align:right">${props.formatBRL(it.total)}</td>
+        </tr>
+      `
+      )
+      .join("");
+
+    const html = `<!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Pedido de Compra</title>
+        <style>
+          * { box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; color: #111; padding: 24px; }
+          .doc { max-width: 900px; margin: 0 auto; border: 1px solid #ddd; border-radius: 12px; overflow: hidden; }
+          .header { background: #0f766e; color: #fff; padding: 18px 22px; display: flex; justify-content: space-between; align-items: center; }
+          .brand h1 { margin: 0; font-size: 20px; letter-spacing: 0.4px; }
+          .brand small { opacity: 0.95; }
+          .tag { font-size: 12px; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.35); border-radius: 999px; }
+          .content { padding: 18px 22px 20px; }
+          .meta-grid { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 8px 20px; margin-bottom: 14px; }
+          .meta-item { font-size: 13px; color: #374151; }
+          .meta-item b { color: #111827; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th, td { border-bottom: 1px solid #e5e7eb; padding: 9px 8px; font-size: 13px; }
+          th { text-align: left; background: #f9fafb; color: #111827; }
+          .num { text-align: right; white-space: nowrap; }
+          .totals { margin-top: 14px; display: flex; justify-content: flex-end; }
+          .total-box { min-width: 260px; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; background: #f9fafb; }
+          .total-line { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+          .total-final { display: flex; justify-content: space-between; font-size: 16px; font-weight: 700; color: #111827; border-top: 1px dashed #cbd5e1; padding-top: 8px; }
+          .obs { margin-top: 16px; font-size: 12px; color: #4b5563; line-height: 1.5; }
+          .signatures { margin-top: 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+          .sign { border-top: 1px solid #9ca3af; padding-top: 8px; text-align: center; font-size: 12px; color: #6b7280; }
+          .footer { padding: 12px 22px 16px; font-size: 11px; color: #6b7280; border-top: 1px solid #e5e7eb; background: #fafafa; }
+          @media print { @page { margin: 0.6cm; } body { padding: 0; } .doc { border: none; border-radius: 0; } }
+        </style>
+      </head>
+      <body>
+        <div class="doc">
+          <div class="header">
+            <div class="brand">
+              <h1>ERP Dantas</h1>
+              <small>Pedido de Compra</small>
+            </div>
+            <span class="tag">OC-${String(purchase._id).slice(-4).toUpperCase()}</span>
+          </div>
+          <div class="content">
+            <div class="meta-grid">
+              <div class="meta-item"><b>Fornecedor:</b> ${purchase.supplier}</div>
+              <div class="meta-item"><b>Data de emissão:</b> ${new Date(purchase.createdAt).toLocaleDateString("pt-BR")}</div>
+              <div class="meta-item"><b>Status:</b> ${purchase.status}</div>
+              <div class="meta-item"><b>Canal:</b> ERP Dantas</div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th class="num">Qtd.</th>
+                  <th class="num">Custo</th>
+                  <th class="num">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows || '<tr><td colspan="4">Sem itens no pedido.</td></tr>'}
+              </tbody>
+            </table>
+            <div class="totals">
+              <div class="total-box">
+                <div class="total-line"><span>Subtotal</span><span>${props.formatBRL(purchase.totalAmount)}</span></div>
+                <div class="total-line"><span>Frete/Taxas</span><span>${props.formatBRL(0)}</span></div>
+                <div class="total-final"><span>Total do pedido</span><span>${props.formatBRL(purchase.totalAmount)}</span></div>
+              </div>
+            </div>
+            <div class="obs">
+              Condições: valores sujeitos à confirmação do fornecedor. O recebimento físico dos itens deve ser validado
+              no ERP para atualização de estoque.
+            </div>
+            <div class="signatures">
+              <div class="sign">Assinatura do responsável pela compra</div>
+              <div class="sign">Assinatura do fornecedor</div>
+            </div>
+          </div>
+          <div class="footer">Documento gerado automaticamente pelo ERP Dantas.</div>
+        </div>
+        <script>window.onload = () => { window.print(); }<\/script>
+      </body>
+      </html>`;
+
+    const win = window.open("", "_blank", "width=960,height=720");
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+  }
+
   return (
     <section className="module-grid animated compras-module">
       <section className="table-card" style={{ gridColumn: "1 / -1" }}>
@@ -317,6 +421,9 @@ export default function ComprasModule(props: ComprasModuleProps) {
                                 Marcar Recebida
                               </button>
                             ) : null}
+                            <button type="button" className="ghost-btn" onClick={() => generatePurchasePdf(item)}>
+                              PDF pedido
+                            </button>
                             <button type="button" className="ghost-btn" onClick={() => props.editPurchase(item)}>
                               Editar
                             </button>

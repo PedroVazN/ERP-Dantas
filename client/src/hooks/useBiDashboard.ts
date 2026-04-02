@@ -13,6 +13,7 @@ export function useBiDashboard(params: {
   setBiInsights: Dispatch<SetStateAction<BiInsights | null>>;
   setBiRefreshing: Dispatch<SetStateAction<boolean>>;
   setError: Dispatch<SetStateAction<string>>;
+  selectedMonth: string;
 }) {
   const loadDashboardBi = useCallback(
     async (silent = false) => {
@@ -23,9 +24,11 @@ export function useBiDashboard(params: {
           params.setBiRefreshing(true);
         }
 
+        const monthQuery = params.selectedMonth ? `?month=${params.selectedMonth}` : "";
+
         const [dashboardData, biData] = await Promise.all([
           api.get<Dashboard>(params.scopedPath("/dashboard")),
-          api.get<BiInsights>(params.scopedPath("/bi/insights")),
+          api.get<BiInsights>(params.scopedPath(`/bi/insights${monthQuery}`)),
         ]);
 
         params.setDashboard(dashboardData);
@@ -42,6 +45,7 @@ export function useBiDashboard(params: {
       params.setDashboard,
       params.setBiInsights,
       params.setBiRefreshing,
+      params.selectedMonth,
     ]
   );
 

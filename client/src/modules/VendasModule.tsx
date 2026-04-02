@@ -61,6 +61,112 @@ export default function VendasModule(props: VendasModuleProps) {
     win.document.close();
   }
 
+  function generateSaleProposalPdf(sale: Sale) {
+    const rows = (sale.items || [])
+      .map(
+        (it) => `
+          <tr>
+            <td>${it.name}</td>
+            <td style="text-align:right">${it.quantity}</td>
+            <td style="text-align:right">${props.formatBRL(it.unitPrice)}</td>
+            <td style="text-align:right">${props.formatBRL(it.total)}</td>
+          </tr>
+        `
+      )
+      .join("");
+
+    const validityDate = new Date();
+    validityDate.setDate(validityDate.getDate() + 7);
+
+    const html = `<!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Proposta de Vendas</title>
+        <style>
+          * { box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; color: #111; padding: 24px; }
+          .doc { max-width: 900px; margin: 0 auto; border: 1px solid #ddd; border-radius: 12px; overflow: hidden; }
+          .header { background: #1f2937; color: #fff; padding: 18px 22px; display: flex; justify-content: space-between; align-items: center; }
+          .brand h1 { margin: 0; font-size: 20px; letter-spacing: 0.4px; }
+          .brand small { opacity: 0.9; }
+          .tag { font-size: 12px; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.35); border-radius: 999px; }
+          .content { padding: 18px 22px 20px; }
+          .meta-grid { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 8px 20px; margin-bottom: 14px; }
+          .meta-item { font-size: 13px; color: #374151; }
+          .meta-item b { color: #111827; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th, td { border-bottom: 1px solid #e5e7eb; padding: 9px 8px; font-size: 13px; }
+          th { text-align: left; background: #f9fafb; color: #111827; }
+          .num { text-align: right; white-space: nowrap; }
+          .totals { margin-top: 14px; display: flex; justify-content: flex-end; }
+          .total-box { min-width: 260px; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; background: #f9fafb; }
+          .total-line { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+          .total-final { display: flex; justify-content: space-between; font-size: 16px; font-weight: 700; color: #111827; border-top: 1px dashed #cbd5e1; padding-top: 8px; }
+          .obs { margin-top: 16px; font-size: 12px; color: #4b5563; line-height: 1.5; }
+          .signatures { margin-top: 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+          .sign { border-top: 1px solid #9ca3af; padding-top: 8px; text-align: center; font-size: 12px; color: #6b7280; }
+          .footer { padding: 12px 22px 16px; font-size: 11px; color: #6b7280; border-top: 1px solid #e5e7eb; background: #fafafa; }
+          @media print { @page { margin: 0.6cm; } body { padding: 0; } .doc { border: none; border-radius: 0; } }
+        </style>
+      </head>
+      <body>
+        <div class="doc">
+          <div class="header">
+            <div class="brand">
+              <h1>ERP Dantas</h1>
+              <small>Proposta Comercial de Vendas</small>
+            </div>
+            <span class="tag">OV-${String(sale._id).slice(-4).toUpperCase()}</span>
+          </div>
+          <div class="content">
+            <div class="meta-grid">
+              <div class="meta-item"><b>Cliente:</b> ${saleCustomerLabel(sale)}</div>
+              <div class="meta-item"><b>Data de emissão:</b> ${new Date(sale.createdAt).toLocaleDateString("pt-BR")}</div>
+              <div class="meta-item"><b>Status:</b> ${sale.status}</div>
+              <div class="meta-item"><b>Validade da proposta:</b> ${validityDate.toLocaleDateString("pt-BR")}</div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Produto</th>
+                  <th class="num">Qtd.</th>
+                  <th class="num">Preço</th>
+                  <th class="num">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows || '<tr><td colspan="4">Sem itens na proposta.</td></tr>'}
+              </tbody>
+            </table>
+            <div class="totals">
+              <div class="total-box">
+                <div class="total-line"><span>Subtotal</span><span>${props.formatBRL(sale.totalAmount)}</span></div>
+                <div class="total-line"><span>Descontos</span><span>${props.formatBRL(0)}</span></div>
+                <div class="total-final"><span>Total da proposta</span><span>${props.formatBRL(sale.totalAmount)}</span></div>
+              </div>
+            </div>
+            <div class="obs">
+              Condições comerciais: proposta sujeita à disponibilidade de estoque e confirmação financeira.
+              A aprovação desta proposta implica ciência dos itens, quantidades e valores acima.
+            </div>
+            <div class="signatures">
+              <div class="sign">Assinatura do responsável comercial</div>
+              <div class="sign">Assinatura do cliente</div>
+            </div>
+          </div>
+          <div class="footer">Documento gerado automaticamente pelo ERP Dantas.</div>
+        </div>
+        <script>window.onload = () => { window.print(); }<\/script>
+      </body>
+      </html>`;
+
+    const win = window.open("", "_blank", "width=960,height=720");
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+  }
+
   const pageSize = 7;
 
   const statusOptions = useMemo(() => {
@@ -339,6 +445,9 @@ export default function VendasModule(props: VendasModuleProps) {
                               onClick={() => setReceiptSale(item)}
                             >
                               Cupom
+                            </button>
+                            <button type="button" className="ghost-btn" onClick={() => generateSaleProposalPdf(item)}>
+                              PDF proposta
                             </button>
                             <button type="button" className="ghost-btn" onClick={() => props.editSale(item)}>
                               Editar

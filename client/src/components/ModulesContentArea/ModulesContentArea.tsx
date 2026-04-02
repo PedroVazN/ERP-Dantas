@@ -22,6 +22,8 @@ export type ModulesContentAreaProps = Omit<ActiveModuleRendererProps, "loading" 
   maxTopProductValue: DashboardPanelProps["maxTopProductValue"];
   maxCostCategoryValue: DashboardPanelProps["maxCostCategoryValue"];
   selectModule: DashboardPanelProps["selectModule"];
+  dashboardMonth: string;
+  setDashboardMonth: (value: string) => void;
 };
 
 export default function ModulesContentArea(props: ModulesContentAreaProps) {
@@ -43,6 +45,8 @@ export default function ModulesContentArea(props: ModulesContentAreaProps) {
     maxTopProductValue,
     maxCostCategoryValue,
     selectModule,
+    dashboardMonth,
+    setDashboardMonth,
     ...activeModuleRendererProps
   } = props;
 
@@ -67,6 +71,8 @@ export default function ModulesContentArea(props: ModulesContentAreaProps) {
           maxTopProductValue={maxTopProductValue}
           maxCostCategoryValue={maxCostCategoryValue}
           selectModule={selectModule}
+          selectedMonth={dashboardMonth}
+          setSelectedMonth={setDashboardMonth}
           // Note: DashboardPanel already receives helpers/handlers via its own props;
           // module actions are handled by selectModule.
         />

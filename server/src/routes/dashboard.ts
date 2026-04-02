@@ -6,18 +6,41 @@ import { getBusinessFilter } from "../middleware/scope";
 export function registerDashboardRoutes(app: Express) {
   app.get("/api/dashboard", async (req: Request, res: Response) => {
     const businessFilter = getBusinessFilter(req);
+
+    const monthParamRaw = String(req.query.month || "").trim();
+    let dateStart: Date | null = null;
+    let dateEnd: Date | null = null;
+    const match = monthParamRaw.match(/^(\d{4})-(\d{2})$/);
+    if (match) {
+      const year = Number(match[1]);
+      const monthIndex = Number(match[2]) - 1;
+      if (Number.isFinite(year) && Number.isFinite(monthIndex) && monthIndex >= 0 && monthIndex <= 11) {
+        dateStart = new Date(year, monthIndex, 1);
+        dateEnd = new Date(year, monthIndex + 1, 1);
+      }
+    }
+
+    const saleDateFilter = dateStart && dateEnd ? { createdAt: { $gte: dateStart, $lt: dateEnd } } : {};
+    const expenseDateFilter = dateStart && dateEnd ? { dueDate: { $gte: dateStart, $lt: dateEnd } } : {};
+
     const [revenueAgg, expenseAgg, cogsAgg, lowStock, salesCount, purchaseCount] = await Promise.all([
       SaleModel.aggregate([
-        { $match: { ...businessFilter, status: { $ne: "CANCELADO" } } },
+        { $match: { ...businessFilter, status: { $ne: "CANCELADO" }, ...saleDateFilter } },
         { $group: { _id: null, total: { $sum: "$totalAmount" } } },
       ]),
       ExpenseModel.aggregate([
-        { $match: { ...businessFilter, status: { $in: ["PAGO", "PENDENTE", "AGUARDANDO_APROVACAO"] } } },
+        {
+          $match: {
+            ...businessFilter,
+            status: { $in: ["PAGO", "PENDENTE", "AGUARDANDO_APROVACAO"] },
+            ...expenseDateFilter,
+          },
+        },
         { $group: { _id: null, total: { $sum: "$amount" } } },
       ]),
       // CPV: custo real dos itens vendidos via lookup no cadastro de produtos
       SaleModel.aggregate([
-        { $match: { ...businessFilter, status: { $ne: "CANCELADO" } } },
+        { $match: { ...businessFilter, status: { $ne: "CANCELADO" }, ...saleDateFilter } },
         { $unwind: "$items" },
         {
           $lookup: {
@@ -44,8 +67,8 @@ export function registerDashboardRoutes(app: Express) {
       })
         .sort({ stock: 1 })
         .limit(10),
-      SaleModel.countDocuments(businessFilter),
-      PurchaseModel.countDocuments(businessFilter),
+      SaleModel.countDocuments({ ...businessFilter, ...saleDateFilter }),
+      PurchaseModel.countDocuments({ ...businessFilter, ...(saleDateFilter as any) }),
     ]);
 
     const revenue = revenueAgg[0]?.total || 0;

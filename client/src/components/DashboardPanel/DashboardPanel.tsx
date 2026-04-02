@@ -16,6 +16,8 @@ export type DashboardPanelProps = {
   maxTopProductValue: number;
   maxCostCategoryValue: number;
   selectModule: (key: "vendas" | "produtos" | "financeiro" | "clientes" | "compras") => void;
+  selectedMonth: string;
+  setSelectedMonth: (value: string) => void;
 };
 
 export default function DashboardPanel(props: DashboardPanelProps) {
@@ -45,6 +47,14 @@ export default function DashboardPanel(props: DashboardPanelProps) {
           <span className="metric-pill">
             Atualização: {new Date(biInsights.updatedAt).toLocaleTimeString("pt-BR")}
           </span>
+          <label className="metric-pill" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span>Mês BI:</span>
+            <input
+              type="month"
+              value={props.selectedMonth}
+              onChange={(event) => props.setSelectedMonth(event.target.value)}
+            />
+          </label>
         </div>
       </section>
 
