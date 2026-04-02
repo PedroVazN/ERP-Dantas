@@ -87,6 +87,8 @@ export function useCrudModuleHandlers(deps: {
     productId: string;
     quantity: number;
     cost: number;
+    extraExpenses: number;
+    extraExpensesNote: string;
     items: Array<{ productId: string; description: string; quantity: number; cost: number }>;
   };
   setPurchaseForm: Dispatch<
@@ -95,6 +97,8 @@ export function useCrudModuleHandlers(deps: {
       productId: string;
       quantity: number;
       cost: number;
+      extraExpenses: number;
+      extraExpensesNote: string;
       items: Array<{ productId: string; description: string; quantity: number; cost: number }>;
     }>
   >;
@@ -166,6 +170,8 @@ export function useCrudModuleHandlers(deps: {
     SetStateAction<{
       status: Purchase["status"];
       supplier: string;
+      extraExpenses: number;
+      extraExpensesNote: string;
       items: Array<{ productId: string; description: string; quantity: number; cost: number }>;
     }>
   >;
@@ -409,6 +415,8 @@ export function useCrudModuleHandlers(deps: {
 
     await api.post<Purchase>(scopedPath("/purchases"), {
       supplier: supplier.name,
+      extraExpenses: Number(purchaseForm.extraExpenses) || 0,
+      extraExpensesNote: purchaseForm.extraExpensesNote.trim(),
       items: purchaseForm.items.map((item) => ({
         product: item.productId,
         description: item.description,
@@ -417,7 +425,15 @@ export function useCrudModuleHandlers(deps: {
       })),
     });
 
-    setPurchaseForm({ supplierId: "", productId: "", quantity: 1, cost: 0, items: [] });
+    setPurchaseForm({
+      supplierId: "",
+      productId: "",
+      quantity: 1,
+      cost: 0,
+      extraExpenses: 0,
+      extraExpensesNote: "",
+      items: [],
+    });
     await loadAllData();
   }
 
@@ -636,6 +652,8 @@ export function useCrudModuleHandlers(deps: {
     setEditPurchaseForm({
       status: item.status,
       supplier: item.supplier,
+      extraExpenses: typeof item.extraExpenses === "number" ? item.extraExpenses : 0,
+      extraExpensesNote: item.extraExpensesNote || "",
       items: lines,
     });
     openEditModal("purchase", item._id, `Editar compra: ${formatBRL(item.totalAmount)}`);

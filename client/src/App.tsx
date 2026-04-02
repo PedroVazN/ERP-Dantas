@@ -42,6 +42,7 @@ const BUSINESS_KEY = "e_sentinel_workspace";
 
 type ModuleKey =
   | "dashboard"
+  | "relatorios"
   | "atualizacoes"
   | "clientes"
   | "produtos"
@@ -56,6 +57,7 @@ type ModuleKey =
 const moduleMeta: Record<ModuleKey, { label: string; short: string; helper: string }> = {
   ia: { label: "IA", short: "AI", helper: "Automatize compra/venda/cadastro" },
   dashboard: { label: "Dashboard", short: "DB", helper: "Visao geral do negocio" },
+  relatorios: { label: "Relatórios", short: "RL", helper: "Gráficos e evolução no tempo" },
   clientes: { label: "Clientes", short: "CL", helper: "Cadastro e relacionamento" },
   produtos: { label: "Produtos", short: "PR", helper: "Catalogo e estoque" },
   vendas: { label: "Vendas", short: "VD", helper: "PDV e faturamento" },
@@ -170,7 +172,10 @@ function App() {
   const [aiInput, setAiInput] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiPlan, setAiPlan] = useState<AiPlan | null>(null);
-  const [dashboardMonth, setDashboardMonth] = useState<string>("");
+  const [dashboardMonth, setDashboardMonth] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editModalKind, setEditModalKind] = useState<
     | "customer"
@@ -226,6 +231,8 @@ function App() {
   const [editPurchaseForm, setEditPurchaseForm] = useState({
     status: "RECEBIDA" as Purchase["status"],
     supplier: "",
+    extraExpenses: 0,
+    extraExpensesNote: "",
     items: [] as Array<{ productId: string; description: string; quantity: number; cost: number }>,
   });
   const [editExpenseForm, setEditExpenseForm] = useState({
@@ -260,6 +267,8 @@ function App() {
     productId: "",
     quantity: 1,
     cost: 0,
+    extraExpenses: 0,
+    extraExpensesNote: "",
     items: [] as Array<{ productId: string; description: string; quantity: number; cost: number }>,
   });
   const [supplierForm, setSupplierForm] = useState({
@@ -354,10 +363,11 @@ function App() {
       if (!workspaceId) {
         return path;
       }
+      const sep = path.includes("?") ? "&" : "?";
       if (workspaceId === "geral") {
-        return `${path}?scope=geral`;
+        return `${path}${sep}scope=geral`;
       }
-      return `${path}?scope=negocio&businessId=${encodeURIComponent(workspaceId)}`;
+      return `${path}${sep}scope=negocio&businessId=${encodeURIComponent(workspaceId)}`;
     },
     [workspaceId]
   );

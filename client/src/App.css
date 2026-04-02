@@ -1793,6 +1793,132 @@ th {
   }
 }
 
+/* Dashboard: balanço geral + filtro por mês */
+.dashboard-balance-strip {
+  margin-bottom: 18px;
+}
+
+.dashboard-balance-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.dashboard-balance-head h3 {
+  margin: 0 0 4px;
+}
+
+.dashboard-month-select {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted, #64748b);
+}
+
+.dashboard-month-select select {
+  min-width: 220px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border, #cbd5e1) 80%, transparent);
+  background: var(--surface, #fff);
+  color: var(--text, #0f172a);
+  font-size: 14px;
+}
+
+.dashboard-balance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.dashboard-balance-card {
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent, #2563eb) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent, #2563eb) 22%, transparent);
+}
+
+.dashboard-balance-card h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted, #64748b);
+}
+
+.dashboard-balance-card strong {
+  display: block;
+  font-size: 1.35rem;
+  margin-bottom: 6px;
+}
+
+.dashboard-balance-footer {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Relatórios (gráficos) */
+.reports-module-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.reports-module-header h2 {
+  margin: 0 0 4px;
+}
+
+.reports-module-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.reports-months-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted, #64748b);
+}
+
+.reports-months-label select {
+  min-width: 200px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border, #cbd5e1) 80%, transparent);
+  background: var(--surface, #fff);
+  color: var(--text, #0f172a);
+  font-size: 14px;
+}
+
+.reports-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 18px;
+}
+
+.reports-chart-wide {
+  grid-column: 1 / -1;
+}
+
+.reports-chart-wrap {
+  margin-top: 12px;
+  width: 100%;
+}
+
+.reports-chart-wrap-tall {
+  min-height: 360px;
+}
+
 /* Catálogo de produtos (aba catálogo) */
 /* ── Catalog tab bar ── */
 .catalog-tabs {

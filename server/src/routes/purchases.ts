@@ -4,6 +4,40 @@ import { Types, isValidObjectId } from "mongoose";
 import { ExpenseModel, ProductModel, PurchaseModel } from "../models";
 import { blockWriteInGeneralScope, getBusinessFilter, getScopeContext } from "../middleware/scope";
 
+function sumPurchaseItemsTotal(items: Array<{ total?: number }> | undefined): number {
+  return (items || []).reduce((s, it) => s + (Number(it.total) || 0), 0);
+}
+
+async function syncLinkedPurchaseExpense(
+  businessId: string,
+  purchase: { _id: Types.ObjectId; totalAmount: number; status: string }
+) {
+  if (purchase.status !== "APROVADA" && purchase.status !== "RECEBIDA") {
+    return;
+  }
+  const expenseUpdate = await ExpenseModel.updateOne(
+    {
+      businessId,
+      purchaseId: purchase._id,
+      category: "COMPRAS",
+      status: "PENDENTE",
+    },
+    { $set: { amount: purchase.totalAmount } }
+  );
+  if (expenseUpdate.matchedCount === 0) {
+    const ocSuffix = String(purchase._id).slice(-6).toUpperCase();
+    await ExpenseModel.updateOne(
+      {
+        businessId,
+        category: "COMPRAS",
+        status: "PENDENTE",
+        description: new RegExp(`^OC-${ocSuffix}`),
+      },
+      { $set: { amount: purchase.totalAmount } }
+    );
+  }
+}
+
 export function registerPurchaseRoutes(
   app: Express,
   deps: {
@@ -26,9 +60,11 @@ export function registerPurchaseRoutes(
       return;
     }
     const { businessId } = getScopeContext(req);
-    const { supplier, items } = req.body as {
+    const { supplier, items, extraExpenses: extraRaw, extraExpensesNote: noteRaw } = req.body as {
       supplier: string;
       items: Array<{ product?: string; description: string; quantity: number; cost: number }>;
+      extraExpenses?: number;
+      extraExpensesNote?: string;
     };
 
     if (!supplier || !items?.length) {
@@ -53,7 +89,15 @@ export function registerPurchaseRoutes(
       });
     }
 
-    const totalAmount = normalizedItems.reduce((sum, item) => sum + item.total, 0);
+    const itemsSum = normalizedItems.reduce((sum, item) => sum + item.total, 0);
+    const extraExpenses = Number(extraRaw ?? 0);
+    if (!Number.isFinite(extraExpenses) || extraExpenses < 0) {
+      return res.status(400).json({ message: "Despesas extras inválidas." });
+    }
+    const extraExpensesNote = String(noteRaw ?? "")
+      .trim()
+      .slice(0, 500);
+    const totalAmount = itemsSum + extraExpenses;
 
     // Toda ordem de compra nasce como AGUARDANDO_APROVACAO.
     // Estoque só é aplicado quando marcada como RECEBIDA.
@@ -70,6 +114,8 @@ export function registerPurchaseRoutes(
         requestedAt: new Date(),
       },
       stockApplied: false,
+      extraExpenses,
+      extraExpensesNote,
       totalAmount,
     });
 
@@ -106,6 +152,8 @@ export function registerPurchaseRoutes(
         | "CANCELADA";
       supplier: string;
       items: Array<{ product?: string; description: string; quantity: number; cost: number }>;
+      extraExpenses: number;
+      extraExpensesNote: string;
     }>;
 
     const purchase = await PurchaseModel.findOne({ _id: id, businessId });
@@ -169,32 +217,41 @@ export function registerPurchaseRoutes(
       }
 
       purchase.set("items", normalizedItems);
-      purchase.totalAmount = normalizedItems.reduce((sum, item) => sum + item.total, 0);
 
-      // Se a ordem já gerou despesa (após aprovação), mantém o financeiro alinhado ao total recalculado.
-      if (purchase.status === "APROVADA" || purchase.status === "RECEBIDA") {
-        const expenseUpdate = await ExpenseModel.updateOne(
-          {
-            businessId,
-            purchaseId: purchase._id,
-            category: "COMPRAS",
-            status: "PENDENTE",
-          },
-          { $set: { amount: purchase.totalAmount } }
-        );
-        if (expenseUpdate.matchedCount === 0) {
-          const ocSuffix = String(purchase._id).slice(-6).toUpperCase();
-          await ExpenseModel.updateOne(
-            {
-              businessId,
-              category: "COMPRAS",
-              status: "PENDENTE",
-              description: new RegExp(`^OC-${ocSuffix}`),
-            },
-            { $set: { amount: purchase.totalAmount } }
-          );
+      const itemsSum = normalizedItems.reduce((sum, item) => sum + item.total, 0);
+      let extra = Number(purchase.extraExpenses ?? 0);
+      if (payload.extraExpenses !== undefined) {
+        extra = Number(payload.extraExpenses);
+        if (!Number.isFinite(extra) || extra < 0) {
+          return res.status(400).json({ message: "Despesas extras inválidas." });
         }
+        purchase.extraExpenses = extra;
       }
+      if (payload.extraExpensesNote !== undefined) {
+        purchase.extraExpensesNote = String(payload.extraExpensesNote || "")
+          .trim()
+          .slice(0, 500);
+      }
+      purchase.totalAmount = itemsSum + (Number(purchase.extraExpenses) || 0);
+
+      await syncLinkedPurchaseExpense(businessId, purchase);
+    }
+
+    if (!hasItems && (payload.extraExpenses !== undefined || payload.extraExpensesNote !== undefined)) {
+      if (payload.extraExpenses !== undefined) {
+        const ex = Number(payload.extraExpenses);
+        if (!Number.isFinite(ex) || ex < 0) {
+          return res.status(400).json({ message: "Despesas extras inválidas." });
+        }
+        purchase.extraExpenses = ex;
+      }
+      if (payload.extraExpensesNote !== undefined) {
+        purchase.extraExpensesNote = String(payload.extraExpensesNote || "")
+          .trim()
+          .slice(0, 500);
+      }
+      purchase.totalAmount = sumPurchaseItemsTotal(purchase.items as Array<{ total?: number }>) + (Number(purchase.extraExpenses) || 0);
+      await syncLinkedPurchaseExpense(businessId, purchase);
     }
 
     if (payload.supplier !== undefined) {

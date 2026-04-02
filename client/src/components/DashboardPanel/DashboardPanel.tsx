@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+
 import type { BiInsights, Dashboard } from "../../types";
 import type { Product } from "../../types";
 
@@ -15,13 +17,28 @@ export type DashboardPanelProps = {
   maxTimeseriesValue: number;
   maxTopProductValue: number;
   maxCostCategoryValue: number;
-  selectModule: (key: "vendas" | "produtos" | "financeiro" | "clientes" | "compras") => void;
+  selectModule: (key: "vendas" | "produtos" | "financeiro" | "clientes" | "compras" | "relatorios") => void;
   selectedMonth: string;
   setSelectedMonth: (value: string) => void;
 };
 
+function buildMonthSelectOptions(count: number) {
+  const out: { value: string; label: string }[] = [];
+  const now = new Date();
+  for (let i = 0; i < count; i += 1) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const raw = d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    const label = raw.charAt(0).toUpperCase() + raw.slice(1);
+    out.push({ value, label });
+  }
+  return out;
+}
+
 export default function DashboardPanel(props: DashboardPanelProps) {
   const { dashboard, biInsights } = props;
+  const monthOptions = useMemo(() => buildMonthSelectOptions(36), []);
+  const purchasesTotal = dashboard.purchasesTotal ?? 0;
   const estoqueContabil = props.products.reduce((acc, item) => acc + item.cost * item.stock, 0);
   const potencialFaturamento = props.products.reduce((acc, item) => acc + item.price * item.stock, 0);
   const balancoMensal = biInsights.kpis.revenue - biInsights.kpis.expenses;
@@ -47,15 +64,54 @@ export default function DashboardPanel(props: DashboardPanelProps) {
           <span className="metric-pill">
             Atualização: {new Date(biInsights.updatedAt).toLocaleTimeString("pt-BR")}
           </span>
-          <label className="metric-pill" style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span>Mês BI:</span>
-            <input
-              type="month"
+        </div>
+      </section>
+
+      <section className="dashboard-balance-strip table-card animated">
+        <div className="dashboard-balance-head">
+          <div>
+            <h3>Balanço geral</h3>
+            <p className="theme-helper">Indicadores principais do mês selecionado (comparáveis ao filtro do BI).</p>
+          </div>
+          <label className="dashboard-month-select">
+            <span>Mês</span>
+            <select
               value={props.selectedMonth}
               onChange={(event) => props.setSelectedMonth(event.target.value)}
-            />
+              aria-label="Filtrar dashboard por mês"
+            >
+              {monthOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
+        <div className="dashboard-balance-grid">
+          <article className="dashboard-balance-card">
+            <h4>Total comprado</h4>
+            <strong>{props.formatBRL(purchasesTotal)}</strong>
+            <span className="theme-helper">Soma das ordens de compra não canceladas no período</span>
+          </article>
+          <article className="dashboard-balance-card">
+            <h4>Total faturado</h4>
+            <strong>{props.formatBRL(dashboard.revenue)}</strong>
+            <span className="theme-helper">Receita de vendas no mês</span>
+          </article>
+          <article className="dashboard-balance-card">
+            <h4>Lucro geral</h4>
+            <strong>{props.formatBRL(dashboard.profit)}</strong>
+            <span className="theme-helper">Lucro bruto: faturamento − custo dos itens vendidos (CPV)</span>
+          </article>
+        </div>
+        {!props.viewerOnly ? (
+          <div className="dashboard-balance-footer">
+            <button type="button" className="ghost-btn" onClick={() => props.selectModule("relatorios")}>
+              Abrir relatórios com gráficos
+            </button>
+          </div>
+        ) : null}
       </section>
 
       <section className="kpi-grid dashboard-kpi-grid">

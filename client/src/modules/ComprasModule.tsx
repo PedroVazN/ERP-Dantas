@@ -7,6 +7,8 @@ type PurchaseFormState = {
   productId: string;
   quantity: number;
   cost: number;
+  extraExpenses: number;
+  extraExpensesNote: string;
   items: Array<{ productId: string; description: string; quantity: number; cost: number }>;
 };
 
@@ -86,6 +88,12 @@ export default function ComprasModule(props: ComprasModuleProps) {
     () => overdueExpenses.reduce((acc, item) => acc + item.amount, 0),
     [overdueExpenses]
   );
+
+  const orderItemsSubtotal = useMemo(
+    () => props.purchaseForm.items.reduce((acc, it) => acc + it.quantity * it.cost, 0),
+    [props.purchaseForm.items]
+  );
+  const orderGrandTotal = orderItemsSubtotal + (props.purchaseForm.extraExpenses || 0);
 
   function getPurchaseBadgeClass(status: Purchase["status"]) {
     if (status === "APROVADA" || status === "RECEBIDA") return "status-chip success";
@@ -168,6 +176,9 @@ export default function ComprasModule(props: ComprasModuleProps) {
 
   function generatePurchasePdf(purchase: Purchase) {
     const items = purchase.items || [];
+    const itemsSubtotal = items.reduce((acc, it) => acc + (it.total ?? it.quantity * it.cost), 0);
+    const extra = typeof purchase.extraExpenses === "number" ? purchase.extraExpenses : 0;
+    const note = (purchase.extraExpensesNote || "").trim();
     const rows = items
       .map(
         (it) => `
@@ -244,8 +255,8 @@ export default function ComprasModule(props: ComprasModuleProps) {
             </table>
             <div class="totals">
               <div class="total-box">
-                <div class="total-line"><span>Subtotal</span><span>${props.formatBRL(purchase.totalAmount)}</span></div>
-                <div class="total-line"><span>Frete/Taxas</span><span>${props.formatBRL(0)}</span></div>
+                <div class="total-line"><span>Subtotal (itens)</span><span>${props.formatBRL(itemsSubtotal)}</span></div>
+                <div class="total-line"><span>Despesas extras${note ? ` (${note})` : ""}</span><span>${props.formatBRL(extra)}</span></div>
                 <div class="total-final"><span>Total do pedido</span><span>${props.formatBRL(purchase.totalAmount)}</span></div>
               </div>
             </div>
@@ -485,6 +496,8 @@ export default function ComprasModule(props: ComprasModuleProps) {
                       supplierId: event.target.value,
                       productId: "",
                       items: [],
+                      extraExpenses: 0,
+                      extraExpensesNote: "",
                     });
                     setLineDrafts({});
                   }}
@@ -507,6 +520,39 @@ export default function ComprasModule(props: ComprasModuleProps) {
               <div className="form-field">
                 <label>Condição de pagamento</label>
                 <input value={activeSupplier?.paymentCondition || "-"} readOnly />
+              </div>
+            </div>
+
+            <div className="order-toolbar">
+              <div className="form-field">
+                <label>Despesas extras (R$)</label>
+                <small className="field-help">
+                  Frete, taxas, impostos adicionais — somam ao total da ordem e entram na despesa financeira após aprovação.
+                </small>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={props.purchaseForm.extraExpenses || ""}
+                  onChange={(event) => {
+                    const v = Number(event.target.value);
+                    props.setPurchaseForm((prev) => ({
+                      ...prev,
+                      extraExpenses: Number.isFinite(v) && v >= 0 ? v : 0,
+                    }));
+                  }}
+                />
+              </div>
+              <div className="form-field">
+                <label>Observação das despesas extras</label>
+                <input
+                  type="text"
+                  placeholder="ex.: frete, taxa administrativa"
+                  value={props.purchaseForm.extraExpensesNote}
+                  onChange={(event) =>
+                    props.setPurchaseForm((prev) => ({ ...prev, extraExpensesNote: event.target.value }))
+                  }
+                />
               </div>
             </div>
 
@@ -612,6 +658,12 @@ export default function ComprasModule(props: ComprasModuleProps) {
                 </tbody>
               </table>
             </div>
+
+            <p style={{ marginTop: 12, fontWeight: 600 }}>
+              Subtotal itens: {props.formatBRL(orderItemsSubtotal)} · Despesas extras:{" "}
+              {props.formatBRL(props.purchaseForm.extraExpenses || 0)} · Total estimado:{" "}
+              {props.formatBRL(orderGrandTotal)}
+            </p>
 
             <div className="table-actions">
               <button type="submit" disabled={!props.purchaseForm.items.length}>

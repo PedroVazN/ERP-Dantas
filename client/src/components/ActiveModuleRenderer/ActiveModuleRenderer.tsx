@@ -12,11 +12,13 @@ import ChecklistModule from "../../modules/ChecklistModule";
 import IaModule from "../../modules/IaModule";
 import UsuarioModule from "../../modules/UsuarioModule";
 import AtualizacoesModule from "../../modules/AtualizacoesModule";
+import ReportsModule from "../../modules/ReportsModule";
 
 export type ActiveModuleRendererProps = {
   loading: boolean;
   activeModule:
     | "dashboard"
+    | "relatorios"
     | "atualizacoes"
     | "clientes"
     | "produtos"
@@ -101,6 +103,8 @@ export type ActiveModuleRendererProps = {
     productId: string;
     quantity: number;
     cost: number;
+    extraExpenses: number;
+    extraExpensesNote: string;
     items: Array<{ productId: string; description: string; quantity: number; cost: number }>;
   };
   setPurchaseForm: Dispatch<
@@ -109,6 +113,8 @@ export type ActiveModuleRendererProps = {
       productId: string;
       quantity: number;
       cost: number;
+      extraExpenses: number;
+      extraExpensesNote: string;
       items: Array<{ productId: string; description: string; quantity: number; cost: number }>;
     }>
   >;
@@ -206,6 +212,10 @@ export default function ActiveModuleRenderer(props: ActiveModuleRendererProps) {
 
   if (props.activeModule === "atualizacoes") {
     return <AtualizacoesModule />;
+  }
+
+  if (props.activeModule === "relatorios") {
+    return <ReportsModule scopedPath={props.scopedPath} formatBRL={props.formatBRL} />;
   }
 
   if (props.activeModule === "produtos") {

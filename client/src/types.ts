@@ -97,6 +97,9 @@ export type Sale = {
 export type Purchase = {
   _id: string;
   supplier: string;
+  /** Frete, taxas, impostos etc. — incluído em totalAmount e na despesa gerada na aprovação. */
+  extraExpenses?: number;
+  extraExpensesNote?: string;
   totalAmount: number;
   status: "ABERTA" | "AGUARDANDO_APROVACAO" | "APROVADA" | "RECEBIDA" | "REJEITADA" | "CANCELADA";
   createdAt: string;
@@ -168,7 +171,25 @@ export type Dashboard = {
   profit: number;
   salesCount: number;
   purchaseCount: number;
+  /** Soma das ordens de compra não canceladas no período (mesmo filtro de mês da API). */
+  purchasesTotal: number;
   lowStock: Product[];
+};
+
+/** Série mensal para relatórios (gráficos). */
+export type MonthlyReportPoint = {
+  period: string;
+  label: string;
+  revenue: number;
+  expenses: number;
+  purchasesTotal: number;
+  /** Lucro bruto = faturamento − CPV dos itens vendidos. */
+  profitGross: number;
+};
+
+export type MonthlyReportResponse = {
+  months: number;
+  series: MonthlyReportPoint[];
 };
 
 export type BiTimeseriesPoint = {

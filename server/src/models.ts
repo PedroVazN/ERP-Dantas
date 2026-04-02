@@ -116,6 +116,9 @@ const purchaseSchema = new mongoose.Schema(
       reason: { type: String, trim: true },
     },
     stockApplied: { type: Boolean, default: true },
+    /** Frete, taxas, impostos adicionais etc. — soma ao total da ordem e entra na despesa financeira. */
+    extraExpenses: { type: Number, default: 0, min: 0 },
+    extraExpensesNote: { type: String, trim: true, default: "" },
     totalAmount: { type: Number, required: true, min: 0 },
     purchaseDate: { type: Date, default: Date.now },
   },

@@ -23,7 +23,8 @@ export function registerDashboardRoutes(app: Express) {
     const saleDateFilter = dateStart && dateEnd ? { createdAt: { $gte: dateStart, $lt: dateEnd } } : {};
     const expenseDateFilter = dateStart && dateEnd ? { dueDate: { $gte: dateStart, $lt: dateEnd } } : {};
 
-    const [revenueAgg, expenseAgg, cogsAgg, lowStock, salesCount, purchaseCount] = await Promise.all([
+    const [revenueAgg, expenseAgg, cogsAgg, lowStock, salesCount, purchaseCount, purchasesTotalAgg] =
+      await Promise.all([
       SaleModel.aggregate([
         { $match: { ...businessFilter, status: { $ne: "CANCELADO" }, ...saleDateFilter } },
         { $group: { _id: null, total: { $sum: "$totalAmount" } } },
@@ -68,7 +69,17 @@ export function registerDashboardRoutes(app: Express) {
         .sort({ stock: 1 })
         .limit(10),
       SaleModel.countDocuments({ ...businessFilter, ...saleDateFilter }),
-      PurchaseModel.countDocuments({ ...businessFilter, ...(saleDateFilter as any) }),
+      PurchaseModel.countDocuments({ ...businessFilter, ...(saleDateFilter as object) }),
+      PurchaseModel.aggregate([
+        {
+          $match: {
+            ...businessFilter,
+            status: { $ne: "CANCELADA" },
+            ...(saleDateFilter as object),
+          },
+        },
+        { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+      ]),
     ]);
 
     const revenue = revenueAgg[0]?.total || 0;
@@ -76,12 +87,15 @@ export function registerDashboardRoutes(app: Express) {
     const cogs = cogsAgg[0]?.cogs || 0;
     // Lucro bruto = receita - CPV (custo dos produtos efetivamente vendidos)
     const profit = revenue - cogs;
+    const purchasesTotal = purchasesTotalAgg[0]?.total || 0;
+
     res.json({
       revenue,
       expenses,
       profit,
       salesCount,
       purchaseCount,
+      purchasesTotal,
       lowStock,
     });
   });

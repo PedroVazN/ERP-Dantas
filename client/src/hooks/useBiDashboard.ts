@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import { api } from "../api";
 import type { BiInsights, Dashboard } from "../types";
@@ -24,10 +24,10 @@ export function useBiDashboard(params: {
           params.setBiRefreshing(true);
         }
 
-        const monthQuery = params.selectedMonth ? `?month=${params.selectedMonth}` : "";
+        const monthQuery = params.selectedMonth ? `?month=${encodeURIComponent(params.selectedMonth)}` : "";
 
         const [dashboardData, biData] = await Promise.all([
-          api.get<Dashboard>(params.scopedPath("/dashboard")),
+          api.get<Dashboard>(params.scopedPath(`/dashboard${monthQuery}`)),
           api.get<BiInsights>(params.scopedPath(`/bi/insights${monthQuery}`)),
         ]);
 
@@ -48,6 +48,37 @@ export function useBiDashboard(params: {
       params.selectedMonth,
     ]
   );
+
+  const prevMonthRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    prevMonthRef.current = null;
+  }, [params.workspaceId]);
+
+  useEffect(() => {
+    if (!params.isAuthenticated || !params.workspaceId || params.activeModule !== "dashboard") return;
+    if (!params.selectedMonth) return;
+
+    if (prevMonthRef.current === null) {
+      prevMonthRef.current = params.selectedMonth;
+      return;
+    }
+
+    if (prevMonthRef.current === params.selectedMonth) return;
+
+    prevMonthRef.current = params.selectedMonth;
+    void loadDashboardBi(false).catch((err) => {
+      const message = err instanceof Error ? err.message : "Erro ao atualizar dashboard";
+      params.setError(message);
+    });
+  }, [
+    params.selectedMonth,
+    params.workspaceId,
+    params.activeModule,
+    params.isAuthenticated,
+    loadDashboardBi,
+    params.setError,
+  ]);
 
   useEffect(() => {
     if (!params.isAuthenticated || !params.workspaceId || params.activeModule !== "dashboard") return;

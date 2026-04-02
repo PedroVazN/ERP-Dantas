@@ -20,6 +20,7 @@ import { registerBusinessRoutes } from "./routes/businesses";
 import { registerSettingsRoutes } from "./routes/settings";
 import { registerEconomicIndicatorsRoutes } from "./routes/economicIndicators";
 import { registerDashboardRoutes } from "./routes/dashboard";
+import { registerReportsRoutes } from "./routes/reports";
 import { registerBiInsightsRoutes } from "./routes/bi";
 import { registerAiRoutes } from "./routes/ai";
 import {
@@ -448,6 +449,7 @@ registerBusinessRoutes(app);
 registerSettingsRoutes(app);
 registerEconomicIndicatorsRoutes(app, { fetchFxRates, fetchSgsLatestValue });
 registerDashboardRoutes(app);
+registerReportsRoutes(app, { formatPeriodKey, formatPeriodLabel });
 registerBiInsightsRoutes(app, {
   monthBounds,
   formatPeriodKey,

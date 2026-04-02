@@ -62,6 +62,8 @@ export type EditSaleFormState = {
 export type EditPurchaseFormState = {
   status: Purchase["status"];
   supplier: string;
+  extraExpenses: number;
+  extraExpensesNote: string;
   items: Array<{
     productId: string;
     description: string;
@@ -825,6 +827,35 @@ export default function EditEntityModal(props: EditEntityModalProps) {
             </select>
           </div>
 
+          <div className="form-field">
+            <label>Despesas extras (frete, taxas, impostos…)</label>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              value={props.editPurchaseForm.extraExpenses || ""}
+              onChange={(event) => {
+                const v = Number(event.target.value);
+                props.setEditPurchaseForm((prev) => ({
+                  ...prev,
+                  extraExpenses: Number.isFinite(v) && v >= 0 ? v : 0,
+                }));
+              }}
+            />
+            <small className="field-help">Somam ao total da ordem e entram na despesa financeira após aprovação.</small>
+          </div>
+          <div className="form-field">
+            <label>Observação das despesas extras</label>
+            <input
+              type="text"
+              placeholder="ex.: frete SP, taxa cartão"
+              value={props.editPurchaseForm.extraExpensesNote}
+              onChange={(event) =>
+                props.setEditPurchaseForm((prev) => ({ ...prev, extraExpensesNote: event.target.value }))
+              }
+            />
+          </div>
+
           <div className="table-scroll" style={{ marginBottom: 12 }}>
             <table className="order-items-table">
               <thead>
@@ -956,10 +987,8 @@ export default function EditEntityModal(props: EditEntityModalProps) {
             <p style={{ marginTop: 8, fontWeight: 600 }}>
               Total do pedido:{" "}
               {props.formatBRL(
-                props.editPurchaseForm.items.reduce(
-                  (sum, it) => sum + it.quantity * it.cost,
-                  0
-                )
+                props.editPurchaseForm.items.reduce((sum, it) => sum + it.quantity * it.cost, 0) +
+                  (props.editPurchaseForm.extraExpenses || 0)
               )}
             </p>
           </div>
@@ -1013,6 +1042,8 @@ export default function EditEntityModal(props: EditEntityModalProps) {
                   await api.patch<Purchase>(props.scopedPath(`/purchases/${props.editingId}`), {
                     status: props.editPurchaseForm.status,
                     supplier: props.editPurchaseForm.supplier,
+                    extraExpenses: props.editPurchaseForm.extraExpenses,
+                    extraExpensesNote: props.editPurchaseForm.extraExpensesNote,
                     items: lines.map((it) => ({
                       product: it.productId || undefined,
                       description: it.description,
