@@ -403,7 +403,7 @@ export default function VendasModule(props: VendasModuleProps) {
               </div>
             </div>
 
-            <div className="table-scroll">
+            <div className="table-scroll vendas-list-table">
               <table>
                 <thead>
                   <tr>
@@ -472,6 +472,47 @@ export default function VendasModule(props: VendasModuleProps) {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            <div className="vendas-list-cards">
+              {paginatedSales.length ? (
+                paginatedSales.map((item) => (
+                  <article className="vendas-card" key={item._id}>
+                    <div className="vendas-card-head">
+                      <strong>OV-{String(item._id).slice(-4).toUpperCase()}</strong>
+                      <span>{new Date(item.createdAt).toLocaleDateString("pt-BR")}</span>
+                    </div>
+                    <p className="vendas-card-customer">{saleCustomerLabel(item)}</p>
+                    <div className="vendas-card-metrics">
+                      <span>{props.formatBRL(item.totalAmount)}</span>
+                      <span>{item.paymentMethod}</span>
+                    </div>
+                    <div className="vendas-card-statuses">
+                      <span className={getSaleStatusClass(item.status)}>{item.status.replaceAll("_", " ")}</span>
+                      <span className={getBillingStatusClass(item.billingStatus)}>
+                        {(item.billingStatus || "N/A").replaceAll("_", " ")}
+                      </span>
+                    </div>
+                    <small>NF-e: {item.invoice?.number || "Gerando..."}</small>
+                    <div className="table-actions">
+                      <button type="button" className="ghost-btn" onClick={() => setReceiptSale(item)}>
+                        Cupom
+                      </button>
+                      <button type="button" className="ghost-btn" onClick={() => generateSaleProposalPdf(item)}>
+                        PDF proposta
+                      </button>
+                      <button type="button" className="ghost-btn" onClick={() => props.editSale(item)}>
+                        Editar
+                      </button>
+                      <button type="button" className="ghost-btn danger" onClick={() => props.deleteSale(item)}>
+                        Excluir
+                      </button>
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <p className="empty">Nenhuma ordem encontrada com os filtros atuais.</p>
+              )}
             </div>
 
             <div className="list-footer">
@@ -546,101 +587,109 @@ export default function VendasModule(props: VendasModuleProps) {
               </select>
             </div>
 
-            <div className="table-scroll">
-              <table className="order-items-table">
-                <thead>
-                  <tr>
-                    <th>Produto</th>
-                    <th>Estoque</th>
-                    <th>Preço (R$)</th>
-                    <th>Preço customizado (R$)</th>
-                    <th>Quantidade</th>
-                    <th>Ação</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {props.products.length ? (
-                    props.products.map((item) => (
-                      <tr key={item._id}>
-                        <td>{item.name}</td>
-                        <td>{item.stock}</td>
-                        <td>{props.formatBRL(item.price)}</td>
-                        <td>
-                          <input
-                            type="number"
-                            min={0}
-                            step="0.01"
-                            placeholder={item.price.toFixed(2)}
-                            value={lineDrafts[item._id]?.unitPrice ?? item.price.toFixed(2)}
-                            onChange={(event) => updateLineDraft(item._id, "unitPrice", event.target.value)}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min={1}
-                            placeholder="Qtd."
-                            value={lineDrafts[item._id]?.quantity || ""}
-                            onChange={(event) => updateLineDraft(item._id, "quantity", event.target.value)}
-                          />
-                        </td>
-                        <td>
-                          <button type="button" onClick={() => addSaleFromLine(item)}>
-                            Adicionar à ordem
-                          </button>
-                        </td>
+            <div className="sales-create-panes">
+              <section className="sales-pane">
+                <h4>Produtos disponíveis</h4>
+                <div className="table-scroll">
+                  <table className="order-items-table">
+                    <thead>
+                      <tr>
+                        <th>Produto</th>
+                        <th>Estoque</th>
+                        <th>Preço (R$)</th>
+                        <th>Preço customizado (R$)</th>
+                        <th>Quantidade</th>
+                        <th>Ação</th>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="empty">
-                        Nenhum produto disponível para venda.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    </thead>
+                    <tbody>
+                      {props.products.length ? (
+                        props.products.map((item) => (
+                          <tr key={item._id}>
+                            <td>{item.name}</td>
+                            <td>{item.stock}</td>
+                            <td>{props.formatBRL(item.price)}</td>
+                            <td>
+                              <input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                placeholder={item.price.toFixed(2)}
+                                value={lineDrafts[item._id]?.unitPrice ?? item.price.toFixed(2)}
+                                onChange={(event) => updateLineDraft(item._id, "unitPrice", event.target.value)}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                min={1}
+                                placeholder="Qtd."
+                                value={lineDrafts[item._id]?.quantity || ""}
+                                onChange={(event) => updateLineDraft(item._id, "quantity", event.target.value)}
+                              />
+                            </td>
+                            <td>
+                              <button type="button" onClick={() => addSaleFromLine(item)}>
+                                Adicionar
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="empty">
+                            Nenhum produto disponível para venda.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
 
-            <div className="table-scroll" style={{ marginTop: 10 }}>
-              <table className="order-items-table">
-                <thead>
-                  <tr>
-                    <th>Produto</th>
-                    <th>Quantidade</th>
-                    <th>Preço (R$)</th>
-                    <th>Total</th>
-                    <th>Ação</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {props.saleForm.items.length ? (
-                    props.saleForm.items.map((it) => (
-                      <tr key={it.productId}>
-                        <td>{findProductName(it.productId)}</td>
-                        <td>{it.quantity}</td>
-                        <td>{props.formatBRL(it.unitPrice)}</td>
-                        <td>{props.formatBRL(it.quantity * it.unitPrice)}</td>
-                        <td>
-                          <button
-                            type="button"
-                            className="ghost-btn danger"
-                            onClick={() => removeSaleItem(it.productId)}
-                          >
-                            Remover
-                          </button>
-                        </td>
+              <section className="sales-pane">
+                <h4>Itens da ordem</h4>
+                <div className="table-scroll">
+                  <table className="order-items-table">
+                    <thead>
+                      <tr>
+                        <th>Produto</th>
+                        <th>Quantidade</th>
+                        <th>Preço (R$)</th>
+                        <th>Total</th>
+                        <th>Ação</th>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={5} className="empty">
-                        Nenhum item adicionado na ordem.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody>
+                      {props.saleForm.items.length ? (
+                        props.saleForm.items.map((it) => (
+                          <tr key={it.productId}>
+                            <td>{findProductName(it.productId)}</td>
+                            <td>{it.quantity}</td>
+                            <td>{props.formatBRL(it.unitPrice)}</td>
+                            <td>{props.formatBRL(it.quantity * it.unitPrice)}</td>
+                            <td>
+                              <button
+                                type="button"
+                                className="ghost-btn danger"
+                                onClick={() => removeSaleItem(it.productId)}
+                              >
+                                Remover
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="empty">
+                            Nenhum item adicionado na ordem.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
             </div>
 
             <div className="table-actions">

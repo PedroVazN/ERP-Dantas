@@ -811,6 +811,19 @@ th {
   margin-top: 12px;
 }
 
+.sales-create-panes {
+  display: grid;
+  gap: 10px;
+}
+
+.sales-pane h4 {
+  margin: 0 0 6px;
+}
+
+.vendas-list-cards {
+  display: none;
+}
+
 .order-items-table input {
   min-width: 92px;
   max-width: 120px;
@@ -1690,6 +1703,59 @@ th {
 }
 
 @media (max-width: 640px) {
+  .vendas-module .vendas-list-table {
+    display: none;
+  }
+
+  .vendas-module .vendas-list-cards {
+    display: grid;
+    gap: 10px;
+  }
+
+  .vendas-module .vendas-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px;
+    background: color-mix(in srgb, var(--panel-2) 75%, transparent);
+    display: grid;
+    gap: 8px;
+  }
+
+  .vendas-module .vendas-card-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .vendas-module .vendas-card-customer {
+    margin: 0;
+    font-weight: 600;
+  }
+
+  .vendas-module .vendas-card-metrics,
+  .vendas-module .vendas-card-statuses {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .vendas-module .sales-create-panes {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(92%, 92%);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    gap: 10px;
+    padding-bottom: 4px;
+  }
+
+  .vendas-module .sales-pane {
+    scroll-snap-align: start;
+  }
+
   .vendas-module .table-scroll table {
     min-width: 620px;
   }
