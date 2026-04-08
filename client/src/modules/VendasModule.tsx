@@ -107,75 +107,83 @@ export default function VendasModule(props: VendasModuleProps) {
           * { box-sizing: border-box; }
           body {
             margin: 0;
-            padding: 22px;
+            padding: 16px;
             font-family: "Georgia", "Times New Roman", serif;
             color: #3f4339;
             background: #efeee9;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
           .doc {
-            max-width: 960px;
+            max-width: 820px;
             margin: 0 auto;
-            border-radius: 18px;
+            border-radius: 14px;
             border: 1px solid #d6d5cd;
             overflow: hidden;
             background:
-              linear-gradient(rgba(250, 250, 248, 0.96), rgba(250, 250, 248, 0.96)),
+              linear-gradient(rgba(250, 250, 248, 0.88), rgba(250, 250, 248, 0.9)),
               url("${window.location.origin}/usenature.png");
             background-size: cover;
             background-position: center;
           }
           .header {
-            padding: 24px 24px 14px;
+            padding: 20px 20px 10px;
             text-align: center;
           }
           .logo {
-            width: 210px;
-            max-width: 70%;
-            margin: 0 auto 8px;
+            width: 260px;
+            max-width: 82%;
+            margin: 0 auto 6px;
             display: block;
             object-fit: contain;
+            filter: contrast(1.05) saturate(0.9);
           }
           .subtitle {
-            margin: 0;
+            margin: 0 0 2px;
             letter-spacing: 0.08em;
-            font-size: 12px;
+            font-size: 11px;
             color: #5d624f;
           }
           .title {
             text-align: center;
-            margin: 4px 0 16px;
-            font-size: 42px;
-            letter-spacing: 0.04em;
+            margin: 2px 0 10px;
+            font-size: 46px;
+            letter-spacing: 0.018em;
             color: #3f4339;
           }
           .content {
-            padding: 0 24px 22px;
+            padding: 0 20px 14px;
             display: grid;
-            grid-template-columns: 280px minmax(0, 1fr);
-            gap: 14px;
+            grid-template-columns: 33% minmax(0, 1fr);
+            gap: 10px;
           }
           .client-box,
           .products-box {
-            background: rgba(244, 244, 239, 0.88);
+            background: rgba(244, 244, 239, 0.92);
             border: 1px solid #d0d0c8;
-            border-radius: 16px;
-            padding: 14px;
+            border-radius: 12px;
+            padding: 10px;
           }
           .section-head {
-            margin: 0 0 10px;
+            margin: -10px -10px 10px;
+            padding: 8px 10px;
+            border-bottom: 1px solid #d0d0c8;
+            background: rgba(233, 233, 227, 0.82);
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
             font-size: 13px;
             letter-spacing: 0.08em;
             color: #6b705e;
             text-transform: uppercase;
           }
           .client-box h4 {
-            margin: 0 0 8px;
-            font-size: 24px;
+            margin: 0 0 6px;
+            font-size: 20px;
             color: #3d4238;
           }
           .client-line {
             margin: 0 0 4px;
-            font-size: 14px;
+            font-size: 13px;
             color: #4f5548;
             line-height: 1.35;
           }
@@ -192,18 +200,19 @@ export default function VendasModule(props: VendasModuleProps) {
             background: #788167;
             color: #fff;
             font-weight: 700;
-            padding: 8px;
+            padding: 6px;
+            font-size: 18px;
             letter-spacing: 0.06em;
           }
           .pix-box img {
             width: 100%;
             display: block;
-            padding: 12px 12px 0;
+            padding: 10px 10px 0;
           }
           .pix-desc {
             margin: 0;
             text-align: center;
-            padding: 4px 10px 12px;
+            padding: 4px 8px 10px;
             font-size: 12px;
             color: #586050;
           }
@@ -211,11 +220,11 @@ export default function VendasModule(props: VendasModuleProps) {
           th, td {
             padding: 8px 6px;
             border-bottom: 1px solid #d8d8d1;
-            font-size: 17px;
+            font-size: 14px;
             color: #464b3d;
           }
           th {
-            font-size: 12px;
+            font-size: 13px;
             letter-spacing: 0.08em;
             text-transform: uppercase;
             color: #6b705e;
@@ -230,7 +239,7 @@ export default function VendasModule(props: VendasModuleProps) {
           .total-line {
             display: flex;
             justify-content: space-between;
-            font-size: 16px;
+            font-size: 14px;
             padding: 5px 0;
             color: #4f5548;
           }
@@ -238,29 +247,29 @@ export default function VendasModule(props: VendasModuleProps) {
             border-top: 1px solid #bcc0b3;
             margin-top: 4px;
             padding-top: 8px;
-            font-size: 36px;
+            font-size: 38px;
             color: #3b4035;
             font-weight: 700;
           }
           .offer {
-            margin: 8px 24px 0;
+            margin: 6px 20px 0;
             background: #7b846a;
             color: #fff;
             border-radius: 999px;
             text-align: center;
-            padding: 9px 12px;
-            font-size: 24px;
+            padding: 8px 12px;
+            font-size: 28px;
             letter-spacing: 0.03em;
             font-weight: 700;
           }
           .footer {
             text-align: center;
-            padding: 14px 22px 20px;
+            padding: 10px 18px 16px;
             color: #5f6654;
           }
           .footer p {
             margin: 0 0 10px;
-            font-size: 16px;
+            font-size: 14px;
           }
           .benefits {
             display: flex;
@@ -276,6 +285,32 @@ export default function VendasModule(props: VendasModuleProps) {
             border-radius: 999px;
             padding: 5px 10px;
           }
+          @media (max-width: 860px) {
+            .content {
+              grid-template-columns: 1fr;
+            }
+            .title {
+              font-size: 34px;
+            }
+            .offer {
+              font-size: 24px;
+            }
+            .pix-head {
+              font-size: 18px;
+            }
+            th, td {
+              font-size: 15px;
+            }
+            .total-line {
+              font-size: 15px;
+            }
+            .total-final {
+              font-size: 32px;
+            }
+            .pix-desc {
+              font-size: 13px;
+            }
+          }
           @media print {
             @page { margin: 0.35cm; }
             body { padding: 0; background: #fff; }
@@ -285,7 +320,7 @@ export default function VendasModule(props: VendasModuleProps) {
       <body>
         <div class="doc">
           <div class="header">
-            <img class="logo" src="${window.location.origin}/logousenaturesemfundo.jpg" alt="Use Nature" />
+            <img class="logo" src="${window.location.origin}/logousenature.jpg" alt="Use Nature" />
             <p class="subtitle">SABONETES NATURAIS</p>
           </div>
           <h1 class="title">PROPOSTA DE VENDA</h1>
@@ -295,6 +330,7 @@ export default function VendasModule(props: VendasModuleProps) {
               <h4>${customerName}</h4>
               <p class="client-line">Telefone: ${customerPhone}</p>
               <p class="client-line">E-mail: ${customerEmail}</p>
+              <p class="client-line">Endereço: Cidade/UF, CEP</p>
               <p class="client-line">Pedido: OV-${String(sale._id).slice(-4).toUpperCase()}</p>
               <p class="client-line">Emissão: ${new Date(sale.createdAt).toLocaleDateString("pt-BR")}</p>
               <p class="client-line">Validade: ${validityDate.toLocaleDateString("pt-BR")}</p>
