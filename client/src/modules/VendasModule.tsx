@@ -62,14 +62,34 @@ export default function VendasModule(props: VendasModuleProps) {
   }
 
   function generateSaleProposalPdf(sale: Sale) {
+    const escapeHtml = (value: string) =>
+      value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+
+    const customerData =
+      sale.customer && typeof sale.customer === "object"
+        ? sale.customer
+        : ({ name: saleCustomerLabel(sale), phone: "", email: "" } as {
+            name?: string;
+            phone?: string;
+            email?: string;
+          });
+    const customerName = escapeHtml(customerData.name || saleCustomerLabel(sale));
+    const customerPhone = customerData.phone ? escapeHtml(customerData.phone) : "Não informado";
+    const customerEmail = customerData.email ? escapeHtml(customerData.email) : "Não informado";
+
     const rows = (sale.items || [])
       .map(
         (it) => `
           <tr>
-            <td>${it.name}</td>
-            <td style="text-align:right">${it.quantity}</td>
-            <td style="text-align:right">${props.formatBRL(it.unitPrice)}</td>
-            <td style="text-align:right">${props.formatBRL(it.total)}</td>
+            <td>${escapeHtml(it.name)}</td>
+            <td class="num">${it.quantity}x</td>
+            <td class="num">${props.formatBRL(it.unitPrice)}</td>
+            <td class="num">${props.formatBRL(it.total)}</td>
           </tr>
         `
       )
@@ -85,77 +105,239 @@ export default function VendasModule(props: VendasModuleProps) {
         <title>Proposta de Vendas</title>
         <style>
           * { box-sizing: border-box; }
-          body { font-family: Arial, sans-serif; color: #111; padding: 24px; }
-          .doc { max-width: 900px; margin: 0 auto; border: 1px solid #ddd; border-radius: 12px; overflow: hidden; }
-          .header { background: #1f2937; color: #fff; padding: 18px 22px; display: flex; justify-content: space-between; align-items: center; }
-          .brand h1 { margin: 0; font-size: 20px; letter-spacing: 0.4px; }
-          .brand small { opacity: 0.9; }
-          .tag { font-size: 12px; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.35); border-radius: 999px; }
-          .content { padding: 18px 22px 20px; }
-          .meta-grid { display: grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap: 8px 20px; margin-bottom: 14px; }
-          .meta-item { font-size: 13px; color: #374151; }
-          .meta-item b { color: #111827; }
-          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-          th, td { border-bottom: 1px solid #e5e7eb; padding: 9px 8px; font-size: 13px; }
-          th { text-align: left; background: #f9fafb; color: #111827; }
+          body {
+            margin: 0;
+            padding: 22px;
+            font-family: "Georgia", "Times New Roman", serif;
+            color: #3f4339;
+            background: #efeee9;
+          }
+          .doc {
+            max-width: 960px;
+            margin: 0 auto;
+            border-radius: 18px;
+            border: 1px solid #d6d5cd;
+            overflow: hidden;
+            background:
+              linear-gradient(rgba(250, 250, 248, 0.96), rgba(250, 250, 248, 0.96)),
+              url("${window.location.origin}/usenature.png");
+            background-size: cover;
+            background-position: center;
+          }
+          .header {
+            padding: 24px 24px 14px;
+            text-align: center;
+          }
+          .logo {
+            width: 210px;
+            max-width: 70%;
+            margin: 0 auto 8px;
+            display: block;
+            object-fit: contain;
+          }
+          .subtitle {
+            margin: 0;
+            letter-spacing: 0.08em;
+            font-size: 12px;
+            color: #5d624f;
+          }
+          .title {
+            text-align: center;
+            margin: 4px 0 16px;
+            font-size: 42px;
+            letter-spacing: 0.04em;
+            color: #3f4339;
+          }
+          .content {
+            padding: 0 24px 22px;
+            display: grid;
+            grid-template-columns: 280px minmax(0, 1fr);
+            gap: 14px;
+          }
+          .client-box,
+          .products-box {
+            background: rgba(244, 244, 239, 0.88);
+            border: 1px solid #d0d0c8;
+            border-radius: 16px;
+            padding: 14px;
+          }
+          .section-head {
+            margin: 0 0 10px;
+            font-size: 13px;
+            letter-spacing: 0.08em;
+            color: #6b705e;
+            text-transform: uppercase;
+          }
+          .client-box h4 {
+            margin: 0 0 8px;
+            font-size: 24px;
+            color: #3d4238;
+          }
+          .client-line {
+            margin: 0 0 4px;
+            font-size: 14px;
+            color: #4f5548;
+            line-height: 1.35;
+          }
+          .pix-box {
+            margin-top: 16px;
+            border: 2px solid #848b76;
+            border-radius: 14px;
+            overflow: hidden;
+            background: #fff;
+          }
+          .pix-head {
+            margin: 0;
+            text-align: center;
+            background: #788167;
+            color: #fff;
+            font-weight: 700;
+            padding: 8px;
+            letter-spacing: 0.06em;
+          }
+          .pix-box img {
+            width: 100%;
+            display: block;
+            padding: 12px 12px 0;
+          }
+          .pix-desc {
+            margin: 0;
+            text-align: center;
+            padding: 4px 10px 12px;
+            font-size: 12px;
+            color: #586050;
+          }
+          table { width: 100%; border-collapse: collapse; }
+          th, td {
+            padding: 8px 6px;
+            border-bottom: 1px solid #d8d8d1;
+            font-size: 17px;
+            color: #464b3d;
+          }
+          th {
+            font-size: 12px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #6b705e;
+            text-align: left;
+          }
           .num { text-align: right; white-space: nowrap; }
-          .totals { margin-top: 14px; display: flex; justify-content: flex-end; }
-          .total-box { min-width: 260px; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; background: #f9fafb; }
-          .total-line { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
-          .total-final { display: flex; justify-content: space-between; font-size: 16px; font-weight: 700; color: #111827; border-top: 1px dashed #cbd5e1; padding-top: 8px; }
-          .obs { margin-top: 16px; font-size: 12px; color: #4b5563; line-height: 1.5; }
-          .signatures { margin-top: 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
-          .sign { border-top: 1px solid #9ca3af; padding-top: 8px; text-align: center; font-size: 12px; color: #6b7280; }
-          .footer { padding: 12px 22px 16px; font-size: 11px; color: #6b7280; border-top: 1px solid #e5e7eb; background: #fafafa; }
-          @media print { @page { margin: 0.6cm; } body { padding: 0; } .doc { border: none; border-radius: 0; } }
+          .totals {
+            margin-top: 10px;
+            margin-left: auto;
+            max-width: 360px;
+          }
+          .total-line {
+            display: flex;
+            justify-content: space-between;
+            font-size: 16px;
+            padding: 5px 0;
+            color: #4f5548;
+          }
+          .total-final {
+            border-top: 1px solid #bcc0b3;
+            margin-top: 4px;
+            padding-top: 8px;
+            font-size: 36px;
+            color: #3b4035;
+            font-weight: 700;
+          }
+          .offer {
+            margin: 8px 24px 0;
+            background: #7b846a;
+            color: #fff;
+            border-radius: 999px;
+            text-align: center;
+            padding: 9px 12px;
+            font-size: 24px;
+            letter-spacing: 0.03em;
+            font-weight: 700;
+          }
+          .footer {
+            text-align: center;
+            padding: 14px 22px 20px;
+            color: #5f6654;
+          }
+          .footer p {
+            margin: 0 0 10px;
+            font-size: 16px;
+          }
+          .benefits {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            font-size: 12px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+          }
+          .benefits span {
+            border: 1px solid #b9beae;
+            border-radius: 999px;
+            padding: 5px 10px;
+          }
+          @media print {
+            @page { margin: 0.35cm; }
+            body { padding: 0; background: #fff; }
+          }
         </style>
       </head>
       <body>
         <div class="doc">
           <div class="header">
-            <div class="brand">
-              <h1>ERP Dantas</h1>
-              <small>Proposta Comercial de Vendas</small>
-            </div>
-            <span class="tag">OV-${String(sale._id).slice(-4).toUpperCase()}</span>
+            <img class="logo" src="${window.location.origin}/logousenaturesemfundo.jpg" alt="Use Nature" />
+            <p class="subtitle">SABONETES NATURAIS</p>
           </div>
+          <h1 class="title">PROPOSTA DE VENDA</h1>
           <div class="content">
-            <div class="meta-grid">
-              <div class="meta-item"><b>Cliente:</b> ${saleCustomerLabel(sale)}</div>
-              <div class="meta-item"><b>Data de emissão:</b> ${new Date(sale.createdAt).toLocaleDateString("pt-BR")}</div>
-              <div class="meta-item"><b>Status:</b> ${sale.status}</div>
-              <div class="meta-item"><b>Validade da proposta:</b> ${validityDate.toLocaleDateString("pt-BR")}</div>
-            </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Produto</th>
-                  <th class="num">Qtd.</th>
-                  <th class="num">Preço</th>
-                  <th class="num">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rows || '<tr><td colspan="4">Sem itens na proposta.</td></tr>'}
-              </tbody>
-            </table>
-            <div class="totals">
-              <div class="total-box">
-                <div class="total-line"><span>Subtotal</span><span>${props.formatBRL(sale.totalAmount)}</span></div>
-                <div class="total-line"><span>Descontos</span><span>${props.formatBRL(0)}</span></div>
-                <div class="total-final"><span>Total da proposta</span><span>${props.formatBRL(sale.totalAmount)}</span></div>
+            <div class="client-box">
+              <p class="section-head">Informações do cliente</p>
+              <h4>${customerName}</h4>
+              <p class="client-line">Telefone: ${customerPhone}</p>
+              <p class="client-line">E-mail: ${customerEmail}</p>
+              <p class="client-line">Pedido: OV-${String(sale._id).slice(-4).toUpperCase()}</p>
+              <p class="client-line">Emissão: ${new Date(sale.createdAt).toLocaleDateString("pt-BR")}</p>
+              <p class="client-line">Validade: ${validityDate.toLocaleDateString("pt-BR")}</p>
+
+              <div class="pix-box">
+                <p class="pix-head">PAGUE AQUI</p>
+                <img src="${window.location.origin}/pix.jpg" alt="QR Code PIX" />
+                <p class="pix-desc">Escaneie para pagar em PIX, cartão ou boleto.</p>
               </div>
             </div>
-            <div class="obs">
-              Condições comerciais: proposta sujeita à disponibilidade de estoque e confirmação financeira.
-              A aprovação desta proposta implica ciência dos itens, quantidades e valores acima.
-            </div>
-            <div class="signatures">
-              <div class="sign">Assinatura do responsável comercial</div>
-              <div class="sign">Assinatura do cliente</div>
+
+            <div class="products-box">
+              <p class="section-head">Produtos</p>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Produto</th>
+                    <th class="num">Qtd.</th>
+                    <th class="num">Preço</th>
+                    <th class="num">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows || '<tr><td colspan="4">Sem itens na proposta.</td></tr>'}
+                </tbody>
+              </table>
+              <div class="totals">
+                <div class="total-line"><span>Subtotal</span><span>${props.formatBRL(sale.totalAmount)}</span></div>
+                <div class="total-line"><span>Desconto</span><span>${props.formatBRL(0)}</span></div>
+                <div class="total-line total-final"><span>Total</span><span>${props.formatBRL(sale.totalAmount)}</span></div>
+              </div>
             </div>
           </div>
-          <div class="footer">Documento gerado automaticamente pelo ERP Dantas.</div>
+          <div class="offer">APROVEITE ESSA OFERTA!</div>
+          <div class="footer">
+            <p>Garantia de produtos feitos à mão, 100% naturais e ecologicamente corretos.</p>
+            <div class="benefits">
+              <span>Ingredientes naturais</span>
+              <span>Feito à mão</span>
+              <span>Embalagens sustentáveis</span>
+              <span>Ecologicamente corretos</span>
+            </div>
+          </div>
         </div>
         <script>window.onload = () => { window.print(); }<\/script>
       </body>
