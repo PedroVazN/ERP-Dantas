@@ -120,29 +120,20 @@ export default function VendasModule(props: VendasModuleProps) {
             border-radius: 14px;
             border: 1px solid #d6d5cd;
             overflow: hidden;
-            background:
-              linear-gradient(rgba(250, 250, 248, 0.88), rgba(250, 250, 248, 0.9)),
-              url("${window.location.origin}/usenature.png");
-            background-size: cover;
-            background-position: center;
+            background: linear-gradient(180deg, #faf9f5 0%, #f0eee6 55%, #ebe8df 100%);
           }
           .header {
-            padding: 20px 20px 10px;
+            padding: 22px 20px 18px;
             text-align: center;
+            background: linear-gradient(165deg, #4a5542 0%, #3d4638 55%, #353d32 100%);
+            border-bottom: 1px solid #2f362c;
           }
           .logo {
-            width: 260px;
-            max-width: 82%;
-            margin: 0 auto 6px;
+            width: min(280px, 88vw);
+            max-width: 100%;
+            margin: 0 auto;
             display: block;
             object-fit: contain;
-            filter: contrast(1.05) saturate(0.9);
-          }
-          .subtitle {
-            margin: 0 0 2px;
-            letter-spacing: 0.08em;
-            font-size: 11px;
-            color: #5d624f;
           }
           .title {
             text-align: center;
@@ -320,8 +311,7 @@ export default function VendasModule(props: VendasModuleProps) {
       <body>
         <div class="doc">
           <div class="header">
-            <img class="logo" src="${window.location.origin}/logousenature.jpg" alt="Use Nature" />
-            <p class="subtitle">SABONETES NATURAIS</p>
+            <img class="logo" src="${window.location.origin}/usenature.png" alt="Use Nature — Sabonetes naturais" />
           </div>
           <h1 class="title">PROPOSTA DE VENDA</h1>
           <div class="content">
