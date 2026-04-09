@@ -1985,6 +1985,71 @@ th {
   min-height: 360px;
 }
 
+/* Financeiro (fluxo de caixa) */
+.finance-header h2 {
+  margin: 0 0 4px;
+}
+
+.finance-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.finance-kpi {
+  border-top: 3px solid color-mix(in srgb, var(--accent) 34%, transparent);
+}
+
+.finance-kpi-in {
+  border-top-color: color-mix(in srgb, #16a34a 45%, transparent);
+}
+
+.finance-kpi-out {
+  border-top-color: color-mix(in srgb, #dc2626 45%, transparent);
+}
+
+.finance-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.finance-form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.finance-table .finance-value {
+  font-weight: 700;
+}
+
+.finance-table .finance-value.in {
+  color: #15803d;
+}
+
+.finance-table .finance-value.out {
+  color: #b91c1c;
+}
+
+@media (max-width: 1100px) {
+  .finance-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .finance-filters,
+  .finance-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .finance-summary-grid,
+  .finance-filters,
+  .finance-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Catálogo de produtos (aba catálogo) */
 /* ── Catalog tab bar ── */
 .catalog-tabs {

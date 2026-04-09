@@ -294,6 +294,8 @@ export default function ActiveModuleRenderer(props: ActiveModuleRendererProps) {
         submitExpense={props.submitExpense}
         expenseForm={props.expenseForm}
         setExpenseForm={props.setExpenseForm}
+        sales={props.sales}
+        purchases={props.purchases}
         expenses={props.expenses}
         reviewExpense={props.reviewExpense}
         updateExpensePaymentStatus={props.updateExpensePaymentStatus}
