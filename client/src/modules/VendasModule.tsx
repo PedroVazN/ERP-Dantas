@@ -178,42 +178,11 @@ export default function VendasModule(props: VendasModuleProps) {
             color: #4f5548;
             line-height: 1.35;
           }
-          .pix-box {
-            margin-top: 16px;
-            margin-left: auto;
-            margin-right: auto;
-            max-width: 220px;
-            border: 2px solid #848b76;
-            border-radius: 14px;
-            overflow: hidden;
-            background: #fff;
-          }
-          .pix-head {
-            margin: 0;
-            text-align: center;
-            background: #788167;
-            color: #fff;
-            font-weight: 700;
-            padding: 6px;
-            font-size: 18px;
-            letter-spacing: 0.06em;
-          }
-          .pix-box img {
-            display: block;
-            width: auto;
-            height: auto;
-            max-width: 200px;
-            max-height: 200px;
-            margin: 0 auto;
-            padding: 10px 10px 0;
-            object-fit: contain;
-          }
-          .pix-desc {
-            margin: 0;
-            text-align: center;
-            padding: 4px 8px 10px;
+          .receipt-note {
+            margin: 10px 0 0;
             font-size: 12px;
-            color: #586050;
+            color: #6b705e;
+            line-height: 1.4;
           }
           table { width: 100%; border-collapse: collapse; }
           th, td {
@@ -312,9 +281,6 @@ export default function VendasModule(props: VendasModuleProps) {
             .thank-you strong {
               font-size: 20px;
             }
-            .pix-head {
-              font-size: 18px;
-            }
             th, td {
               font-size: 15px;
             }
@@ -324,18 +290,10 @@ export default function VendasModule(props: VendasModuleProps) {
             .total-final {
               font-size: 32px;
             }
-            .pix-desc {
-              font-size: 13px;
-            }
           }
           @media print {
             @page { margin: 0.35cm; }
             body { padding: 0; background: #fff; }
-            .pix-box { max-width: 200px; }
-            .pix-box img {
-              max-width: 180px;
-              max-height: 180px;
-            }
           }
         </style>
       </head>
@@ -354,12 +312,7 @@ export default function VendasModule(props: VendasModuleProps) {
               <p class="client-line">Pedido: OV-${String(sale._id).slice(-4).toUpperCase()}</p>
               <p class="client-line">Data da compra: ${purchaseDate}</p>
               <p class="client-line">Forma de pagamento: ${paymentLabel}</p>
-
-              <div class="pix-box">
-                <p class="pix-head">Referência PIX (comprovante)</p>
-                <img src="${window.location.origin}/pix.jpg" alt="QR Code PIX" />
-                <p class="pix-desc">Guarde este documento como comprovante da sua compra. O QR Code acima corresponde ao pagamento registrado neste pedido.</p>
-              </div>
+              <p class="receipt-note">Comprovante emitido com base no pedido registrado no sistema.</p>
             </div>
 
             <div class="products-box">
