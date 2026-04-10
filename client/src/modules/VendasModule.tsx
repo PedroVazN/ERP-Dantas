@@ -95,14 +95,14 @@ export default function VendasModule(props: VendasModuleProps) {
       )
       .join("");
 
-    const validityDate = new Date();
-    validityDate.setDate(validityDate.getDate() + 7);
+    const purchaseDate = new Date(sale.createdAt).toLocaleDateString("pt-BR");
+    const paymentLabel = escapeHtml(sale.paymentMethod || "—");
 
     const html = `<!DOCTYPE html>
       <html lang="pt-BR">
       <head>
         <meta charset="UTF-8" />
-        <title>Proposta de Vendas</title>
+        <title>Comprovante de compra</title>
         <style>
           * { box-sizing: border-box; }
           body {
@@ -242,16 +242,25 @@ export default function VendasModule(props: VendasModuleProps) {
             color: #3b4035;
             font-weight: 700;
           }
-          .offer {
-            margin: 6px 20px 0;
-            background: #7b846a;
-            color: #fff;
-            border-radius: 999px;
+          .thank-you {
+            margin: 14px 20px 0;
             text-align: center;
-            padding: 8px 12px;
-            font-size: 28px;
-            letter-spacing: 0.03em;
-            font-weight: 700;
+            padding: 14px 16px;
+            border: 1px solid #c9cfc0;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.65);
+          }
+          .thank-you strong {
+            display: block;
+            font-size: 22px;
+            color: #3b4035;
+            margin-bottom: 6px;
+            letter-spacing: 0.02em;
+          }
+          .thank-you span {
+            font-size: 14px;
+            color: #5a6252;
+            line-height: 1.45;
           }
           .footer {
             text-align: center;
@@ -262,19 +271,28 @@ export default function VendasModule(props: VendasModuleProps) {
             margin: 0 0 10px;
             font-size: 14px;
           }
+          .footer-note {
+            font-size: 12px;
+            color: #6b705e;
+            line-height: 1.5;
+            max-width: 520px;
+            margin: 0 auto 12px;
+          }
           .benefits {
             display: flex;
             justify-content: center;
             flex-wrap: wrap;
             gap: 8px;
-            font-size: 12px;
-            letter-spacing: 0.04em;
+            font-size: 11px;
+            letter-spacing: 0.03em;
             text-transform: uppercase;
+            color: #6b705e;
           }
           .benefits span {
-            border: 1px solid #b9beae;
-            border-radius: 999px;
+            border: 1px solid #c9cfc0;
+            border-radius: 8px;
             padding: 5px 10px;
+            background: rgba(255,255,255,0.5);
           }
           @media (max-width: 860px) {
             .content {
@@ -283,8 +301,8 @@ export default function VendasModule(props: VendasModuleProps) {
             .title {
               font-size: 34px;
             }
-            .offer {
-              font-size: 24px;
+            .thank-you strong {
+              font-size: 20px;
             }
             .pix-head {
               font-size: 18px;
@@ -313,27 +331,26 @@ export default function VendasModule(props: VendasModuleProps) {
           <div class="header">
             <img class="logo" src="${window.location.origin}/usenature.png" alt="Use Nature — Sabonetes naturais" />
           </div>
-          <h1 class="title">PROPOSTA DE VENDA</h1>
+          <h1 class="title">COMPROVANTE DE COMPRA</h1>
           <div class="content">
             <div class="client-box">
-              <p class="section-head">Informações do cliente</p>
+              <p class="section-head">Dados do comprador</p>
               <h4>${customerName}</h4>
               <p class="client-line">Telefone: ${customerPhone}</p>
               <p class="client-line">E-mail: ${customerEmail}</p>
-              <p class="client-line">Endereço: Cidade/UF, CEP</p>
               <p class="client-line">Pedido: OV-${String(sale._id).slice(-4).toUpperCase()}</p>
-              <p class="client-line">Emissão: ${new Date(sale.createdAt).toLocaleDateString("pt-BR")}</p>
-              <p class="client-line">Validade: ${validityDate.toLocaleDateString("pt-BR")}</p>
+              <p class="client-line">Data da compra: ${purchaseDate}</p>
+              <p class="client-line">Forma de pagamento: ${paymentLabel}</p>
 
               <div class="pix-box">
-                <p class="pix-head">PAGUE AQUI</p>
+                <p class="pix-head">Referência PIX (comprovante)</p>
                 <img src="${window.location.origin}/pix.jpg" alt="QR Code PIX" />
-                <p class="pix-desc">Escaneie para pagar em PIX, cartão ou boleto.</p>
+                <p class="pix-desc">Guarde este documento como comprovante da sua compra. O QR Code acima corresponde ao pagamento registrado neste pedido.</p>
               </div>
             </div>
 
             <div class="products-box">
-              <p class="section-head">Produtos</p>
+              <p class="section-head">Itens adquiridos</p>
               <table>
                 <thead>
                   <tr>
@@ -344,24 +361,26 @@ export default function VendasModule(props: VendasModuleProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  ${rows || '<tr><td colspan="4">Sem itens na proposta.</td></tr>'}
+                  ${rows || '<tr><td colspan="4">Sem itens registrados neste pedido.</td></tr>'}
                 </tbody>
               </table>
               <div class="totals">
                 <div class="total-line"><span>Subtotal</span><span>${props.formatBRL(sale.totalAmount)}</span></div>
                 <div class="total-line"><span>Desconto</span><span>${props.formatBRL(0)}</span></div>
-                <div class="total-line total-final"><span>Total</span><span>${props.formatBRL(sale.totalAmount)}</span></div>
+                <div class="total-line total-final"><span>Total pago</span><span>${props.formatBRL(sale.totalAmount)}</span></div>
               </div>
             </div>
           </div>
-          <div class="offer">APROVEITE ESSA OFERTA!</div>
+          <div class="thank-you">
+            <strong>Obrigado pela compra!</strong>
+            <span>Sua preferência é muito importante para nós. Em caso de dúvida sobre o pedido, entre em contato informando o número OV-${String(sale._id).slice(-4).toUpperCase()}.</span>
+          </div>
           <div class="footer">
-            <p>Garantia de produtos feitos à mão, 100% naturais e ecologicamente corretos.</p>
+            <p class="footer-note">Este documento resume os itens e o valor do seu pedido, para sua guarda e conferência.</p>
             <div class="benefits">
+              <span>Produtos artesanais</span>
               <span>Ingredientes naturais</span>
-              <span>Feito à mão</span>
-              <span>Embalagens sustentáveis</span>
-              <span>Ecologicamente corretos</span>
+              <span>Embalagens conscientes</span>
             </div>
           </div>
         </div>
@@ -655,7 +674,7 @@ export default function VendasModule(props: VendasModuleProps) {
                               Cupom
                             </button>
                             <button type="button" className="ghost-btn" onClick={() => generateSaleProposalPdf(item)}>
-                              PDF proposta
+                              PDF comprovante
                             </button>
                             <button type="button" className="ghost-btn" onClick={() => props.editSale(item)}>
                               Editar
@@ -707,7 +726,7 @@ export default function VendasModule(props: VendasModuleProps) {
                         Cupom
                       </button>
                       <button type="button" className="ghost-btn" onClick={() => generateSaleProposalPdf(item)}>
-                        PDF proposta
+                        PDF comprovante
                       </button>
                       <button type="button" className="ghost-btn" onClick={() => props.editSale(item)}>
                         Editar
