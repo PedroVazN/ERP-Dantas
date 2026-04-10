@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { API_URL } from "../api";
 import "./PublicOrderPage.css";
 
+const BRAND_LOGO_SRC = "/usenature.png";
+
 type MenuProduct = {
   id: string;
   name: string;
@@ -33,6 +35,16 @@ function readParams() {
 
 function formatBrl(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+}
+
+function groupByCategory(products: MenuProduct[]): Map<string, MenuProduct[]> {
+  const map = new Map<string, MenuProduct[]>();
+  for (const p of products) {
+    const key = (p.category || "Produtos").trim() || "Produtos";
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(p);
+  }
+  return map;
 }
 
 export function PublicOrderPage() {
@@ -82,10 +94,17 @@ export function PublicOrderPage() {
       .filter((row) => row.qty > 0);
   }, [menu, cart]);
 
+  const cartCount = useMemo(() => cartItems.reduce((n, r) => n + r.qty, 0), [cartItems]);
+
   const subtotal = useMemo(
     () => cartItems.reduce((sum, row) => sum + row.product.price * row.qty, 0),
     [cartItems]
   );
+
+  const categoriesBlock = useMemo(() => {
+    if (!menu?.products.length) return [];
+    return Array.from(groupByCategory(menu.products).entries());
+  }, [menu]);
 
   const addToCart = (id: string, stock: number) => {
     setCart((prev) => {
@@ -142,15 +161,20 @@ export function PublicOrderPage() {
     }
   };
 
+  const shellClass = "public-order";
+
   if (!businessId || !token) {
     return (
-      <div className="public-order">
-        <div className="public-order__panel public-order__panel--narrow">
-          <h1 className="public-order__title">Pedido online</h1>
-          <p className="public-order__muted">
-            Este endereço precisa incluir o código da loja e o código de acesso. Peça o link completo ao
-            estabelecimento.
-          </p>
+      <div className={shellClass}>
+        <BrandedHero businessName="Cardápio digital" tagline="Link inválido" />
+        <div className="public-order__container">
+          <div className="public-order__state-card">
+            <h1 className="public-order__state-title">Endereço incompleto</h1>
+            <p className="public-order__state-text">
+              Este link precisa incluir o código da loja e o código de acesso. Solicite o endereço completo ao
+              estabelecimento.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -158,13 +182,15 @@ export function PublicOrderPage() {
 
   if (loadError) {
     return (
-      <div className="public-order">
-        <div className="public-order__panel public-order__panel--narrow">
-          <h1 className="public-order__title">Não foi possível abrir o cardápio</h1>
-          <p className="public-order__error">{loadError}</p>
-          <button type="button" className="public-order__btn" onClick={() => void loadMenu()}>
-            Tentar novamente
-          </button>
+      <div className={shellClass}>
+        <BrandedHero businessName="Cardápio digital" tagline="Não foi possível carregar" />
+        <div className="public-order__container">
+          <div className="public-order__state-card public-order__state-card--error">
+            <p className="public-order__state-error">{loadError}</p>
+            <button type="button" className="public-order__cta public-order__cta--primary" onClick={() => void loadMenu()}>
+              Tentar novamente
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -172,35 +198,76 @@ export function PublicOrderPage() {
 
   if (!menu) {
     return (
-      <div className="public-order public-order--center">
-        <p className="public-order__muted">Carregando cardápio…</p>
+      <div className={shellClass}>
+        <div className="public-order__hero public-order__hero--loading">
+          <div className="public-order__hero-inner">
+            <div className="public-order__brand-lockup">
+              <img src={BRAND_LOGO_SRC} alt="" className="public-order__logo" width={56} height={56} decoding="async" />
+              <div className="public-order__skeleton public-order__skeleton--title" />
+            </div>
+            <div className="public-order__skeleton public-order__skeleton--line" />
+          </div>
+        </div>
+        <div className="public-order__container">
+          <div className="public-order__skeleton-grid" aria-hidden>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="public-order__skeleton-card" />
+            ))}
+          </div>
+        </div>
+        <p className="public-order__sr-only" role="status">
+          Carregando cardápio
+        </p>
       </div>
     );
   }
 
   if (step === "done" && createdSale) {
     return (
-      <div className="public-order">
-        <header className="public-order__header">
-          <h1 className="public-order__brand">{menu.businessName}</h1>
-          <p className="public-order__muted">Pedido recebido</p>
-        </header>
-        <div className="public-order__panel">
-          <p>
-            Valor: <strong>{formatBrl(createdSale.totalAmount)}</strong>
-          </p>
-          {createdSale.invoice?.number && (
-            <p className="public-order__muted">Referência: {createdSale.invoice.number}</p>
-          )}
-          <p className="public-order__pix-hint">
-            Escaneie o QR Code PIX abaixo para pagar. Após o pagamento, a loja confirma o pedido no
-            sistema.
-          </p>
-          <div className="public-order__pix-wrap">
-            <img src="/pix.jpg" alt="QR Code PIX" className="public-order__pix-img" />
+      <div className={shellClass}>
+        <header className="public-order__topbar public-order__topbar--success">
+          <div className="public-order__topbar-inner">
+            <img src={BRAND_LOGO_SRC} alt="" width={40} height={40} className="public-order__logo public-order__logo--sm" />
+            <span className="public-order__topbar-text">{menu.businessName}</span>
           </div>
-          <p className="public-order__muted public-order__small">
-            Guarde este comprovante. Em caso de dúvida, informe o telefone cadastrado no pedido.
+        </header>
+        <div className="public-order__success-wrap">
+          <div className="public-order__success-icon" aria-hidden>
+            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="24" cy="24" r="22" stroke="currentColor" strokeWidth="2" opacity="0.2" />
+              <path
+                d="M14 24l7 7 13-14"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+          <h1 className="public-order__success-title">Pedido recebido</h1>
+          <p className="public-order__success-lead">
+            Obrigado pela preferência. Use o PIX abaixo para concluir o pagamento.
+          </p>
+          <div className="public-order__receipt">
+            <div className="public-order__receipt-row">
+              <span>Total</span>
+              <strong>{formatBrl(createdSale.totalAmount)}</strong>
+            </div>
+            {createdSale.invoice?.number ? (
+              <div className="public-order__receipt-row public-order__receipt-row--muted">
+                <span>Referência</span>
+                <span>{createdSale.invoice.number}</span>
+              </div>
+            ) : null}
+          </div>
+          <p className="public-order__pix-copy">
+            Escaneie o QR Code com o app do seu banco. Após o pagamento, a loja confirma o pedido.
+          </p>
+          <div className="public-order__pix-frame">
+            <img src="/pix.jpg" alt="QR Code para pagamento PIX" className="public-order__pix-img" width={280} height={280} />
+          </div>
+          <p className="public-order__fine-print">
+            Guarde esta tela. Em dúvidas, informe o telefone usado no pedido ao atendimento.
           </p>
         </div>
       </div>
@@ -208,88 +275,155 @@ export function PublicOrderPage() {
   }
 
   return (
-    <div className="public-order">
-      <header className="public-order__header">
-        <h1 className="public-order__brand">{menu.businessName}</h1>
-        <p className="public-order__muted">Monte seu pedido abaixo</p>
+    <div className={shellClass}>
+      <header className="public-order__topbar">
+        <div className="public-order__topbar-inner">
+          <div className="public-order__brand-lockup public-order__brand-lockup--compact">
+            <img
+              src={BRAND_LOGO_SRC}
+              alt="E-Sentinel"
+              width={44}
+              height={44}
+              className="public-order__logo"
+              decoding="async"
+            />
+            <div className="public-order__brand-text">
+              <span className="public-order__eyebrow">Cardápio digital</span>
+              <span className="public-order__store-name">{menu.businessName}</span>
+            </div>
+          </div>
+          {step === "shop" && cartCount > 0 ? (
+            <button
+              type="button"
+              className="public-order__cart-pill"
+              onClick={() => setStep("details")}
+              aria-label={`Abrir sacola com ${cartCount} itens`}
+            >
+              <span className="public-order__cart-pill-icon" aria-hidden>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M6 6h15l-1.5 9h-12z" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="9" cy="20" r="1" />
+                  <circle cx="18" cy="20" r="1" />
+                </svg>
+              </span>
+              <span className="public-order__cart-pill-qty">{cartCount}</span>
+            </button>
+          ) : null}
+        </div>
       </header>
 
       {step === "shop" && (
         <>
-          <div className="public-order__grid">
-            {menu.products.map((p) => {
-              const qty = cart[p.id] || 0;
-              const photoUrl = p.hasPhoto
-                ? `${API_URL}/products/${p.id}/photo?businessId=${encodeURIComponent(menu.businessId)}`
-                : null;
-              return (
-                <article key={p.id} className="public-order__card">
-                  <div className="public-order__card-visual">
-                    {photoUrl ? (
-                      <img src={photoUrl} alt="" className="public-order__card-img" loading="lazy" />
-                    ) : (
-                      <div className="public-order__card-placeholder" aria-hidden />
-                    )}
+          <section className="public-order__hero" aria-labelledby="hero-title">
+            <div className="public-order__hero-inner">
+              <h1 id="hero-title" className="public-order__hero-title">
+                O que vamos pedir hoje?
+              </h1>
+              <p className="public-order__hero-sub">
+                Toque nos itens para adicionar à sacola. Pagamento seguro via PIX ao finalizar.
+              </p>
+              {menu.products.length > 0 ? (
+                <p className="public-order__hero-meta">
+                  <span className="public-order__pill">{menu.products.length} itens no cardápio</span>
+                </p>
+              ) : null}
+            </div>
+          </section>
+
+          <main className="public-order__container">
+            {menu.products.length === 0 ? (
+              <div className="public-order__state-card">
+                <p className="public-order__state-text">Nenhum produto disponível no momento. Volte em breve.</p>
+              </div>
+            ) : (
+              categoriesBlock.map(([category, items]) => (
+                <section key={category} className="public-order__section" aria-labelledby={`cat-${category}`}>
+                  <h2 id={`cat-${category}`} className="public-order__section-title">
+                    {category}
+                  </h2>
+                  <div className="public-order__grid">
+                    {items.map((p) => {
+                      const qty = cart[p.id] || 0;
+                      const photoUrl = p.hasPhoto
+                        ? `${API_URL}/products/${p.id}/photo?businessId=${encodeURIComponent(menu.businessId)}`
+                        : null;
+                      return (
+                        <article key={p.id} className="public-order__card">
+                          <div className="public-order__card-visual">
+                            {photoUrl ? (
+                              <img src={photoUrl} alt="" className="public-order__card-img" loading="lazy" />
+                            ) : (
+                              <div className="public-order__card-placeholder" aria-hidden>
+                                <span className="public-order__card-placeholder-icon">✦</span>
+                              </div>
+                            )}
+                            {qty > 0 ? <span className="public-order__card-badge">{qty} na sacola</span> : null}
+                          </div>
+                          <div className="public-order__card-body">
+                            <h3 className="public-order__card-title">{p.name}</h3>
+                            {p.description ? <p className="public-order__card-desc">{p.description}</p> : null}
+                            <div className="public-order__card-footer">
+                              <div className="public-order__price-block">
+                                <span className="public-order__price">{formatBrl(p.price)}</span>
+                                <span className="public-order__stock">Até {p.stock} un.</span>
+                              </div>
+                              <div className="public-order__card-actions">
+                                {qty > 0 ? (
+                                  <div className="public-order__stepper">
+                                    <button
+                                      type="button"
+                                      className="public-order__stepper-btn"
+                                      onClick={() => removeFromCart(p.id)}
+                                      aria-label={`Remover um ${p.name}`}
+                                    >
+                                      −
+                                    </button>
+                                    <span className="public-order__stepper-qty">{qty}</span>
+                                    <button
+                                      type="button"
+                                      className="public-order__stepper-btn"
+                                      onClick={() => addToCart(p.id, p.stock)}
+                                      disabled={qty >= p.stock}
+                                      aria-label={`Adicionar um ${p.name}`}
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    className="public-order__cta public-order__cta--primary public-order__cta--card"
+                                    onClick={() => addToCart(p.id, p.stock)}
+                                  >
+                                    Adicionar
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
                   </div>
-                  <div className="public-order__card-body">
-                    <h2 className="public-order__card-title">{p.name}</h2>
-                    {p.description ? (
-                      <p className="public-order__card-desc">{p.description}</p>
-                    ) : null}
-                    <div className="public-order__card-row">
-                      <span className="public-order__price">{formatBrl(p.price)}</span>
-                      <span className="public-order__stock">Estoque: {p.stock}</span>
-                    </div>
-                    <div className="public-order__card-actions">
-                      {qty > 0 ? (
-                        <div className="public-order__stepper">
-                          <button
-                            type="button"
-                            className="public-order__stepper-btn"
-                            onClick={() => removeFromCart(p.id)}
-                            aria-label="Remover um"
-                          >
-                            −
-                          </button>
-                          <span className="public-order__stepper-qty">{qty}</span>
-                          <button
-                            type="button"
-                            className="public-order__stepper-btn"
-                            onClick={() => addToCart(p.id, p.stock)}
-                            disabled={qty >= p.stock}
-                            aria-label="Adicionar um"
-                          >
-                            +
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          className="public-order__btn public-order__btn--primary"
-                          onClick={() => addToCart(p.id, p.stock)}
-                        >
-                          Adicionar
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+                </section>
+              ))
+            )}
+          </main>
 
           {cartItems.length > 0 && (
-            <div className="public-order__bar">
-              <div className="public-order__bar-inner">
-                <span>
-                  {cartItems.reduce((n, r) => n + r.qty, 0)} itens · {formatBrl(subtotal)}
-                </span>
+            <div className="public-order__dock">
+              <div className="public-order__dock-inner">
+                <div className="public-order__dock-sum">
+                  <span className="public-order__dock-label">Subtotal</span>
+                  <span className="public-order__dock-total">{formatBrl(subtotal)}</span>
+                  <span className="public-order__dock-items">{cartCount} itens</span>
+                </div>
                 <button
                   type="button"
-                  className="public-order__btn public-order__btn--primary"
+                  className="public-order__cta public-order__cta--primary public-order__cta--dock"
                   onClick={() => setStep("details")}
                 >
-                  Continuar
+                  Finalizar pedido
                 </button>
               </div>
             </div>
@@ -298,61 +432,112 @@ export function PublicOrderPage() {
       )}
 
       {step === "details" && (
-        <div className="public-order__panel public-order__panel--narrow">
-          <h2 className="public-order__subtitle">Seus dados</h2>
-          <label className="public-order__label">
-            Nome
-            <input
-              className="public-order__input"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-              autoComplete="name"
-              placeholder="Como identificamos seu pedido"
-            />
-          </label>
-          <label className="public-order__label">
-            WhatsApp / telefone
-            <input
-              className="public-order__input"
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              autoComplete="tel"
-              inputMode="tel"
-              placeholder="DDD + número"
-            />
-          </label>
-
-          <div className="public-order__summary">
-            <h3 className="public-order__summary-title">Resumo</h3>
-            <ul className="public-order__summary-list">
-              {cartItems.map(({ product, qty }) => (
-                <li key={product.id}>
-                  {qty}× {product.name} — {formatBrl(product.price * qty)}
-                </li>
-              ))}
-            </ul>
-            <p className="public-order__summary-total">
-              Total <strong>{formatBrl(subtotal)}</strong>
-            </p>
+        <>
+          <header className="public-order__topbar">
+            <div className="public-order__topbar-inner">
+              <div className="public-order__brand-lockup public-order__brand-lockup--compact">
+                <img
+                  src={BRAND_LOGO_SRC}
+                  alt="E-Sentinel"
+                  width={40}
+                  height={40}
+                  className="public-order__logo public-order__logo--sm"
+                  decoding="async"
+                />
+                <div className="public-order__brand-text">
+                  <span className="public-order__eyebrow">Finalizar</span>
+                  <span className="public-order__store-name">{menu.businessName}</span>
+                </div>
+              </div>
+            </div>
+          </header>
+          <div className="public-order__checkout">
+          <div className="public-order__checkout-head">
+            <button type="button" className="public-order__back" onClick={() => setStep("shop")}>
+              ← Voltar ao cardápio
+            </button>
+            <h2 className="public-order__checkout-title">Quase lá</h2>
+            <p className="public-order__checkout-lead">Informe seus dados para identificarmos seu pedido.</p>
           </div>
 
-          {submitError ? <p className="public-order__error">{submitError}</p> : null}
+          <div className="public-order__checkout-grid">
+            <div className="public-order__checkout-form">
+              <label className="public-order__field">
+                <span className="public-order__field-label">Nome completo</span>
+                <input
+                  className="public-order__input"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  autoComplete="name"
+                  placeholder="Como devemos chamar você"
+                />
+              </label>
+              <label className="public-order__field">
+                <span className="public-order__field-label">WhatsApp</span>
+                <input
+                  className="public-order__input"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  autoComplete="tel"
+                  inputMode="tel"
+                  placeholder="DDD + número"
+                />
+              </label>
+              {submitError ? <p className="public-order__field-error">{submitError}</p> : null}
+              <div className="public-order__checkout-actions">
+                <button type="button" className="public-order__cta public-order__cta--ghost" onClick={() => setStep("shop")}>
+                  Voltar
+                </button>
+                <button
+                  type="button"
+                  className="public-order__cta public-order__cta--primary"
+                  disabled={submitting}
+                  onClick={() => void handleSubmitOrder()}
+                >
+                  {submitting ? "Enviando…" : "Confirmar e ver PIX"}
+                </button>
+              </div>
+            </div>
 
-          <div className="public-order__actions">
-            <button type="button" className="public-order__btn" onClick={() => setStep("shop")}>
-              Voltar
-            </button>
-            <button
-              type="button"
-              className="public-order__btn public-order__btn--primary"
-              disabled={submitting}
-              onClick={() => void handleSubmitOrder()}
-            >
-              {submitting ? "Enviando…" : "Gerar pedido e PIX"}
-            </button>
+            <aside className="public-order__checkout-aside" aria-label="Resumo do pedido">
+              <div className="public-order__summary-card">
+                <h3 className="public-order__summary-heading">Seu pedido</h3>
+                <ul className="public-order__summary-lines">
+                  {cartItems.map(({ product, qty }) => (
+                    <li key={product.id} className="public-order__summary-line">
+                      <span>
+                        {qty}× {product.name}
+                      </span>
+                      <span>{formatBrl(product.price * qty)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="public-order__summary-total-row">
+                  <span>Total</span>
+                  <strong>{formatBrl(subtotal)}</strong>
+                </div>
+              </div>
+            </aside>
           </div>
         </div>
+        </>
       )}
+    </div>
+  );
+}
+
+function BrandedHero({ businessName, tagline }: { businessName: string; tagline: string }) {
+  return (
+    <div className="public-order__hero public-order__hero--minimal">
+      <div className="public-order__hero-inner">
+        <div className="public-order__brand-lockup">
+          <img src={BRAND_LOGO_SRC} alt="E-Sentinel" width={56} height={56} className="public-order__logo" />
+          <div className="public-order__brand-text">
+            <span className="public-order__eyebrow">{tagline}</span>
+            <span className="public-order__store-name">{businessName}</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
