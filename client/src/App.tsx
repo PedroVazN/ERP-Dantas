@@ -780,6 +780,9 @@ function App() {
           setWhatsAppForm={setWhatsAppForm}
           sendManualWhatsAppMessage={sendManualWhatsAppMessage}
           loadWhatsAppStatus={loadWhatsAppStatus}
+          publicOrderLojaId={workspaceId}
+          publicOrderLojaName={selectedBusiness?.name ?? ""}
+          isGeneralWorkspace={isGeneralWorkspace}
         />
 
         <GlobalModalsRenderer

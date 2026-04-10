@@ -192,6 +192,10 @@ export type ActiveModuleRendererProps = {
   setWhatsAppForm: Dispatch<SetStateAction<{ phone: string; message: string }>>;
   sendManualWhatsAppMessage: (event: FormEvent) => Promise<void> | void;
   loadWhatsAppStatus: () => Promise<void> | void;
+
+  publicOrderLojaId: string | null;
+  publicOrderLojaName: string;
+  isGeneralWorkspace: boolean;
 };
 
 export default function ActiveModuleRenderer(props: ActiveModuleRendererProps) {
@@ -348,6 +352,9 @@ export default function ActiveModuleRenderer(props: ActiveModuleRendererProps) {
         setWhatsAppForm={props.setWhatsAppForm}
         sendManualWhatsAppMessage={props.sendManualWhatsAppMessage}
         loadWhatsAppStatus={props.loadWhatsAppStatus}
+        publicOrderLojaId={props.publicOrderLojaId}
+        publicOrderLojaName={props.publicOrderLojaName}
+        isGeneralWorkspace={props.isGeneralWorkspace}
       />
     );
   }

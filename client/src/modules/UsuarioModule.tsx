@@ -1,5 +1,11 @@
 import type { Theme, WhatsAppStatus } from "../types";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
+import { useMemo, useState } from "react";
+import {
+  buildPublicOrderUrl,
+  getPublicOrderSecret,
+  publicOrderQrImageUrl,
+} from "../utils/publicOrderUrl";
 
 type UserFormState = {
   userName: string;
@@ -23,9 +29,37 @@ export type UsuarioModuleProps = {
   setWhatsAppForm: Dispatch<SetStateAction<WhatsAppFormState>>;
   sendManualWhatsAppMessage: (event: FormEvent) => Promise<void> | void;
   loadWhatsAppStatus: () => Promise<void> | void;
+
+  /** ERP específico: id do negócio atual (não use "geral"). */
+  publicOrderLojaId: string | null;
+  publicOrderLojaName: string;
+  isGeneralWorkspace: boolean;
 };
 
 export default function UsuarioModule(props: UsuarioModuleProps) {
+  const [copied, setCopied] = useState(false);
+  const secret = getPublicOrderSecret();
+  const canBuildLink =
+    Boolean(props.publicOrderLojaId) &&
+    !props.isGeneralWorkspace &&
+    props.publicOrderLojaId !== "geral";
+
+  const orderUrl = useMemo(() => {
+    if (!canBuildLink || !secret) return "";
+    return buildPublicOrderUrl(window.location.origin, props.publicOrderLojaId!, secret);
+  }, [canBuildLink, props.publicOrderLojaId, secret]);
+
+  async function copyOrderLink() {
+    if (!orderUrl) return;
+    try {
+      await navigator.clipboard.writeText(orderUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
+
   return (
     <section className="module-grid animated user-grid">
       <form className="form-card" onSubmit={props.submitUserProfile}>
@@ -71,6 +105,55 @@ export default function UsuarioModule(props: UsuarioModuleProps) {
         </div>
         <button type="submit">Salvar perfil</button>
       </form>
+
+      <section className="table-card">
+        <h3>Pedido online (cardápio do cliente)</h3>
+        <p className="theme-helper">
+          Gere o QR Code e o link para seus clientes abrirem a página de compra no celular. O pedido cai no
+          módulo Vendas como pendente de PIX.
+        </p>
+        {props.isGeneralWorkspace || !props.publicOrderLojaId ? (
+          <p className="theme-helper">
+            Selecione um <strong>ERP / loja</strong> no topo (não o “ERP Geral”) para ver o link e o QR Code
+            deste negócio.
+          </p>
+        ) : !secret ? (
+          <p className="theme-helper">
+            Defina <code>VITE_PUBLIC_ORDER_SECRET</code> no ambiente do front-end (mesmo valor de{" "}
+            <code>PUBLIC_ORDER_SECRET</code> no servidor) e faça o build de novo para habilitar o link e o QR.
+          </p>
+        ) : (
+          <>
+            <p className="theme-helper">
+              Loja: <strong>{props.publicOrderLojaName || props.publicOrderLojaId}</strong>
+            </p>
+            <div className="form-field">
+              <label>Link público do cardápio</label>
+              <small className="field-help">Copie e envie no WhatsApp ou use o QR abaixo em cardápio físico.</small>
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+                <input readOnly value={orderUrl} style={{ flex: "1 1 220px" }} />
+                <button type="button" className="ghost-btn" onClick={() => void copyOrderLink()}>
+                  {copied ? "Copiado!" : "Copiar link"}
+                </button>
+              </div>
+            </div>
+            <div style={{ marginTop: "1rem", textAlign: "center" }}>
+              <p className="field-help" style={{ marginBottom: "0.5rem" }}>
+                QR Code para abrir a página de compra
+              </p>
+              <img
+                src={publicOrderQrImageUrl(orderUrl)}
+                width={220}
+                height={220}
+                alt="QR Code do link do cardápio"
+                referrerPolicy="no-referrer"
+                loading="lazy"
+                style={{ borderRadius: 12, border: "1px solid var(--border, #dde5f1)" }}
+              />
+            </div>
+          </>
+        )}
+      </section>
 
       <section className="table-card">
         <h3>Tema da interface</h3>
