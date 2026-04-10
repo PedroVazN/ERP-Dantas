@@ -22,6 +22,7 @@ import { registerEconomicIndicatorsRoutes } from "./routes/economicIndicators";
 import { registerDashboardRoutes } from "./routes/dashboard";
 import { registerReportsRoutes } from "./routes/reports";
 import { registerBiInsightsRoutes } from "./routes/bi";
+import { registerPublicOrderRoutes } from "./routes/publicOrder";
 import { registerAiRoutes } from "./routes/ai";
 import {
   BusinessModel,
@@ -408,6 +409,8 @@ registerProductRoutes(app);
 registerSupplierRoutes(app);
 
 registerSalesRoutes(app, { normalizeSaleItemsAndApplyStock, generateInvoicePayload });
+
+registerPublicOrderRoutes(app, { normalizeSaleItemsAndApplyStock, generateInvoicePayload });
 
 registerWhatsAppRoutes(app, {
   whatsappApiUrl,
