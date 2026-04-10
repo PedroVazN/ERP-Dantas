@@ -50,60 +50,62 @@ export default function ChecklistModule(props: ChecklistModuleProps) {
 
       <section className="table-card">
         <h3>Checklist de futuros implementos</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>Ideia</th>
-              <th>Detalhes</th>
-              <th>Criada em</th>
-              <th>Status</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {props.checklistItems.length === 0 ? (
+        <div className="table-scroll">
+          <table className="responsive-table">
+            <thead>
               <tr>
-                <td colSpan={5} className="empty">
-                  Nenhuma ideia cadastrada ainda.
-                </td>
+                <th>Ideia</th>
+                <th>Detalhes</th>
+                <th>Criada em</th>
+                <th>Status</th>
+                <th>Ações</th>
               </tr>
-            ) : (
-              props.checklistItems.map((item) => (
-                <tr key={item._id}>
-                  <td>{item.title}</td>
-                  <td>{item.notes || "-"}</td>
-                  <td>{new Date(item.createdAt).toLocaleDateString("pt-BR")}</td>
-                  <td>{item.completed ? "Concluída" : "Pendente"}</td>
-                  <td>
-                    <div className="table-actions">
-                      <button
-                        type="button"
-                        className="ghost-btn"
-                        onClick={() => props.toggleChecklistItem(item)}
-                      >
-                        {item.completed ? "Marcar pendente" : "Marcar concluída"}
-                      </button>
-                      <button
-                        type="button"
-                        className="ghost-btn"
-                        onClick={() => props.editChecklistItem(item)}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="ghost-btn danger"
-                        onClick={() => props.deleteChecklistItem(item)}
-                      >
-                        Excluir
-                      </button>
-                    </div>
+            </thead>
+            <tbody>
+              {props.checklistItems.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="empty">
+                    Nenhuma ideia cadastrada ainda.
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                props.checklistItems.map((item) => (
+                  <tr key={item._id}>
+                    <td data-label="Ideia">{item.title}</td>
+                    <td data-label="Detalhes">{item.notes || "-"}</td>
+                    <td data-label="Criada em">{new Date(item.createdAt).toLocaleDateString("pt-BR")}</td>
+                    <td data-label="Status">{item.completed ? "Concluída" : "Pendente"}</td>
+                    <td data-label="Ações">
+                      <div className="table-actions">
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          onClick={() => props.toggleChecklistItem(item)}
+                        >
+                          {item.completed ? "Marcar pendente" : "Marcar concluída"}
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          onClick={() => props.editChecklistItem(item)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-btn danger"
+                          onClick={() => props.deleteChecklistItem(item)}
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
   );

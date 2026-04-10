@@ -793,6 +793,10 @@ th {
   scrollbar-width: thin;
 }
 
+.responsive-table {
+  width: 100%;
+}
+
 .list-footer {
   margin-top: 12px;
   display: flex;
@@ -1561,6 +1565,8 @@ th {
     border-radius: 14px;
     padding: 8px;
     box-shadow: 0 8px 20px var(--shadow-soft);
+    max-height: min(62vh, 560px);
+    overflow-y: auto;
   }
 
   /* No mobile o menu usa fundo claro; força contraste de textos/ícones. */
@@ -1645,6 +1651,11 @@ th {
     padding: 12px;
   }
 
+  .mobile-menu-trigger {
+    min-height: 40px;
+    font-size: 12px;
+  }
+
   .content-header h2 {
     font-size: 22px;
   }
@@ -1681,6 +1692,60 @@ th {
     text-align: center;
     padding: 8px;
     font-size: 12px;
+  }
+
+  .responsive-table thead {
+    display: none;
+  }
+
+  .responsive-table tbody {
+    display: grid;
+    gap: 10px;
+  }
+
+  .responsive-table tr {
+    display: grid;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--panel-2) 75%, transparent);
+  }
+
+  .responsive-table td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    border-bottom: none;
+    padding: 0;
+    font-size: 13px;
+    word-break: break-word;
+  }
+
+  .responsive-table td[data-label]::before {
+    content: attr(data-label);
+    min-width: 98px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .responsive-table td[data-label] > .table-actions {
+    width: 100%;
+  }
+
+  .responsive-table td[data-label] .table-actions .ghost-btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .responsive-table td.empty {
+    display: block;
+    text-align: center;
+    padding: 12px 8px;
   }
 }
 

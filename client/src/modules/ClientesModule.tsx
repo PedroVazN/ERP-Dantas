@@ -72,43 +72,45 @@ export default function ClientesModule(props: ClientesModuleProps) {
 
       <section className="table-card">
         <h3>Lista de clientes</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>E-mail</th>
-              <th>Telefone</th>
-              <th>Observação</th>
-              <th>Status</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {props.customers.map((item) => (
-              <tr key={item._id}>
-                <td>{item.name}</td>
-                <td>{item.email || "-"}</td>
-                <td>{item.phone || "-"}</td>
-                <td>{item.notes || "-"}</td>
-                <td>{item.status}</td>
-                <td>
-                  <div className="table-actions">
-                    <button type="button" className="ghost-btn" onClick={() => props.editCustomer(item)}>
-                      Editar
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost-btn danger"
-                      onClick={() => props.deleteCustomer(item)}
-                    >
-                      Excluir
-                    </button>
-                  </div>
-                </td>
+        <div className="table-scroll">
+          <table className="responsive-table">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>E-mail</th>
+                <th>Telefone</th>
+                <th>Observação</th>
+                <th>Status</th>
+                <th>Ações</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {props.customers.map((item) => (
+                <tr key={item._id}>
+                  <td data-label="Nome">{item.name}</td>
+                  <td data-label="E-mail">{item.email || "-"}</td>
+                  <td data-label="Telefone">{item.phone || "-"}</td>
+                  <td data-label="Observação">{item.notes || "-"}</td>
+                  <td data-label="Status">{item.status}</td>
+                  <td data-label="Ações">
+                    <div className="table-actions">
+                      <button type="button" className="ghost-btn" onClick={() => props.editCustomer(item)}>
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost-btn danger"
+                        onClick={() => props.deleteCustomer(item)}
+                      >
+                        Excluir
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
   );

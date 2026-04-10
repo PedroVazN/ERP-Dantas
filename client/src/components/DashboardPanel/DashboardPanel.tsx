@@ -305,7 +305,7 @@ export default function DashboardPanel(props: DashboardPanelProps) {
       <section className="table-card animated">
         <h3>Produtos com estoque crítico</h3>
         <div className="table-scroll dashboard-table-scroll">
-          <table>
+          <table className="responsive-table">
             <thead>
               <tr>
                 <th>Produto</th>
@@ -326,12 +326,12 @@ export default function DashboardPanel(props: DashboardPanelProps) {
               ) : (
                 lowStockSuggestions.map((item) => (
                   <tr key={item._id}>
-                    <td>{item.name}</td>
-                    <td>{item.sku}</td>
-                    <td>{item.stock}</td>
-                    <td>{item.minStock}</td>
-                    <td>{item.suggestedQty} un.</td>
-                    <td>
+                    <td data-label="Produto">{item.name}</td>
+                    <td data-label="SKU">{item.sku}</td>
+                    <td data-label="Estoque">{item.stock}</td>
+                    <td data-label="Mínimo">{item.minStock}</td>
+                    <td data-label="Sugestão">{item.suggestedQty} un.</td>
+                    <td data-label="Ação">
                       {props.viewerOnly ? (
                         "—"
                       ) : (

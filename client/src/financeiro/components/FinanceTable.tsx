@@ -20,7 +20,7 @@ export default function FinanceTable(props: FinanceTableProps) {
     <section className="table-card">
       <h3>Movimentações financeiras</h3>
       <div className="table-scroll">
-        <table className="finance-table">
+        <table className="finance-table responsive-table">
           <thead>
             <tr>
               <th>Data</th>
@@ -47,17 +47,17 @@ export default function FinanceTable(props: FinanceTableProps) {
                 const alreadyReversed = props.movimentacoes.some((x) => x.movimentacaoOriginalId === mov.id);
                 return (
                   <tr key={mov.id}>
-                    <td>{new Date(mov.data).toLocaleDateString("pt-BR")}</td>
-                    <td>
+                    <td data-label="Data">{new Date(mov.data).toLocaleDateString("pt-BR")}</td>
+                    <td data-label="Tipo">
                       <span className={`status-chip ${isEntrada ? "success" : "danger"}`}>
                         {isEntrada ? "+ Entrada" : "- Saída"}
                       </span>
                     </td>
-                    <td className={valueClass}>{props.formatCurrency(mov.valor)}</td>
-                    <td>{mov.descricao}</td>
-                    <td>{mov.categoria}</td>
-                    <td>{originLabel(mov.origem)}</td>
-                    <td>
+                    <td data-label="Valor" className={valueClass}>{props.formatCurrency(mov.valor)}</td>
+                    <td data-label="Descrição">{mov.descricao}</td>
+                    <td data-label="Categoria">{mov.categoria}</td>
+                    <td data-label="Origem">{originLabel(mov.origem)}</td>
+                    <td data-label="Ações">
                       <div className="table-actions">
                         {canEdit ? (
                           <>

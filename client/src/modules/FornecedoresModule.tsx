@@ -116,55 +116,57 @@ export default function FornecedoresModule(props: FornecedoresModuleProps) {
 
       <section className="table-card">
         <h3>Lista de fornecedores</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>CNPJ/CPF</th>
-              <th>Contato</th>
-              <th>Cidade</th>
-              <th>Ramo</th>
-              <th>Pagamento</th>
-              <th>Status</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {props.suppliers.length === 0 ? (
+        <div className="table-scroll">
+          <table className="responsive-table">
+            <thead>
               <tr>
-                <td colSpan={8} className="empty">
-                  Nenhum fornecedor cadastrado ainda.
-                </td>
+                <th>Nome</th>
+                <th>CNPJ/CPF</th>
+                <th>Contato</th>
+                <th>Cidade</th>
+                <th>Ramo</th>
+                <th>Pagamento</th>
+                <th>Status</th>
+                <th>Ações</th>
               </tr>
-            ) : (
-              props.suppliers.map((item) => (
-                <tr key={item._id}>
-                  <td>{item.name}</td>
-                  <td>{item.document || "-"}</td>
-                  <td>{item.contact}</td>
-                  <td>{item.city || "-"}</td>
-                  <td>{item.businessArea || "-"}</td>
-                  <td>{item.paymentCondition}</td>
-                  <td>{item.status}</td>
-                  <td>
-                    <div className="table-actions">
-                      <button type="button" className="ghost-btn" onClick={() => props.editSupplier(item)}>
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        className="ghost-btn danger"
-                        onClick={() => props.deleteSupplier(item)}
-                      >
-                        Excluir
-                      </button>
-                    </div>
+            </thead>
+            <tbody>
+              {props.suppliers.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="empty">
+                    Nenhum fornecedor cadastrado ainda.
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                props.suppliers.map((item) => (
+                  <tr key={item._id}>
+                    <td data-label="Nome">{item.name}</td>
+                    <td data-label="CNPJ/CPF">{item.document || "-"}</td>
+                    <td data-label="Contato">{item.contact}</td>
+                    <td data-label="Cidade">{item.city || "-"}</td>
+                    <td data-label="Ramo">{item.businessArea || "-"}</td>
+                    <td data-label="Pagamento">{item.paymentCondition}</td>
+                    <td data-label="Status">{item.status}</td>
+                    <td data-label="Ações">
+                      <div className="table-actions">
+                        <button type="button" className="ghost-btn" onClick={() => props.editSupplier(item)}>
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-btn danger"
+                          onClick={() => props.deleteSupplier(item)}
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
     </section>
   );

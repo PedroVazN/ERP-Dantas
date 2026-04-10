@@ -96,8 +96,8 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
   async function exportCatalogPDF() {
     setExportingPDF(true);
     try {
-      const allProducts = props.products;
-      const withPhoto = allProducts.filter((p) => p.hasPhoto);
+      const exportProducts = props.products.filter((p) => p.stock > 0);
+      const withPhoto = exportProducts.filter((p) => p.hasPhoto);
 
       const photosMap: Record<string, string> = {};
       // Busca fotos em lotes de 4 para não sobrecarregar o servidor
@@ -112,7 +112,7 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
         );
       }
 
-      const cards = allProducts
+      const cards = exportProducts
         .map((p) => {
           const safeName = escapeHtml(p.name);
           const safeDesc = escapeHtml(p.description || "");
@@ -212,7 +212,7 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
     <div class="brand-name">NATURE SABOARIA</div>
     <div class="brand-sub">SABONETES ARTESANAIS</div>
     <h1>Catálogo de Produtos</h1>
-    <p>Gerado em ${now} · ${String(allProducts.length)} produto(s)</p>
+    <p>Gerado em ${now} · ${String(exportProducts.length)} produto(s) com estoque</p>
   </header>
   <div class="grid">
   ${cards}
@@ -404,74 +404,76 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
             className="ghost-btn catalog-tab catalog-export-btn"
             onClick={() => void exportCatalogPDF()}
             disabled={exportingPDF}
-            title="Exportar todos os produtos como PDF"
+            title="Exportar somente produtos com estoque como PDF"
           >
-            {exportingPDF ? `⏳ Carregando fotos…` : "⬇ Exportar PDF"}
+            {exportingPDF ? `⏳ Carregando fotos…` : "⬇ Exportar PDF (com estoque)"}
           </button>
         </div>
 
         {tab === "lista" ? (
           <>
             <h3>Produtos</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Nome</th>
-                  <th>SKU</th>
-                  <th>Código</th>
-                  <th>Descrição</th>
-                  <th>Preço</th>
-                  <th>Custo</th>
-                  <th>Estoque</th>
-                  <th>Foto</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {props.products.map((item) => (
-                  <tr key={item._id}>
-                    <td>{item.name}</td>
-                    <td>{item.sku}</td>
-                    <td>{item.productCode || "-"}</td>
-                    <td>{item.description || "-"}</td>
-                    <td>{props.formatBRL(item.price)}</td>
-                    <td>{props.formatBRL(item.cost)}</td>
-                    <td>{item.stock}</td>
-                    <td>
-                      {item.hasPhoto ? (
-                        <img
-                          className="product-photo-thumb"
-                          src={`${API_URL}${props.scopedPath(`/products/${item._id}/photo`)}`}
-                          alt={`Foto de ${item.name}`}
-                          title="Clique para ampliar"
-                          onClick={() => props.openProductPhotoModal(item._id)}
-                        />
-                      ) : (
-                        "-"
-                      )}
-                    </td>
-                    <td>
-                      <div className="table-actions">
-                        <button
-                          type="button"
-                          className="ghost-btn"
-                          onClick={() => props.editProduct(item)}
-                        >
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          className="ghost-btn danger"
-                          onClick={() => props.deleteProduct(item)}
-                        >
-                          Excluir
-                        </button>
-                      </div>
-                    </td>
+            <div className="table-scroll">
+              <table className="responsive-table">
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>SKU</th>
+                    <th>Código</th>
+                    <th>Descrição</th>
+                    <th>Preço</th>
+                    <th>Custo</th>
+                    <th>Estoque</th>
+                    <th>Foto</th>
+                    <th>Ações</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {props.products.map((item) => (
+                    <tr key={item._id}>
+                      <td data-label="Nome">{item.name}</td>
+                      <td data-label="SKU">{item.sku}</td>
+                      <td data-label="Código">{item.productCode || "-"}</td>
+                      <td data-label="Descrição">{item.description || "-"}</td>
+                      <td data-label="Preço">{props.formatBRL(item.price)}</td>
+                      <td data-label="Custo">{props.formatBRL(item.cost)}</td>
+                      <td data-label="Estoque">{item.stock}</td>
+                      <td data-label="Foto">
+                        {item.hasPhoto ? (
+                          <img
+                            className="product-photo-thumb"
+                            src={`${API_URL}${props.scopedPath(`/products/${item._id}/photo`)}`}
+                            alt={`Foto de ${item.name}`}
+                            title="Clique para ampliar"
+                            onClick={() => props.openProductPhotoModal(item._id)}
+                          />
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td data-label="Ações">
+                        <div className="table-actions">
+                          <button
+                            type="button"
+                            className="ghost-btn"
+                            onClick={() => props.editProduct(item)}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            className="ghost-btn danger"
+                            onClick={() => props.deleteProduct(item)}
+                          >
+                            Excluir
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </>
         ) : (
           <div className="catalog-shell">
