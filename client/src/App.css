@@ -828,6 +828,22 @@ th {
   display: none;
 }
 
+.compras-list-cards {
+  display: none;
+}
+
+.compras-create-panes {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.compras-pane h4 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  color: var(--title);
+}
+
 .order-items-table input {
   min-width: 92px;
   max-width: 120px;
@@ -1747,6 +1763,36 @@ th {
     text-align: center;
     padding: 12px 8px;
   }
+
+  .app-modal-body .edit-sale-table-wrap {
+    overflow-x: visible;
+  }
+
+  .app-modal-body .edit-sale-table-wrap table {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .app-modal-body .edit-sale-table-wrap .responsive-table td[data-label]:has(input),
+  .app-modal-body .edit-sale-table-wrap .responsive-table td[data-label]:has(select) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .app-modal-body .edit-sale-table-wrap .responsive-table td[data-label] input,
+  .app-modal-body .edit-sale-table-wrap .responsive-table td[data-label] select {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    box-sizing: border-box;
+  }
+
+  .app-modal-body .edit-sale-add-line-btn,
+  .app-modal-body .edit-sale-remove-btn {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 /* Ajustes pontuais de responsividade para Vendas/Compras */
@@ -1756,7 +1802,7 @@ th {
     min-width: 700px;
   }
 
-  .compras-module .table-scroll table {
+  .compras-module .compras-list-table table {
     min-width: 660px;
   }
 
@@ -1906,8 +1952,138 @@ th {
     min-width: 0;
   }
 
-  .compras-module .table-scroll table {
+  .compras-module .compras-list-table {
+    display: none;
+  }
+
+  .compras-module .compras-list-cards {
+    display: grid;
+    gap: 10px;
+  }
+
+  .compras-module .compras-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px;
+    background: color-mix(in srgb, var(--panel-2) 75%, transparent);
+    display: grid;
+    gap: 8px;
+  }
+
+  .compras-module .compras-card-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .compras-module .compras-card-supplier {
+    margin: 0;
+    font-weight: 600;
+  }
+
+  .compras-module .compras-card-metrics,
+  .compras-module .compras-card-statuses {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .compras-module .compras-create-panes {
+    flex-direction: column;
+    overflow-x: visible;
+    gap: 14px;
+  }
+
+  .compras-module .compras-pane {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .compras-module .order-form .compras-order-table-wrap {
+    overflow-x: visible;
+  }
+
+  .compras-module .order-form .compras-order-table-wrap table {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .compras-module .compras-list-table table {
     min-width: 560px;
+  }
+
+  .compras-module .order-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .compras-module .order-header .view-switch {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .compras-module .order-header .view-switch button {
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+    text-align: center;
+    padding: 10px 8px;
+    font-size: 13px;
+  }
+
+  .compras-module .compras-order-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .compras-module .compras-order-actions > button {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .compras-module .compras-card .table-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .compras-module .compras-card .table-actions .ghost-btn,
+  .compras-module .compras-card .table-actions > button {
+    width: 100%;
+    min-width: 0;
+    text-align: center;
+  }
+
+  .compras-module .order-form .responsive-table td[data-label]:has(input) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .compras-module .order-form .responsive-table td[data-label]:has(input)::before {
+    margin-bottom: 0;
+  }
+
+  .compras-module .order-form .responsive-table td[data-label] input {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .compras-module .compras-add-line-btn,
+  .compras-module .compras-remove-line-btn {
+    width: 100%;
+    min-width: 0;
   }
 
   .vendas-module th,
@@ -1935,24 +2111,12 @@ th {
     font-size: 11px;
   }
 
-  .compras-module .table-scroll {
+  .compras-module .compras-list-table {
     max-width: 100%;
   }
 
-  .compras-module .table-actions {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 6px;
-    width: 100%;
-  }
-
-  .compras-module .table-actions > button {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .compras-module td:first-child,
-  .compras-module th:first-child {
+  .compras-module .compras-list-table td:first-child,
+  .compras-module .compras-list-table th:first-child {
     max-width: 180px;
     white-space: normal;
     word-break: break-word;

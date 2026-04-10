@@ -609,8 +609,8 @@ export default function EditEntityModal(props: EditEntityModalProps) {
             </small>
           </div>
 
-          <div className="table-scroll" style={{ marginBottom: 12 }}>
-            <table className="order-items-table">
+          <div className="table-scroll edit-sale-table-wrap" style={{ marginBottom: 12 }}>
+            <table className="order-items-table responsive-table">
               <thead>
                 <tr>
                   <th>Produto</th>
@@ -627,7 +627,7 @@ export default function EditEntityModal(props: EditEntityModalProps) {
                   const lineTotal = line.quantity * line.unitPrice;
                   return (
                     <tr key={`${line.productId}-${index}`}>
-                      <td>
+                      <td data-label="Produto">
                         <select
                           value={line.productId}
                           onChange={(event) => {
@@ -652,8 +652,8 @@ export default function EditEntityModal(props: EditEntityModalProps) {
                           ))}
                         </select>
                       </td>
-                      <td>{product ? product.stock : "—"}</td>
-                      <td>
+                      <td data-label="Estoque">{product ? product.stock : "—"}</td>
+                      <td data-label="Preço (R$)">
                         <input
                           type="number"
                           min={0}
@@ -669,7 +669,7 @@ export default function EditEntityModal(props: EditEntityModalProps) {
                           }}
                         />
                       </td>
-                      <td>
+                      <td data-label="Qtd.">
                         <input
                           type="number"
                           min={1}
@@ -688,11 +688,11 @@ export default function EditEntityModal(props: EditEntityModalProps) {
                           }}
                         />
                       </td>
-                      <td>{props.formatBRL(lineTotal)}</td>
-                      <td>
+                      <td data-label="Total">{props.formatBRL(lineTotal)}</td>
+                      <td data-label="Ação">
                         <button
                           type="button"
-                          className="ghost-btn danger"
+                          className="ghost-btn danger edit-sale-remove-btn"
                           disabled={props.editSaleForm.items.length <= 1}
                           onClick={() =>
                             props.setEditSaleForm((prev) => ({
@@ -711,7 +711,7 @@ export default function EditEntityModal(props: EditEntityModalProps) {
             </table>
             <button
               type="button"
-              className="ghost-btn"
+              className="ghost-btn edit-sale-add-line-btn"
               style={{ marginTop: 8 }}
               onClick={() =>
                 props.setEditSaleForm((prev) => ({

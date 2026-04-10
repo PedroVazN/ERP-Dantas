@@ -372,7 +372,7 @@ export default function ComprasModule(props: ComprasModuleProps) {
               </div>
             </div>
 
-            <div className="table-scroll">
+            <div className="table-scroll compras-list-table">
               <table>
                 <thead>
                   <tr>
@@ -458,6 +458,57 @@ export default function ComprasModule(props: ComprasModuleProps) {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            <div className="compras-list-cards">
+              {paginatedPurchases.length ? (
+                paginatedPurchases.map((item) => (
+                  <article className="compras-card" key={item._id}>
+                    <div className="compras-card-head">
+                      <strong>OC-{String(item._id).slice(-4).toUpperCase()}</strong>
+                      <span>{new Date(item.createdAt).toLocaleDateString("pt-BR")}</span>
+                    </div>
+                    <p className="compras-card-supplier">{item.supplier}</p>
+                    <div className="compras-card-metrics">
+                      <span>{props.formatBRL(item.totalAmount)}</span>
+                    </div>
+                    <div className="compras-card-statuses">
+                      <span className={getPurchaseBadgeClass(item.status)}>{item.status.replaceAll("_", " ")}</span>
+                      <span className={getApprovalBadgeClass(item.approval?.status)}>
+                        {(item.approval?.status || "N/A").replaceAll("_", " ")}
+                      </span>
+                    </div>
+                    <div className="table-actions">
+                      {item.status === "AGUARDANDO_APROVACAO" ? (
+                        <>
+                          <button type="button" className="ghost-btn" onClick={() => props.reviewPurchase(item._id, "aprovar")}>
+                            Aprovar
+                          </button>
+                          <button type="button" className="ghost-btn danger" onClick={() => props.reviewPurchase(item._id, "rejeitar")}>
+                            Rejeitar
+                          </button>
+                        </>
+                      ) : null}
+                      {item.status === "APROVADA" ? (
+                        <button type="button" className="ghost-btn" onClick={() => props.markPurchaseReceived(item._id)}>
+                          Marcar Recebida
+                        </button>
+                      ) : null}
+                      <button type="button" className="ghost-btn" onClick={() => generatePurchasePdf(item)}>
+                        PDF pedido
+                      </button>
+                      <button type="button" className="ghost-btn" onClick={() => props.editPurchase(item)}>
+                        Editar
+                      </button>
+                      <button type="button" className="ghost-btn danger" onClick={() => props.deletePurchase(item)}>
+                        Excluir
+                      </button>
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <p className="empty">Nenhuma ordem encontrada com os filtros atuais.</p>
+              )}
             </div>
 
             <div className="list-footer">
@@ -556,107 +607,119 @@ export default function ComprasModule(props: ComprasModuleProps) {
               </div>
             </div>
 
-            <div className="table-scroll">
-              <table className="order-items-table">
-                <thead>
-                  <tr>
-                    <th>Produto</th>
-                    <th>Quantidade</th>
-                    <th>Custo (R$)</th>
-                    <th>Ação</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {props.purchaseForm.supplierId ? (
-                    props.filteredProductsBySupplier.length ? (
-                      props.filteredProductsBySupplier.map((item) => (
-                        <tr key={item._id}>
-                          <td>{item.name}</td>
-                          <td>
-                            <input
-                              type="number"
-                              min={1}
-                              placeholder="Qtd."
-                              value={lineDrafts[item._id]?.quantity || ""}
-                              onChange={(event) => updateLineDraft(item._id, "quantity", event.target.value)}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") event.preventDefault();
-                              }}
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              min={0}
-                              step="0.01"
-                              placeholder="Custo"
-                              value={lineDrafts[item._id]?.cost || ""}
-                              onChange={(event) => updateLineDraft(item._id, "cost", event.target.value)}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") event.preventDefault();
-                              }}
-                            />
-                          </td>
-                          <td>
-                            <button type="button" onClick={() => addPurchaseFromLine(item._id)}>
-                              Adicionar à ordem
-                            </button>
+            <div className="compras-create-panes">
+              <section className="compras-pane">
+                <h4>Produtos do fornecedor</h4>
+                <div className="table-scroll compras-order-table-wrap">
+                  <table className="order-items-table responsive-table">
+                    <thead>
+                      <tr>
+                        <th>Produto</th>
+                        <th>Quantidade</th>
+                        <th>Custo (R$)</th>
+                        <th>Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {props.purchaseForm.supplierId ? (
+                        props.filteredProductsBySupplier.length ? (
+                          props.filteredProductsBySupplier.map((item) => (
+                            <tr key={item._id}>
+                              <td data-label="Produto">{item.name}</td>
+                              <td data-label="Quantidade">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  placeholder="Qtd."
+                                  value={lineDrafts[item._id]?.quantity || ""}
+                                  onChange={(event) => updateLineDraft(item._id, "quantity", event.target.value)}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter") event.preventDefault();
+                                  }}
+                                />
+                              </td>
+                              <td data-label="Custo (R$)">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  placeholder="Custo"
+                                  value={lineDrafts[item._id]?.cost || ""}
+                                  onChange={(event) => updateLineDraft(item._id, "cost", event.target.value)}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter") event.preventDefault();
+                                  }}
+                                />
+                              </td>
+                              <td data-label="Ação">
+                                <button type="button" className="compras-add-line-btn" onClick={() => addPurchaseFromLine(item._id)}>
+                                  Adicionar à ordem
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={4} className="empty">
+                              Não há produtos vinculados a esse fornecedor.
+                            </td>
+                          </tr>
+                        )
+                      ) : (
+                        <tr>
+                          <td colSpan={4} className="empty">
+                            Selecione um fornecedor para carregar os produtos.
                           </td>
                         </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={4} className="empty">
-                          Não há produtos vinculados a esse fornecedor.
-                        </td>
-                      </tr>
-                    )
-                  ) : (
-                    <tr>
-                      <td colSpan={4} className="empty">
-                        Selecione um fornecedor para carregar os produtos.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
 
-            <div className="table-scroll" style={{ marginTop: 10 }}>
-              <table className="order-items-table">
-                <thead>
-                  <tr>
-                    <th>Itens da ordem</th>
-                    <th>Quantidade</th>
-                    <th>Custo (R$)</th>
-                    <th>Total</th>
-                    <th>Ação</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {props.purchaseForm.items.length ? (
-                    props.purchaseForm.items.map((item) => (
-                      <tr key={item.productId}>
-                        <td>{item.description}</td>
-                        <td>{item.quantity}</td>
-                        <td>{props.formatBRL(item.cost)}</td>
-                        <td>{props.formatBRL(item.quantity * item.cost)}</td>
-                        <td>
-                          <button type="button" className="ghost-btn danger" onClick={() => removeOrderItem(item.productId)}>
-                            Remover
-                          </button>
-                        </td>
+              <section className="compras-pane">
+                <h4>Itens da ordem</h4>
+                <div className="table-scroll compras-order-table-wrap">
+                  <table className="order-items-table responsive-table">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th>Quantidade</th>
+                        <th>Custo (R$)</th>
+                        <th>Total</th>
+                        <th>Ação</th>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={5} className="empty">
-                        Nenhum item adicionado na ordem.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody>
+                      {props.purchaseForm.items.length ? (
+                        props.purchaseForm.items.map((item) => (
+                          <tr key={item.productId}>
+                            <td data-label="Item">{item.description}</td>
+                            <td data-label="Qtd.">{item.quantity}</td>
+                            <td data-label="Custo">{props.formatBRL(item.cost)}</td>
+                            <td data-label="Total">{props.formatBRL(item.quantity * item.cost)}</td>
+                            <td data-label="Ação">
+                              <button
+                                type="button"
+                                className="ghost-btn danger compras-remove-line-btn"
+                                onClick={() => removeOrderItem(item.productId)}
+                              >
+                                Remover
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="empty">
+                            Nenhum item adicionado na ordem.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
             </div>
 
             <p style={{ marginTop: 12, fontWeight: 600 }}>
@@ -665,7 +728,7 @@ export default function ComprasModule(props: ComprasModuleProps) {
               {props.formatBRL(orderGrandTotal)}
             </p>
 
-            <div className="table-actions">
+            <div className="table-actions compras-order-actions">
               <button type="submit" disabled={!props.purchaseForm.items.length}>
                 Finalizar ordem de compra
               </button>
