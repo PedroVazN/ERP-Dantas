@@ -180,6 +180,9 @@ export default function VendasModule(props: VendasModuleProps) {
           }
           .pix-box {
             margin-top: 16px;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 220px;
             border: 2px solid #848b76;
             border-radius: 14px;
             overflow: hidden;
@@ -196,9 +199,14 @@ export default function VendasModule(props: VendasModuleProps) {
             letter-spacing: 0.06em;
           }
           .pix-box img {
-            width: 100%;
             display: block;
+            width: auto;
+            height: auto;
+            max-width: 200px;
+            max-height: 200px;
+            margin: 0 auto;
             padding: 10px 10px 0;
+            object-fit: contain;
           }
           .pix-desc {
             margin: 0;
@@ -323,6 +331,11 @@ export default function VendasModule(props: VendasModuleProps) {
           @media print {
             @page { margin: 0.35cm; }
             body { padding: 0; background: #fff; }
+            .pix-box { max-width: 200px; }
+            .pix-box img {
+              max-width: 180px;
+              max-height: 180px;
+            }
           }
         </style>
       </head>
