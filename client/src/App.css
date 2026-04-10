@@ -1751,7 +1751,8 @@ th {
 
 /* Ajustes pontuais de responsividade para Vendas/Compras */
 @media (max-width: 900px) {
-  .vendas-module .table-scroll table {
+  /* Só a lista de ordens precisa de largura mínima; formulário de nova ordem fica 100% da tela */
+  .vendas-module .vendas-list-table table {
     min-width: 700px;
   }
 
@@ -1806,23 +1807,103 @@ th {
     gap: 6px;
   }
 
+  /* Nova ordem: painéis empilhados (sem arrastar horizontalmente) */
   .vendas-module .sales-create-panes {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(92%, 92%);
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x mandatory;
-    gap: 10px;
-    padding-bottom: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow-x: visible;
+    padding-bottom: 0;
   }
 
   .vendas-module .sales-pane {
-    scroll-snap-align: start;
+    min-width: 0;
+    width: 100%;
   }
 
-  .vendas-module .table-scroll table {
+  .vendas-module .order-form .vendas-order-table-wrap {
+    overflow-x: visible;
+  }
+
+  /* Sobrescreve o min-width global de .table-scroll table no formulário de venda */
+  .vendas-module .order-form .vendas-order-table-wrap table {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .vendas-module .vendas-list-table table {
     min-width: 620px;
+  }
+
+  .vendas-module .order-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .vendas-module .order-header .view-switch {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .vendas-module .order-header .view-switch button {
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+    text-align: center;
+    padding: 10px 8px;
+    font-size: 13px;
+  }
+
+  .vendas-module .vendas-order-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .vendas-module .vendas-order-actions > button {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .vendas-module .vendas-card .table-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .vendas-module .vendas-card .table-actions .ghost-btn {
+    width: 100%;
+    min-width: 0;
+    text-align: center;
+  }
+
+  .vendas-module .order-form .responsive-table td[data-label]:has(input) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .vendas-module .order-form .responsive-table td[data-label]:has(input)::before {
+    margin-bottom: 0;
+  }
+
+  .vendas-module .order-form .responsive-table td[data-label] input {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .vendas-module .vendas-add-line-btn,
+  .vendas-module .vendas-remove-line-btn {
+    width: 100%;
+    min-width: 0;
   }
 
   .compras-module .table-scroll table {

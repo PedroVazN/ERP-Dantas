@@ -798,8 +798,8 @@ export default function VendasModule(props: VendasModuleProps) {
             <div className="sales-create-panes">
               <section className="sales-pane">
                 <h4>Produtos disponíveis</h4>
-                <div className="table-scroll">
-                  <table className="order-items-table">
+                <div className="table-scroll vendas-order-table-wrap">
+                  <table className="order-items-table responsive-table">
                     <thead>
                       <tr>
                         <th>Produto</th>
@@ -814,10 +814,10 @@ export default function VendasModule(props: VendasModuleProps) {
                       {props.products.length ? (
                         props.products.map((item) => (
                           <tr key={item._id}>
-                            <td>{item.name}</td>
-                            <td>{item.stock}</td>
-                            <td>{props.formatBRL(item.price)}</td>
-                            <td>
+                            <td data-label="Produto">{item.name}</td>
+                            <td data-label="Estoque">{item.stock}</td>
+                            <td data-label="Preço">{props.formatBRL(item.price)}</td>
+                            <td data-label="Preço custom. (R$)">
                               <input
                                 type="number"
                                 min={0}
@@ -827,7 +827,7 @@ export default function VendasModule(props: VendasModuleProps) {
                                 onChange={(event) => updateLineDraft(item._id, "unitPrice", event.target.value)}
                               />
                             </td>
-                            <td>
+                            <td data-label="Quantidade">
                               <input
                                 type="number"
                                 min={1}
@@ -836,8 +836,8 @@ export default function VendasModule(props: VendasModuleProps) {
                                 onChange={(event) => updateLineDraft(item._id, "quantity", event.target.value)}
                               />
                             </td>
-                            <td>
-                              <button type="button" onClick={() => addSaleFromLine(item)}>
+                            <td data-label="Ação">
+                              <button type="button" className="vendas-add-line-btn" onClick={() => addSaleFromLine(item)}>
                                 Adicionar
                               </button>
                             </td>
@@ -857,8 +857,8 @@ export default function VendasModule(props: VendasModuleProps) {
 
               <section className="sales-pane">
                 <h4>Itens da ordem</h4>
-                <div className="table-scroll">
-                  <table className="order-items-table">
+                <div className="table-scroll vendas-order-table-wrap">
+                  <table className="order-items-table responsive-table">
                     <thead>
                       <tr>
                         <th>Produto</th>
@@ -872,14 +872,14 @@ export default function VendasModule(props: VendasModuleProps) {
                       {props.saleForm.items.length ? (
                         props.saleForm.items.map((it) => (
                           <tr key={it.productId}>
-                            <td>{findProductName(it.productId)}</td>
-                            <td>{it.quantity}</td>
-                            <td>{props.formatBRL(it.unitPrice)}</td>
-                            <td>{props.formatBRL(it.quantity * it.unitPrice)}</td>
-                            <td>
+                            <td data-label="Produto">{findProductName(it.productId)}</td>
+                            <td data-label="Qtd.">{it.quantity}</td>
+                            <td data-label="Preço">{props.formatBRL(it.unitPrice)}</td>
+                            <td data-label="Total">{props.formatBRL(it.quantity * it.unitPrice)}</td>
+                            <td data-label="Ação">
                               <button
                                 type="button"
-                                className="ghost-btn danger"
+                                className="ghost-btn danger vendas-remove-line-btn"
                                 onClick={() => removeSaleItem(it.productId)}
                               >
                                 Remover
@@ -900,7 +900,7 @@ export default function VendasModule(props: VendasModuleProps) {
               </section>
             </div>
 
-            <div className="table-actions">
+            <div className="table-actions vendas-order-actions">
               <button type="submit" disabled={!props.saleForm.items.length}>
                 Finalizar venda
               </button>
