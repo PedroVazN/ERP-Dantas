@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { Types, isValidObjectId } from "mongoose";
 import * as XLSX from "xlsx";
 
-import { ProductModel } from "../models";
+import { ProductModel, SupplierModel } from "../models";
 import { upload } from "../app";
 import { blockWriteInGeneralScope, getBusinessFilter, getScopeContext } from "../middleware/scope";
 
@@ -17,6 +17,7 @@ type ImportPreviewRow = {
   stock: number;
   minStock: number;
   supplierId: string;
+  supplierName: string;
   valid: boolean;
   errors: string[];
 };
@@ -48,6 +49,7 @@ const PRODUCT_IMPORT_TEMPLATE_COLUMNS = [
   "estoque",
   "estoque_minimo",
   "fornecedor_id",
+  "fornecedor_nome",
 ];
 
 function toPreviewRow(raw: Record<string, unknown>, line: number): ImportPreviewRow {
@@ -56,6 +58,7 @@ function toPreviewRow(raw: Record<string, unknown>, line: number): ImportPreview
   const productCode = String(raw.codigo_produto || "").trim();
   const description = String(raw.descricao || "").trim();
   const supplierId = String(raw.fornecedor_id || "").trim();
+  const supplierName = String(raw.fornecedor_nome || "").trim();
   const price = parseNumber(raw.preco_tabela);
   const cost = parseNumber(raw.custo);
   const stock = parseNumber(raw.estoque);
@@ -68,7 +71,6 @@ function toPreviewRow(raw: Record<string, unknown>, line: number): ImportPreview
   if (!Number.isFinite(cost) || cost < 0) errors.push("Custo inválido.");
   if (!Number.isFinite(stock) || stock < 0) errors.push("Estoque inválido.");
   if (!Number.isFinite(minStock) || minStock < 0) errors.push("Estoque mínimo inválido.");
-  if (supplierId && !isValidObjectId(supplierId)) errors.push("Fornecedor ID inválido.");
 
   return {
     line,
@@ -81,6 +83,7 @@ function toPreviewRow(raw: Record<string, unknown>, line: number): ImportPreview
     stock: Number.isFinite(stock) ? stock : 0,
     minStock: Number.isFinite(minStock) ? minStock : 0,
     supplierId,
+    supplierName,
     valid: errors.length === 0,
     errors,
   };
@@ -266,7 +269,18 @@ export function registerProductRoutes(app: Express) {
   app.get("/api/products/import/template", (_req: Request, res: Response) => {
     const worksheet = XLSX.utils.aoa_to_sheet([
       PRODUCT_IMPORT_TEMPLATE_COLUMNS,
-      ["Sabonete Lavanda 90g", "SAB-LAV-90", "00123", "Base vegetal", 12.9, 6.2, 100, 10, ""],
+      [
+        "Sabonete Lavanda 90g",
+        "SAB-LAV-90",
+        "00123",
+        "Base vegetal",
+        12.9,
+        6.2,
+        100,
+        10,
+        "",
+        "Fornecedor Exemplo",
+      ],
     ]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "produtos");
@@ -348,6 +362,49 @@ export function registerProductRoutes(app: Express) {
       indexes.forEach((index) => {
         rows[index].errors.push("SKU duplicado na própria planilha.");
       });
+    });
+
+    const suppliers = await SupplierModel.find({ businessId, status: "ATIVO" })
+      .select("_id name")
+      .lean();
+    const suppliersByName = new Map<string, string>();
+    suppliers.forEach((supplier) => {
+      const key = String(supplier.name || "").trim().toLowerCase();
+      if (!key) return;
+      suppliersByName.set(key, String(supplier._id));
+    });
+
+    rows.forEach((row) => {
+      let resolvedSupplierId = row.supplierId.trim();
+      const supplierName = row.supplierName.trim();
+      if (resolvedSupplierId && isValidObjectId(resolvedSupplierId)) {
+        row.supplierId = resolvedSupplierId;
+        return;
+      }
+
+      // Suporte para quem informou nome no campo fornecedor_id por engano.
+      if (!supplierName && resolvedSupplierId && !isValidObjectId(resolvedSupplierId)) {
+        const byIdColumnName = suppliersByName.get(resolvedSupplierId.toLowerCase());
+        if (byIdColumnName) {
+          row.supplierId = byIdColumnName;
+          row.supplierName = resolvedSupplierId;
+          return;
+        }
+      }
+
+      if (supplierName) {
+        const byName = suppliersByName.get(supplierName.toLowerCase());
+        if (byName) {
+          row.supplierId = byName;
+        } else {
+          row.errors.push("Fornecedor não encontrado (nome).");
+        }
+        return;
+      }
+
+      if (resolvedSupplierId && !isValidObjectId(resolvedSupplierId)) {
+        row.errors.push("Fornecedor ID inválido.");
+      }
     });
 
     const uniqueSkus = Array.from(
