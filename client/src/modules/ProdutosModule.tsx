@@ -1,5 +1,5 @@
 import type { Product, Supplier } from "../types";
-import { API_URL } from "../api";
+import { API_URL, api } from "../api";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { useMemo, useState } from "react";
 
@@ -81,10 +81,38 @@ export type ProdutosModuleProps = {
   deleteProduct: (product: Product) => void;
 };
 
+type ImportedPreviewRow = {
+  line: number;
+  name: string;
+  sku: string;
+  productCode: string;
+  description: string;
+  price: number;
+  cost: number;
+  stock: number;
+  minStock: number;
+  supplierId: string;
+  valid: boolean;
+  errors: string[];
+};
+
+type ProductsImportPreview = {
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  rows: ImportedPreviewRow[];
+};
+
 export default function ProdutosModule(props: ProdutosModuleProps) {
   const [tab, setTab] = useState<"lista" | "catalogo">("lista");
   const [exportingPDF, setExportingPDF] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importCommitting, setImportCommitting] = useState(false);
+  const [importError, setImportError] = useState("");
+  const [importSuccess, setImportSuccess] = useState("");
+  const [importPreview, setImportPreview] = useState<ProductsImportPreview | null>(null);
 
   const catalogProducts = useMemo(() => {
     const q = catalogSearch.trim().toLowerCase();
@@ -243,6 +271,75 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
     }
   }
 
+  async function downloadImportTemplate() {
+    setImportError("");
+    try {
+      const response = await fetch(`${API_URL}${props.scopedPath("/products/import/template")}`);
+      if (!response.ok) {
+        throw new Error("Não foi possível baixar o modelo.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "modelo-importacao-produtos.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "Falha ao baixar modelo.");
+    }
+  }
+
+  async function previewImportFile() {
+    if (!importFile) {
+      setImportError("Selecione um arquivo .xlsx para continuar.");
+      return;
+    }
+    setImportLoading(true);
+    setImportError("");
+    setImportSuccess("");
+    try {
+      const formData = new FormData();
+      formData.append("file", importFile);
+      const response = await api.postFormData<ProductsImportPreview>(
+        props.scopedPath("/products/import/preview"),
+        formData
+      );
+      setImportPreview(response);
+    } catch (error) {
+      setImportPreview(null);
+      setImportError(error instanceof Error ? error.message : "Falha ao ler planilha.");
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
+  async function commitImport() {
+    if (!importPreview) return;
+    const validRows = importPreview.rows.filter((row) => row.valid);
+    if (!validRows.length) {
+      setImportError("Não há linhas válidas para importar.");
+      return;
+    }
+    setImportCommitting(true);
+    setImportError("");
+    setImportSuccess("");
+    try {
+      const response = await api.post<{ message: string }>(props.scopedPath("/products/import/commit"), {
+        rows: validRows,
+      });
+      setImportSuccess(response.message || "Produtos importados com sucesso.");
+      setImportPreview(null);
+      setImportFile(null);
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message : "Falha ao confirmar importação.");
+    } finally {
+      setImportCommitting(false);
+    }
+  }
+
   return (
     <section className="module-grid animated">
       <form className="form-card" onSubmit={props.submitProduct}>
@@ -384,6 +481,92 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
       </form>
 
       <section className="table-card">
+        <div className="products-import-panel">
+          <div className="products-import-header">
+            <div>
+              <h3>Cadastro em massa por Excel</h3>
+              <p className="theme-helper">
+                Baixe o modelo padrão, preencha os produtos e envie a planilha para validação antes do
+                cadastro.
+              </p>
+            </div>
+            <button type="button" className="ghost-btn" onClick={() => void downloadImportTemplate()}>
+              Baixar modelo Excel
+            </button>
+          </div>
+
+          <div className="products-import-actions">
+            <input
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              onChange={(event) => {
+                const file = event.target.files?.[0] || null;
+                setImportFile(file);
+                setImportPreview(null);
+                setImportError("");
+                setImportSuccess("");
+              }}
+            />
+            <button type="button" className="ghost-btn" onClick={() => void previewImportFile()} disabled={importLoading}>
+              {importLoading ? "Lendo planilha..." : "Validar planilha"}
+            </button>
+            <button
+              type="button"
+              className="ghost-btn"
+              onClick={() => void commitImport()}
+              disabled={!importPreview || importPreview.validRows === 0 || importCommitting}
+            >
+              {importCommitting ? "Importando..." : "Confirmar e cadastrar"}
+            </button>
+          </div>
+
+          {importError ? <p className="error">{importError}</p> : null}
+          {importSuccess ? <p className="feedback">{importSuccess}</p> : null}
+
+          {importPreview ? (
+            <div className="products-import-preview">
+              <p className="theme-helper">
+                Linhas: {importPreview.totalRows} · Válidas: {importPreview.validRows} · Com erro:{" "}
+                {importPreview.invalidRows}
+              </p>
+              <div className="table-scroll">
+                <table className="responsive-table products-import-table">
+                  <thead>
+                    <tr>
+                      <th>Linha</th>
+                      <th>Produto</th>
+                      <th>SKU</th>
+                      <th>Código</th>
+                      <th>Preço</th>
+                      <th>Custo</th>
+                      <th>Estoque</th>
+                      <th>Estoque mín.</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importPreview.rows.map((row) => (
+                      <tr key={`${row.line}-${row.sku}`} className={row.valid ? "" : "products-import-row-error"}>
+                        <td data-label="Linha">{row.line}</td>
+                        <td data-label="Produto">{row.name}</td>
+                        <td data-label="SKU">{row.sku}</td>
+                        <td data-label="Código">{row.productCode || "-"}</td>
+                        <td data-label="Preço">{props.formatBRL(row.price)}</td>
+                        <td data-label="Custo">{props.formatBRL(row.cost)}</td>
+                        <td data-label="Estoque">{row.stock}</td>
+                        <td data-label="Estoque mín.">{row.minStock}</td>
+                        <td data-label="Status">
+                          {row.valid ? "OK" : row.errors.join(" | ")}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+        </div>
+
         <div className="catalog-tabs">
           <button
             type="button"

@@ -192,6 +192,24 @@ export type MonthlyReportResponse = {
   series: MonthlyReportPoint[];
 };
 
+export type StockReportRow = {
+  productId: string;
+  product: string;
+  productCode: string;
+  quantitySold: number;
+  stock: number;
+  stockTimeMonths: number | null;
+  cost: number;
+  listPrice: number;
+  salePrice: number;
+  marginPercent: number;
+};
+
+export type StockReportResponse = {
+  months: number;
+  rows: StockReportRow[];
+};
+
 export type BiTimeseriesPoint = {
   period: string;
   label: string;

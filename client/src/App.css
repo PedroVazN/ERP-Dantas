@@ -2295,6 +2295,89 @@ th {
   min-height: 360px;
 }
 
+.reports-stock-card {
+  margin-top: 18px;
+}
+
+.reports-stock-header h3 {
+  margin: 0 0 6px;
+}
+
+.reports-stock-table-wrap {
+  margin-top: 12px;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.reports-stock-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1080px;
+  font-size: 13px;
+}
+
+.reports-stock-table th,
+.reports-stock-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border, #cbd5e1) 75%, transparent);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.reports-stock-table thead th {
+  position: sticky;
+  top: 0;
+  background: color-mix(in srgb, var(--panel, #ffffff) 94%, transparent);
+  z-index: 1;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.reports-stock-table tbody tr:hover {
+  background: color-mix(in srgb, var(--accent, #2563eb) 6%, transparent);
+}
+
+.products-import-panel {
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border, #cbd5e1) 70%, transparent);
+}
+
+.products-import-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.products-import-header h3 {
+  margin: 0 0 4px;
+}
+
+.products-import-actions {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.products-import-preview {
+  margin-top: 12px;
+}
+
+.products-import-table {
+  font-size: 13px;
+}
+
+.products-import-row-error {
+  background: color-mix(in srgb, #dc2626 10%, transparent);
+}
+
 /* Financeiro (fluxo de caixa) */
 .finance-header h2 {
   margin: 0 0 4px;

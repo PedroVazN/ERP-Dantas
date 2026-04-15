@@ -12,7 +12,7 @@ import {
 } from "recharts";
 
 import { api } from "../api";
-import type { MonthlyReportResponse } from "../types";
+import type { MonthlyReportResponse, StockReportResponse } from "../types";
 
 export type ReportsModuleProps = {
   scopedPath: (path: string) => string;
@@ -22,6 +22,7 @@ export type ReportsModuleProps = {
 export default function ReportsModule(props: ReportsModuleProps) {
   const [months, setMonths] = useState(12);
   const [data, setData] = useState<MonthlyReportResponse | null>(null);
+  const [stockData, setStockData] = useState<StockReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -30,12 +31,17 @@ export default function ReportsModule(props: ReportsModuleProps) {
       setLoading(true);
       setError("");
       const q = `?months=${months}`;
-      const res = await api.get<MonthlyReportResponse>(props.scopedPath(`/reports/monthly-series${q}`));
+      const [res, stockRes] = await Promise.all([
+        api.get<MonthlyReportResponse>(props.scopedPath(`/reports/monthly-series${q}`)),
+        api.get<StockReportResponse>(props.scopedPath(`/reports/stock-table${q}`)),
+      ]);
       setData(res);
+      setStockData(stockRes);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro ao carregar relatórios";
       setError(message);
       setData(null);
+      setStockData(null);
     } finally {
       setLoading(false);
     }
@@ -46,6 +52,7 @@ export default function ReportsModule(props: ReportsModuleProps) {
   }, [load]);
 
   const series = data?.series ?? [];
+  const stockRows = stockData?.rows ?? [];
 
   return (
     <section className="dashboard-shell reports-module">
@@ -150,6 +157,59 @@ export default function ReportsModule(props: ReportsModuleProps) {
             </div>
           </article>
         </div>
+      ) : null}
+
+      {!loading && !error ? (
+        <article className="table-card animated reports-stock-card">
+          <div className="reports-stock-header">
+            <h3>Relatório de estoque em tabela</h3>
+            <p className="theme-helper">
+              Uma linha por produto e colunas comparáveis para apoiar reposição, precificação e análise de
+              giro.
+            </p>
+          </div>
+
+          {stockRows.length > 0 ? (
+            <div className="reports-stock-table-wrap">
+              <table className="reports-stock-table">
+                <thead>
+                  <tr>
+                    <th>Produto</th>
+                    <th>Código do produto</th>
+                    <th>Quantidade vendida ({months}m)</th>
+                    <th>Quantidade em estoque</th>
+                    <th>Tempo de estoque</th>
+                    <th>Custo</th>
+                    <th>Preço de tabela</th>
+                    <th>Preço de venda</th>
+                    <th>Margem %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stockRows.map((row) => (
+                    <tr key={row.productId}>
+                      <td>{row.product}</td>
+                      <td>{row.productCode}</td>
+                      <td>{row.quantitySold}</td>
+                      <td>{row.stock}</td>
+                      <td>
+                        {row.stockTimeMonths === null || !Number.isFinite(row.stockTimeMonths)
+                          ? "Sem giro"
+                          : `${row.stockTimeMonths.toFixed(1)} meses`}
+                      </td>
+                      <td>{props.formatBRL(row.cost)}</td>
+                      <td>{props.formatBRL(row.listPrice)}</td>
+                      <td>{props.formatBRL(row.salePrice)}</td>
+                      <td>{`${row.marginPercent.toFixed(1)}%`}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="empty feedback">Nenhum produto encontrado para montar o relatório de estoque.</p>
+          )}
+        </article>
       ) : null}
 
       {!loading && !error && series.length === 0 ? (
