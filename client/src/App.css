@@ -2425,6 +2425,15 @@ th {
   color: #b91c1c;
 }
 
+.conta-corrente-page .finance-summary-grid {
+  margin-bottom: 12px;
+}
+
+.conta-corrente-table th:last-child,
+.conta-corrente-table td:last-child {
+  font-weight: 700;
+}
+
 @media (max-width: 1100px) {
   .finance-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

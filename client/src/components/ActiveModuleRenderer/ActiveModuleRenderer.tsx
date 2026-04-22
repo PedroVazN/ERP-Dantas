@@ -8,6 +8,7 @@ import VendasModule from "../../modules/VendasModule";
 import ComprasModule from "../../modules/ComprasModule";
 import FornecedoresModule from "../../modules/FornecedoresModule";
 import FinanceiroModule from "../../modules/FinanceiroModule";
+import ContaCorrenteModule from "../../modules/ContaCorrenteModule";
 import ChecklistModule from "../../modules/ChecklistModule";
 import IaModule from "../../modules/IaModule";
 import UsuarioModule from "../../modules/UsuarioModule";
@@ -26,6 +27,7 @@ export type ActiveModuleRendererProps = {
     | "compras"
     | "fornecedores"
     | "financeiro"
+    | "contaCorrente"
     | "checklist"
     | "ia"
     | "usuario";
@@ -308,6 +310,10 @@ export default function ActiveModuleRenderer(props: ActiveModuleRendererProps) {
         formatBRL={props.formatBRL}
       />
     );
+  }
+
+  if (props.activeModule === "contaCorrente") {
+    return <ContaCorrenteModule sales={props.sales} purchases={props.purchases} />;
   }
 
   if (props.activeModule === "checklist") {

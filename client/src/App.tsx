@@ -50,6 +50,7 @@ type ModuleKey =
   | "compras"
   | "fornecedores"
   | "financeiro"
+  | "contaCorrente"
   | "checklist"
   | "ia"
   | "usuario";
@@ -64,6 +65,7 @@ const moduleMeta: Record<ModuleKey, { label: string; short: string; helper: stri
   compras: { label: "Compras", short: "CP", helper: "Fornecedores e entradas" },
   fornecedores: { label: "Fornecedores", short: "FR", helper: "Cadastro de fornecedores" },
   financeiro: { label: "Financeiro", short: "FN", helper: "Contas e despesas" },
+  contaCorrente: { label: "Conta Corrente", short: "CC", helper: "Extrato e saldo em conta" },
   checklist: { label: "Checklist", short: "CK", helper: "Ideias e futuros implementos" },
   usuario: { label: "Usuario", short: "US", helper: "Perfil e preferências" },
   atualizacoes: { label: "Atualizações", short: "UP", helper: "Changelog e novidades da versão" },
@@ -332,6 +334,7 @@ function App() {
     if (!isGeneralWorkspace) return moduleMeta;
     return {
       dashboard: moduleMeta.dashboard,
+      contaCorrente: moduleMeta.contaCorrente,
       ia: moduleMeta.ia,
     };
   }, [isGeneralWorkspace]);
@@ -373,7 +376,7 @@ function App() {
   );
 
   useEffect(() => {
-    if (isGeneralWorkspace && activeModule !== "dashboard") {
+    if (isGeneralWorkspace && activeModule !== "dashboard" && activeModule !== "contaCorrente" && activeModule !== "ia") {
       setActiveModule("dashboard");
       setMobileMenuOpen(false);
     }
@@ -385,7 +388,7 @@ function App() {
       setMobileMenuOpen(false);
       return;
     }
-    if (isGeneralWorkspace && module !== "dashboard") {
+    if (isGeneralWorkspace && module !== "dashboard" && module !== "contaCorrente") {
       setMobileMenuOpen(false);
       return;
     }

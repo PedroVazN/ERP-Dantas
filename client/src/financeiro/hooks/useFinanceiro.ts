@@ -77,11 +77,11 @@ const isCurrentMonth = (date: Date) => {
 };
 
 function isVendaPaga(sale: Sale) {
-  return sale.status === "CONCLUIDA" || sale.status === "FATURADA" || sale.billingStatus === "FATURADO";
+  return sale.status === "PAGO" || sale.billingStatus === "FATURADO";
 }
 
 function isVendaCancelada(sale: Sale) {
-  return sale.status === "CANCELADA" || sale.billingStatus === "CANCELADO";
+  return sale.status === "CANCELADO" || sale.billingStatus === "CANCELADO";
 }
 
 function isCompraPaga(purchase: Purchase) {
@@ -96,12 +96,42 @@ export function useFinanceiro(params: { sales: Sale[]; purchases: Purchase[] }) 
   const [state, dispatch] = useReducer(reducer, initialState);
   const saleStateById = useRef<Map<string, { paid: boolean; cancelled: boolean }>>(new Map());
   const purchaseStateById = useRef<Map<string, { paid: boolean; cancelled: boolean }>>(new Map());
+  const salesSyncRunning = useRef(false);
+  const purchasesSyncRunning = useRef(false);
+  const createdEntradaVendaIds = useRef<Set<string>>(new Set());
+  const createdSaidaCompraIds = useRef<Set<string>>(new Set());
+
+  function dedupeMovimentacoes(items: Movimentacao[]) {
+    const seenAuto = new Set<string>();
+    const seenReversals = new Set<string>();
+    const result: Movimentacao[] = [];
+
+    const sorted = [...items].sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+    for (const mov of sorted) {
+      if (mov.origem === "venda" || mov.origem === "compra") {
+        const key = `${mov.origem}:${mov.referenciaId || ""}:${mov.tipo}`;
+        if (seenAuto.has(key)) {
+          continue;
+        }
+        seenAuto.add(key);
+      }
+      if (mov.origem === "estorno" && mov.movimentacaoOriginalId) {
+        if (seenReversals.has(mov.movimentacaoOriginalId)) {
+          continue;
+        }
+        seenReversals.add(mov.movimentacaoOriginalId);
+      }
+      result.push(mov);
+    }
+    return result;
+  }
 
   const load = useCallback(async () => {
     dispatch({ type: "setLoading", payload: true });
     try {
       const items = await financeiroService.listarMovimentacoes();
-      dispatch({ type: "setMovimentacoes", payload: items });
+      const deduped = dedupeMovimentacoes(items);
+      dispatch({ type: "setMovimentacoes", payload: deduped });
     } finally {
       dispatch({ type: "setLoading", payload: false });
     }
@@ -164,105 +194,125 @@ export function useFinanceiro(params: { sales: Sale[]; purchases: Purchase[] }) 
   // Integração automática: vendas pagas e estorno em cancelamento.
   useEffect(() => {
     async function syncSales() {
-      for (const sale of params.sales) {
-        const paid = isVendaPaga(sale);
-        const cancelled = isVendaCancelada(sale);
-        const prev = saleStateById.current.get(sale._id) || { paid: false, cancelled: false };
+      if (salesSyncRunning.current) return;
+      salesSyncRunning.current = true;
+      try {
+        for (const sale of params.sales) {
+          const paid = isVendaPaga(sale);
+          const cancelled = isVendaCancelada(sale);
+          const prev = saleStateById.current.get(sale._id) || { paid: false, cancelled: false };
+          const entradaKey = `venda:${sale._id}`;
 
-        if (paid && !prev.paid) {
-          const existing = state.movimentacoes.find(
-            (m) => m.origem === "venda" && m.referenciaId === sale._id && m.tipo === "entrada"
-          );
-          if (!existing) {
-            const desc = `Venda #${String(sale._id).slice(-6).toUpperCase()} - ${typeof sale.customer === "object" ? sale.customer?.name || "Cliente" : "Cliente"}`;
-            const created = await financeiroService.criarMovimentacao({
-              data: sale.createdAt || new Date().toISOString(),
-              tipo: "entrada",
-              valor: Number(sale.totalAmount) || 0,
-              descricao: desc,
-              categoria: "VENDAS",
-              origem: "venda",
-              referenciaId: sale._id,
-            });
-            dispatch({ type: "prependMovimentacao", payload: created });
-          }
-        }
-
-        if (cancelled && !prev.cancelled) {
-          const original = state.movimentacoes.find(
-            (m) => m.origem === "venda" && m.referenciaId === sale._id && m.tipo === "entrada"
-          );
-          if (original) {
-            const alreadyReversed = state.movimentacoes.some((m) => m.movimentacaoOriginalId === original.id);
-            if (!alreadyReversed) {
-              const est = await financeiroService.criarEstorno(
-                original,
-                new Date().toISOString(),
-                `Estorno venda #${String(sale._id).slice(-6).toUpperCase()}`
-              );
-              dispatch({ type: "prependMovimentacao", payload: est });
+          if (paid && !prev.paid && !createdEntradaVendaIds.current.has(entradaKey)) {
+            const existing = state.movimentacoes.find(
+              (m) => m.origem === "venda" && m.referenciaId === sale._id && m.tipo === "entrada"
+            );
+            if (!existing) {
+              createdEntradaVendaIds.current.add(entradaKey);
+              const desc = `Venda #${String(sale._id).slice(-6).toUpperCase()} - ${typeof sale.customer === "object" ? sale.customer?.name || "Cliente" : "Cliente"}`;
+              const created = await financeiroService.criarMovimentacao({
+                data: sale.createdAt || new Date().toISOString(),
+                tipo: "entrada",
+                valor: Number(sale.totalAmount) || 0,
+                descricao: desc,
+                categoria: "VENDAS",
+                origem: "venda",
+                referenciaId: sale._id,
+              });
+              dispatch({ type: "prependMovimentacao", payload: created });
+            } else {
+              createdEntradaVendaIds.current.add(entradaKey);
             }
           }
-        }
 
-        saleStateById.current.set(sale._id, { paid, cancelled });
+          if (cancelled && !prev.cancelled) {
+            const original = state.movimentacoes.find(
+              (m) => m.origem === "venda" && m.referenciaId === sale._id && m.tipo === "entrada"
+            );
+            if (original) {
+              const alreadyReversed = state.movimentacoes.some((m) => m.movimentacaoOriginalId === original.id);
+              if (!alreadyReversed) {
+                const est = await financeiroService.criarEstorno(
+                  original,
+                  new Date().toISOString(),
+                  `Estorno venda #${String(sale._id).slice(-6).toUpperCase()}`
+                );
+                dispatch({ type: "prependMovimentacao", payload: est });
+              }
+            }
+          }
+
+          saleStateById.current.set(sale._id, { paid, cancelled });
+        }
+      } finally {
+        salesSyncRunning.current = false;
       }
     }
     void syncSales();
-  }, [params.sales, state.movimentacoes]);
+  }, [params.sales]);
 
   // Integração automática: compras pagas e estorno em cancelamento.
   useEffect(() => {
     async function syncPurchases() {
-      for (const purchase of params.purchases) {
-        const paid = isCompraPaga(purchase);
-        const cancelled = isCompraCancelada(purchase);
-        const prev = purchaseStateById.current.get(purchase._id) || { paid: false, cancelled: false };
+      if (purchasesSyncRunning.current) return;
+      purchasesSyncRunning.current = true;
+      try {
+        for (const purchase of params.purchases) {
+          const paid = isCompraPaga(purchase);
+          const cancelled = isCompraCancelada(purchase);
+          const prev = purchaseStateById.current.get(purchase._id) || { paid: false, cancelled: false };
+          const saidaKey = `compra:${purchase._id}`;
 
-        if (paid && !prev.paid) {
-          const existing = state.movimentacoes.find(
-            (m) => m.origem === "compra" && m.referenciaId === purchase._id && m.tipo === "saida"
-          );
-          if (!existing) {
-            const created = await financeiroService.criarMovimentacao({
-              data: purchase.createdAt || new Date().toISOString(),
-              tipo: "saida",
-              valor: Number(purchase.totalAmount) || 0,
-              descricao: `Compra - ${purchase.supplier || "Fornecedor"}`,
-              categoria: "COMPRAS",
-              origem: "compra",
-              referenciaId: purchase._id,
-            });
-            dispatch({ type: "prependMovimentacao", payload: created });
-          }
-        }
-
-        if (cancelled && !prev.cancelled) {
-          const original = state.movimentacoes.find(
-            (m) => m.origem === "compra" && m.referenciaId === purchase._id && m.tipo === "saida"
-          );
-          if (original) {
-            const alreadyReversed = state.movimentacoes.some((m) => m.movimentacaoOriginalId === original.id);
-            if (!alreadyReversed) {
-              const est = await financeiroService.criarEstorno(
-                original,
-                new Date().toISOString(),
-                `Estorno compra #${String(purchase._id).slice(-6).toUpperCase()}`
-              );
-              dispatch({ type: "prependMovimentacao", payload: est });
+          if (paid && !prev.paid && !createdSaidaCompraIds.current.has(saidaKey)) {
+            const existing = state.movimentacoes.find(
+              (m) => m.origem === "compra" && m.referenciaId === purchase._id && m.tipo === "saida"
+            );
+            if (!existing) {
+              createdSaidaCompraIds.current.add(saidaKey);
+              const created = await financeiroService.criarMovimentacao({
+                data: purchase.createdAt || new Date().toISOString(),
+                tipo: "saida",
+                valor: Number(purchase.totalAmount) || 0,
+                descricao: `Compra - ${purchase.supplier || "Fornecedor"}`,
+                categoria: "COMPRAS",
+                origem: "compra",
+                referenciaId: purchase._id,
+              });
+              dispatch({ type: "prependMovimentacao", payload: created });
+            } else {
+              createdSaidaCompraIds.current.add(saidaKey);
             }
           }
-        }
 
-        purchaseStateById.current.set(purchase._id, { paid, cancelled });
+          if (cancelled && !prev.cancelled) {
+            const original = state.movimentacoes.find(
+              (m) => m.origem === "compra" && m.referenciaId === purchase._id && m.tipo === "saida"
+            );
+            if (original) {
+              const alreadyReversed = state.movimentacoes.some((m) => m.movimentacaoOriginalId === original.id);
+              if (!alreadyReversed) {
+                const est = await financeiroService.criarEstorno(
+                  original,
+                  new Date().toISOString(),
+                  `Estorno compra #${String(purchase._id).slice(-6).toUpperCase()}`
+                );
+                dispatch({ type: "prependMovimentacao", payload: est });
+              }
+            }
+          }
+
+          purchaseStateById.current.set(purchase._id, { paid, cancelled });
+        }
+      } finally {
+        purchasesSyncRunning.current = false;
       }
     }
     void syncPurchases();
-  }, [params.purchases, state.movimentacoes]);
+  }, [params.purchases]);
 
   const sortedMovimentacoes = useMemo(
     () =>
-      [...state.movimentacoes].sort(
+      dedupeMovimentacoes(state.movimentacoes).sort(
         (a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()
       ),
     [state.movimentacoes]
