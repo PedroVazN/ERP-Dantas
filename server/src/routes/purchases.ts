@@ -277,12 +277,33 @@ export function registerPurchaseRoutes(
         purchase.approval.status = "REJEITADA";
       }
     } else if (nextStatus === "RECEBIDA") {
-      // Ao marcar como recebida, aplica o estoque se ainda não foi aplicado.
+      // Ao marcar como recebida, aplica o estoque uma única vez.
+      // O lock abaixo evita duplicidade em cliques/requisições concorrentes.
+      let shouldApplyStock = false;
       if (!purchase.stockApplied) {
-        await deps.applyPurchaseStock(
-          businessId,
-          purchase.items as Array<{ product?: Types.ObjectId; quantity: number; cost: number }>
+        const lock = await PurchaseModel.updateOne(
+          { _id: purchase._id, businessId, stockApplied: false },
+          { $set: { stockApplied: true } }
         );
+        shouldApplyStock = lock.modifiedCount === 1;
+      }
+      if (shouldApplyStock) {
+        try {
+          await deps.applyPurchaseStock(
+            businessId,
+            purchase.items as Array<{ product?: Types.ObjectId; quantity: number; cost: number }>
+          );
+          purchase.stockApplied = true;
+        } catch (error) {
+          // rollback do lock caso a aplicação de estoque falhe
+          await PurchaseModel.updateOne(
+            { _id: purchase._id, businessId },
+            { $set: { stockApplied: false } }
+          );
+          purchase.stockApplied = false;
+          throw error;
+        }
+      } else {
         purchase.stockApplied = true;
       }
       purchase.status = "RECEBIDA";
