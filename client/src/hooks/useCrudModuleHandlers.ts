@@ -725,6 +725,25 @@ export function useCrudModuleHandlers(deps: {
     await loadAllData();
   }
 
+  async function updatePurchaseWorkflow(
+    purchaseId: string,
+    payload: {
+      approval?: "PENDENTE" | "APROVADA" | "REJEITADA";
+      received?: boolean;
+      reason?: string;
+    }
+  ) {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para alterar status.");
+      return;
+    }
+    await api.patch<Purchase>(scopedPath(`/purchases/${purchaseId}/workflow`), {
+      ...payload,
+      reviewedBy: currentUser?.name || "Gestor",
+    });
+    await loadAllData();
+  }
+
   async function reviewExpense(expenseId: string, action: "aprovar" | "rejeitar" | "pagar") {
     if (isGeneralWorkspace) {
       setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para aprovar.");
@@ -772,6 +791,7 @@ export function useCrudModuleHandlers(deps: {
     submitUserProfile,
     reviewPurchase,
     markPurchaseReceived,
+    updatePurchaseWorkflow,
     reviewExpense,
     updateExpensePaymentStatus,
   };

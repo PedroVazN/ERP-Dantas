@@ -737,6 +737,7 @@ function App() {
           purchases={purchases}
           reviewPurchase={crudHandlers.reviewPurchase}
           markPurchaseReceived={crudHandlers.markPurchaseReceived}
+          updatePurchaseWorkflow={crudHandlers.updatePurchaseWorkflow}
           editPurchase={crudHandlers.editPurchase}
           deletePurchase={crudHandlers.deletePurchase}
 

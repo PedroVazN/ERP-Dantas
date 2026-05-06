@@ -885,6 +885,110 @@ th {
   border: 1px solid var(--border);
 }
 
+/* Dropdown clicavel com aparencia de status-chip (usado no modulo Compras) */
+.status-chip-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 24px 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.045em;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 12px) 50%, calc(100% - 8px) 50%;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+  min-width: 0;
+  transition: filter 0.15s ease, transform 0.05s ease;
+}
+
+.status-chip-select:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.status-chip-select:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.status-chip-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.status-chip-select option {
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text);
+  background: var(--panel);
+  font-weight: 600;
+}
+
+.status-chip-select.success {
+  background-color: color-mix(in srgb, #22c55e 22%, transparent);
+  color: #15803d;
+  border: 1px solid color-mix(in srgb, #22c55e 35%, var(--border));
+}
+
+.status-chip-select.warning {
+  background-color: color-mix(in srgb, #f59e0b 20%, transparent);
+  color: #b45309;
+  border: 1px solid color-mix(in srgb, #f59e0b 35%, var(--border));
+}
+
+.status-chip-select.danger {
+  background-color: color-mix(in srgb, #ef4444 16%, transparent);
+  color: #b91c1c;
+  border: 1px solid color-mix(in srgb, #ef4444 35%, var(--border));
+}
+
+.status-chip-select.neutral {
+  background-color: var(--panel-2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+/* Layout em grid para o card mobile do modulo Compras */
+.compras-card-statuses-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px !important;
+  align-items: end;
+}
+
+.compras-card-status-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.compras-card-status-item small {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.compras-card-status-item .status-chip,
+.compras-card-status-item .status-chip-select {
+  width: 100%;
+  text-align: center;
+}
+
+@media (max-width: 480px) {
+  .compras-card-statuses-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .updates-shell {
   grid-column: 1 / -1;
 }
@@ -1803,7 +1907,7 @@ th {
   }
 
   .compras-module .compras-list-table table {
-    min-width: 660px;
+    min-width: 820px;
   }
 
   .vendas-module .order-items-table input,
@@ -2011,7 +2115,7 @@ th {
   }
 
   .compras-module .compras-list-table table {
-    min-width: 560px;
+    min-width: 720px;
   }
 
   .compras-module .order-header {

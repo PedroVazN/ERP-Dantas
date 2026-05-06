@@ -320,6 +320,171 @@ export function registerPurchaseRoutes(
     res.json(purchase);
   });
 
+  app.patch("/api/purchases/:id/workflow", async (req: Request, res: Response) => {
+    if (blockWriteInGeneralScope(req, res)) {
+      return;
+    }
+    const { businessId } = getScopeContext(req);
+    const { id } = req.params;
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ message: "ID inválido." });
+    }
+
+    const { approval, received, reviewedBy, reason } = req.body as {
+      approval?: "PENDENTE" | "APROVADA" | "REJEITADA";
+      received?: boolean;
+      reviewedBy?: string;
+      reason?: string;
+    };
+
+    if (approval === undefined && received === undefined) {
+      return res.status(400).json({
+        message: "Informe ao menos um campo (approval ou received).",
+      });
+    }
+
+    if (approval !== undefined && !["PENDENTE", "APROVADA", "REJEITADA"].includes(approval)) {
+      return res.status(400).json({ message: "Status de aprovação inválido." });
+    }
+
+    const purchase = await PurchaseModel.findOne({ _id: id, businessId });
+    if (!purchase) {
+      return res.status(404).json({ message: "Compra não encontrada." });
+    }
+    if (purchase.status === "CANCELADA") {
+      return res.status(400).json({ message: "Compra cancelada não pode ser alterada." });
+    }
+
+    const reviewer = (reviewedBy || "Gestor").toString().trim() || "Gestor";
+    const reasonText = (reason || "").toString().trim();
+
+    // Helpers locais para reverter / aplicar estoque desta ordem.
+    async function revertStock(): Promise<void> {
+      if (!purchase!.stockApplied) return;
+      for (const item of purchase!.items || []) {
+        if (!item.product) continue;
+        await ProductModel.updateOne(
+          { _id: item.product, businessId },
+          { $inc: { stock: -item.quantity } }
+        );
+      }
+      purchase!.stockApplied = false;
+    }
+
+    async function applyStock(): Promise<void> {
+      if (purchase!.stockApplied) return;
+      await deps.applyPurchaseStock(
+        businessId,
+        purchase!.items as Array<{ product?: Types.ObjectId; quantity: number; cost: number }>
+      );
+      purchase!.stockApplied = true;
+    }
+
+    // 1) Mudança de aprovação
+    if (approval !== undefined) {
+      const currentApproval = (purchase.approval?.status as "PENDENTE" | "APROVADA" | "REJEITADA") || "PENDENTE";
+
+      if (approval !== currentApproval) {
+        // Saindo de APROVADA -> reverte estoque (se aplicado) e remove despesa pendente vinculada.
+        if (currentApproval === "APROVADA" && approval !== "APROVADA") {
+          await revertStock();
+          await ExpenseModel.deleteOne({
+            businessId,
+            purchaseId: purchase._id,
+            category: "COMPRAS",
+            status: "PENDENTE",
+          });
+        }
+
+        // Entrando em APROVADA -> garante despesa pendente vinculada.
+        if (approval === "APROVADA" && currentApproval !== "APROVADA") {
+          const existing = await ExpenseModel.findOne({
+            businessId,
+            purchaseId: purchase._id,
+          });
+          if (!existing) {
+            await ExpenseModel.create({
+              businessId,
+              purchaseId: purchase._id,
+              description: `OC-${String(purchase._id).slice(-6).toUpperCase()} - ${purchase.supplier}`,
+              category: "COMPRAS",
+              amount: purchase.totalAmount,
+              dueDate: new Date(),
+              status: "PENDENTE",
+              approval: {
+                required: false,
+                status: "APROVADA",
+                requestedBy: "Sistema",
+                requestedAt: new Date(),
+                reviewedBy: reviewer,
+                reviewedAt: new Date(),
+                reason: "Despesa gerada automaticamente após aprovação da ordem de compra.",
+              },
+            });
+          }
+        }
+
+        purchase.approval = {
+          required: true,
+          status: approval,
+          requestedBy: purchase.approval?.requestedBy || "Sistema",
+          requestedAt:
+            purchase.approval?.requestedAt || purchase.createdAt || new Date(),
+          reviewedBy: reviewer,
+          reviewedAt: new Date(),
+          reason:
+            reasonText ||
+            (approval === "APROVADA"
+              ? "Aprovação registrada no fluxo de compras."
+              : approval === "REJEITADA"
+              ? "Rejeição registrada no fluxo de compras."
+              : "Aprovação revertida para pendente."),
+        };
+      }
+    }
+
+    // 2) Mudança de recebimento
+    if (received !== undefined) {
+      const finalApproval = (purchase.approval?.status as "PENDENTE" | "APROVADA" | "REJEITADA") || "PENDENTE";
+
+      if (received) {
+        if (finalApproval !== "APROVADA") {
+          return res.status(400).json({
+            message: "Aprove a ordem antes de marcar como recebida.",
+          });
+        }
+        await applyStock();
+      } else {
+        await revertStock();
+      }
+    }
+
+    // 3) Recalcula status da ordem com base em aprovação + recebimento
+    const finalApproval = (purchase.approval?.status as "PENDENTE" | "APROVADA" | "REJEITADA") || "PENDENTE";
+    if (finalApproval === "REJEITADA") {
+      purchase.status = "REJEITADA";
+    } else if (finalApproval === "PENDENTE") {
+      purchase.status = "AGUARDANDO_APROVACAO";
+    } else {
+      purchase.status = purchase.stockApplied ? "RECEBIDA" : "APROVADA";
+    }
+
+    await purchase.save();
+
+    await deps.notifySystemWhatsApp(
+      [
+        "Workflow de compra atualizado",
+        `ERP: ${businessId}`,
+        `OC: ${String(purchase._id).slice(-6).toUpperCase()}`,
+        `Aprovação: ${purchase.approval?.status || "-"}`,
+        `Status: ${purchase.status}`,
+        `Revisor: ${reviewer}`,
+      ].join("\n")
+    );
+
+    res.json(purchase);
+  });
+
   app.delete("/api/purchases/:id", async (req: Request, res: Response) => {
     if (blockWriteInGeneralScope(req, res)) {
       return;

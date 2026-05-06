@@ -21,12 +21,19 @@ export type ComprasModuleProps = {
   purchases: Purchase[];
   reviewPurchase: (purchaseId: string, action: "aprovar" | "rejeitar") => void;
   markPurchaseReceived: (purchaseId: string) => void;
+  updatePurchaseWorkflow: (
+    purchaseId: string,
+    payload: { approval?: "PENDENTE" | "APROVADA" | "REJEITADA"; received?: boolean; reason?: string }
+  ) => void;
   editPurchase: (purchase: Purchase) => void;
   deletePurchase: (purchase: Purchase) => void;
   products: Product[];
   expenses: Expense[];
   formatBRL: (value: number) => string;
 };
+
+type ApprovalStatus = "PENDENTE" | "APROVADA" | "REJEITADA";
+type ReceiptStatus = "NAO_RECEBIDO" | "RECEBIDO";
 
 export default function ComprasModule(props: ComprasModuleProps) {
   const [screen, setScreen] = useState<"lista" | "criar">("lista");
@@ -102,11 +109,57 @@ export default function ComprasModule(props: ComprasModuleProps) {
     return "status-chip neutral";
   }
 
-  function getApprovalBadgeClass(status?: Purchase["approval"] extends { status?: infer T } ? T : string) {
-    if (status === "APROVADA") return "status-chip success";
-    if (status === "REJEITADA") return "status-chip danger";
-    if (status === "PENDENTE") return "status-chip warning";
-    return "status-chip neutral";
+  function getApprovalChipTone(status: ApprovalStatus): "success" | "warning" | "danger" | "neutral" {
+    if (status === "APROVADA") return "success";
+    if (status === "REJEITADA") return "danger";
+    if (status === "PENDENTE") return "warning";
+    return "neutral";
+  }
+
+  function getReceiptChipTone(status: ReceiptStatus): "success" | "warning" {
+    return status === "RECEBIDO" ? "success" : "warning";
+  }
+
+  function getApprovalStatus(item: Purchase): ApprovalStatus {
+    return (item.approval?.status as ApprovalStatus) || "PENDENTE";
+  }
+
+  function getReceiptStatus(item: Purchase): ReceiptStatus {
+    return item.status === "RECEBIDA" ? "RECEBIDO" : "NAO_RECEBIDO";
+  }
+
+  function isLocked(item: Purchase): boolean {
+    return item.status === "CANCELADA";
+  }
+
+  async function handleApprovalChange(item: Purchase, value: ApprovalStatus) {
+    if (isLocked(item)) return;
+    if (value === getApprovalStatus(item)) return;
+
+    if (value !== "APROVADA" && getReceiptStatus(item) === "RECEBIDO") {
+      const ok = window.confirm(
+        "Esta ordem já foi recebida. Alterar a aprovação irá reverter o estoque desta ordem. Deseja continuar?"
+      );
+      if (!ok) return;
+    }
+    await props.updatePurchaseWorkflow(item._id, { approval: value });
+  }
+
+  async function handleReceiptChange(item: Purchase, value: ReceiptStatus) {
+    if (isLocked(item)) return;
+    if (value === getReceiptStatus(item)) return;
+
+    if (value === "RECEBIDO" && getApprovalStatus(item) !== "APROVADA") {
+      window.alert("Aprove a ordem antes de marcar como recebida.");
+      return;
+    }
+    if (value === "NAO_RECEBIDO") {
+      const ok = window.confirm(
+        "Reverter o recebimento irá descontar do estoque os itens já lançados desta ordem. Deseja continuar?"
+      );
+      if (!ok) return;
+    }
+    await props.updatePurchaseWorkflow(item._id, { received: value === "RECEBIDO" });
   }
 
   function resetToList() {
@@ -344,7 +397,7 @@ export default function ComprasModule(props: ComprasModuleProps) {
                 </select>
               </div>
               <div className="form-field">
-                <label>Status</label>
+                <label>Status da ordem</label>
                 <select
                   value={statusFilter}
                   onChange={(event) => {
@@ -380,78 +433,81 @@ export default function ComprasModule(props: ComprasModuleProps) {
                     <th>Fornecedor</th>
                     <th>Data</th>
                     <th>Valor</th>
-                    <th>Status</th>
+                    <th>Status da Ordem</th>
                     <th>Aprovação</th>
+                    <th>Recebimento</th>
                     <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedPurchases.length ? (
-                    paginatedPurchases.map((item) => (
-                      <tr key={item._id}>
-                        <td>OC-{String(item._id).slice(-4).toUpperCase()}</td>
-                        <td>{item.supplier}</td>
-                        <td>{new Date(item.createdAt).toLocaleDateString("pt-BR")}</td>
-                        <td>{props.formatBRL(item.totalAmount)}</td>
-                        <td>
-                          <span className={getPurchaseBadgeClass(item.status)}>
-                            {item.status.replaceAll("_", " ")}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={getApprovalBadgeClass(item.approval?.status)}>
-                            {(item.approval?.status || "N/A").replaceAll("_", " ")}
-                          </span>
-                        </td>
-                        <td>
-                          <div className="table-actions">
-                            {item.status === "AGUARDANDO_APROVACAO" ? (
-                              <>
-                                <button
-                                  type="button"
-                                  className="ghost-btn"
-                                  onClick={() => props.reviewPurchase(item._id, "aprovar")}
-                                >
-                                  Aprovar
-                                </button>
-                                <button
-                                  type="button"
-                                  className="ghost-btn danger"
-                                  onClick={() => props.reviewPurchase(item._id, "rejeitar")}
-                                >
-                                  Rejeitar
-                                </button>
-                              </>
-                            ) : null}
-                            {item.status === "APROVADA" ? (
+                    paginatedPurchases.map((item) => {
+                      const approvalStatus = getApprovalStatus(item);
+                      const receiptStatus = getReceiptStatus(item);
+                      const locked = isLocked(item);
+                      return (
+                        <tr key={item._id}>
+                          <td>OC-{String(item._id).slice(-4).toUpperCase()}</td>
+                          <td>{item.supplier}</td>
+                          <td>{new Date(item.createdAt).toLocaleDateString("pt-BR")}</td>
+                          <td>{props.formatBRL(item.totalAmount)}</td>
+                          <td>
+                            <span className={getPurchaseBadgeClass(item.status)}>
+                              {item.status.replaceAll("_", " ")}
+                            </span>
+                          </td>
+                          <td>
+                            <select
+                              className={`status-chip-select ${getApprovalChipTone(approvalStatus)}`}
+                              value={approvalStatus}
+                              disabled={locked}
+                              title="Clique para alterar a aprovação"
+                              onChange={(event) => handleApprovalChange(item, event.target.value as ApprovalStatus)}
+                            >
+                              <option value="PENDENTE">PENDENTE</option>
+                              <option value="APROVADA">APROVADA</option>
+                              <option value="REJEITADA">REJEITADA</option>
+                            </select>
+                          </td>
+                          <td>
+                            <select
+                              className={`status-chip-select ${getReceiptChipTone(receiptStatus)}`}
+                              value={receiptStatus}
+                              disabled={locked || approvalStatus !== "APROVADA"}
+                              title={
+                                approvalStatus !== "APROVADA"
+                                  ? "Aprove a ordem para alterar o recebimento"
+                                  : "Clique para alterar o recebimento"
+                              }
+                              onChange={(event) => handleReceiptChange(item, event.target.value as ReceiptStatus)}
+                            >
+                              <option value="NAO_RECEBIDO">NÃO RECEBIDO</option>
+                              <option value="RECEBIDO">RECEBIDO</option>
+                            </select>
+                          </td>
+                          <td>
+                            <div className="table-actions">
+                              <button type="button" className="ghost-btn" onClick={() => generatePurchasePdf(item)}>
+                                PDF pedido
+                              </button>
+                              <button type="button" className="ghost-btn" onClick={() => props.editPurchase(item)}>
+                                Editar
+                              </button>
                               <button
                                 type="button"
-                                className="ghost-btn"
-                                onClick={() => props.markPurchaseReceived(item._id)}
+                                className="ghost-btn danger"
+                                onClick={() => props.deletePurchase(item)}
                               >
-                                Marcar Recebida
+                                Excluir
                               </button>
-                            ) : null}
-                            <button type="button" className="ghost-btn" onClick={() => generatePurchasePdf(item)}>
-                              PDF pedido
-                            </button>
-                            <button type="button" className="ghost-btn" onClick={() => props.editPurchase(item)}>
-                              Editar
-                            </button>
-                            <button
-                              type="button"
-                              className="ghost-btn danger"
-                              onClick={() => props.deletePurchase(item)}
-                            >
-                              Excluir
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
-                      <td colSpan={7} className="empty">
+                      <td colSpan={8} className="empty">
                         Nenhuma ordem encontrada com os filtros atuais.
                       </td>
                     </tr>
@@ -462,50 +518,65 @@ export default function ComprasModule(props: ComprasModuleProps) {
 
             <div className="compras-list-cards">
               {paginatedPurchases.length ? (
-                paginatedPurchases.map((item) => (
-                  <article className="compras-card" key={item._id}>
-                    <div className="compras-card-head">
-                      <strong>OC-{String(item._id).slice(-4).toUpperCase()}</strong>
-                      <span>{new Date(item.createdAt).toLocaleDateString("pt-BR")}</span>
-                    </div>
-                    <p className="compras-card-supplier">{item.supplier}</p>
-                    <div className="compras-card-metrics">
-                      <span>{props.formatBRL(item.totalAmount)}</span>
-                    </div>
-                    <div className="compras-card-statuses">
-                      <span className={getPurchaseBadgeClass(item.status)}>{item.status.replaceAll("_", " ")}</span>
-                      <span className={getApprovalBadgeClass(item.approval?.status)}>
-                        {(item.approval?.status || "N/A").replaceAll("_", " ")}
-                      </span>
-                    </div>
-                    <div className="table-actions">
-                      {item.status === "AGUARDANDO_APROVACAO" ? (
-                        <>
-                          <button type="button" className="ghost-btn" onClick={() => props.reviewPurchase(item._id, "aprovar")}>
-                            Aprovar
-                          </button>
-                          <button type="button" className="ghost-btn danger" onClick={() => props.reviewPurchase(item._id, "rejeitar")}>
-                            Rejeitar
-                          </button>
-                        </>
-                      ) : null}
-                      {item.status === "APROVADA" ? (
-                        <button type="button" className="ghost-btn" onClick={() => props.markPurchaseReceived(item._id)}>
-                          Marcar Recebida
+                paginatedPurchases.map((item) => {
+                  const approvalStatus = getApprovalStatus(item);
+                  const receiptStatus = getReceiptStatus(item);
+                  const locked = isLocked(item);
+                  return (
+                    <article className="compras-card" key={item._id}>
+                      <div className="compras-card-head">
+                        <strong>OC-{String(item._id).slice(-4).toUpperCase()}</strong>
+                        <span>{new Date(item.createdAt).toLocaleDateString("pt-BR")}</span>
+                      </div>
+                      <p className="compras-card-supplier">{item.supplier}</p>
+                      <div className="compras-card-metrics">
+                        <span>{props.formatBRL(item.totalAmount)}</span>
+                      </div>
+                      <div className="compras-card-statuses compras-card-statuses-grid">
+                        <div className="compras-card-status-item">
+                          <small>Status da Ordem</small>
+                          <span className={getPurchaseBadgeClass(item.status)}>{item.status.replaceAll("_", " ")}</span>
+                        </div>
+                        <div className="compras-card-status-item">
+                          <small>Aprovação</small>
+                          <select
+                            className={`status-chip-select ${getApprovalChipTone(approvalStatus)}`}
+                            value={approvalStatus}
+                            disabled={locked}
+                            onChange={(event) => handleApprovalChange(item, event.target.value as ApprovalStatus)}
+                          >
+                            <option value="PENDENTE">PENDENTE</option>
+                            <option value="APROVADA">APROVADA</option>
+                            <option value="REJEITADA">REJEITADA</option>
+                          </select>
+                        </div>
+                        <div className="compras-card-status-item">
+                          <small>Recebimento</small>
+                          <select
+                            className={`status-chip-select ${getReceiptChipTone(receiptStatus)}`}
+                            value={receiptStatus}
+                            disabled={locked || approvalStatus !== "APROVADA"}
+                            onChange={(event) => handleReceiptChange(item, event.target.value as ReceiptStatus)}
+                          >
+                            <option value="NAO_RECEBIDO">NÃO RECEBIDO</option>
+                            <option value="RECEBIDO">RECEBIDO</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="table-actions">
+                        <button type="button" className="ghost-btn" onClick={() => generatePurchasePdf(item)}>
+                          PDF pedido
                         </button>
-                      ) : null}
-                      <button type="button" className="ghost-btn" onClick={() => generatePurchasePdf(item)}>
-                        PDF pedido
-                      </button>
-                      <button type="button" className="ghost-btn" onClick={() => props.editPurchase(item)}>
-                        Editar
-                      </button>
-                      <button type="button" className="ghost-btn danger" onClick={() => props.deletePurchase(item)}>
-                        Excluir
-                      </button>
-                    </div>
-                  </article>
-                ))
+                        <button type="button" className="ghost-btn" onClick={() => props.editPurchase(item)}>
+                          Editar
+                        </button>
+                        <button type="button" className="ghost-btn danger" onClick={() => props.deletePurchase(item)}>
+                          Excluir
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })
               ) : (
                 <p className="empty">Nenhuma ordem encontrada com os filtros atuais.</p>
               )}
