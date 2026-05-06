@@ -491,6 +491,33 @@ export default function VendasModule(props: VendasModuleProps) {
     }));
   }
 
+  function handleCustomerSelect(customerId: string) {
+    if (!customerId) {
+      props.setSaleForm((prev) => ({
+        ...prev,
+        customerId: "",
+        customerName: "",
+        customerPhone: "",
+        customerNote: "",
+      }));
+      return;
+    }
+    const matched = activeCustomers.find((c) => c._id === customerId);
+    if (!matched) return;
+    props.setSaleForm((prev) => ({
+      ...prev,
+      customerId: matched._id,
+      customerName: matched.name || "",
+      customerPhone: matched.phone || "",
+      customerNote: matched.notes || prev.customerNote,
+    }));
+  }
+
+  const sortedActiveCustomers = useMemo(
+    () => [...activeCustomers].sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
+    [activeCustomers]
+  );
+
   function removeSaleItem(productId: string) {
     props.setSaleForm((prev) => ({
       ...prev,
@@ -734,6 +761,24 @@ export default function VendasModule(props: VendasModuleProps) {
           <form className="form-card order-form" onSubmit={props.submitSale}>
             <h3>Emitir nova ordem de venda</h3>
             <div className="order-toolbar">
+              <div className="form-field">
+                <label>Cliente cadastrado</label>
+                <small className="field-help">
+                  Selecione um cliente já cadastrado para preencher automaticamente os dados.
+                </small>
+                <select
+                  value={props.saleForm.customerId}
+                  onChange={(event) => handleCustomerSelect(event.target.value)}
+                >
+                  <option value="">Novo cliente / digitar manualmente</option>
+                  {sortedActiveCustomers.map((customer) => (
+                    <option key={customer._id} value={customer._id}>
+                      {customer.name}
+                      {customer.phone ? ` — ${customer.phone}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="form-field">
                 <label>Telefone do cliente</label>
                 <small className="field-help">
