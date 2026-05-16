@@ -76,11 +76,28 @@ export default function PrecosModule(props: PrecosModuleProps) {
   }, [props.products, search]);
 
   function parsePriceInput(value: string): number {
-    const normalized = value
+    if (!value) return NaN;
+    const cleaned = value
       .trim()
       .replace(/\s+/g, "")
-      .replace(/\./g, "")
-      .replace(",", ".");
+      .replace(/r\$/gi, "");
+
+    if (!cleaned) return NaN;
+
+    const hasComma = cleaned.includes(",");
+    const hasDot = cleaned.includes(".");
+
+    let normalized = cleaned;
+    if (hasComma) {
+      normalized = cleaned.replace(/\./g, "").replace(",", ".");
+    } else if (hasDot) {
+      const lastDot = cleaned.lastIndexOf(".");
+      const decimalsAfter = cleaned.length - lastDot - 1;
+      const dotCount = (cleaned.match(/\./g) || []).length;
+      const looksLikeThousand = dotCount > 1 || decimalsAfter === 3;
+      normalized = looksLikeThousand ? cleaned.replace(/\./g, "") : cleaned;
+    }
+
     const parsed = Number(normalized);
     return Number.isFinite(parsed) ? parsed : NaN;
   }
