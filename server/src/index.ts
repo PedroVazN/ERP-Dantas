@@ -9,6 +9,7 @@ import { registerAuthRoutes } from "./routes/auth";
 import { registerHealthRoute } from "./routes/health";
 import { registerCustomerRoutes } from "./routes/customers";
 import { registerProductRoutes } from "./routes/products";
+import { registerPriceTableRoutes } from "./routes/priceTable";
 import { registerSupplierRoutes } from "./routes/suppliers";
 import { registerSalesRoutes } from "./routes/sales";
 import { registerPurchaseRoutes } from "./routes/purchases";
@@ -339,14 +340,45 @@ async function normalizeSaleItemsAndApplyStock(
 
 async function applyPurchaseStock(
   businessId: string,
-  items: Array<{ product?: Types.ObjectId; quantity: number; cost: number }>
+  items: Array<{ product?: Types.ObjectId; quantity: number; cost: number }>,
+  extraExpenses: number = 0
 ) {
+  // O rateio das despesas extras (frete, taxas, impostos) é distribuído entre
+  // os itens da OC proporcionalmente ao subtotal de cada um. Assim o custo
+  // unitário "real" considerado no custo médio do produto inclui sua parte
+  // dessas despesas.
+  const safeExtra = Math.max(0, Number(extraExpenses) || 0);
+  const subtotal = items.reduce(
+    (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.cost) || 0),
+    0
+  );
+
   for (const item of items) {
     if (!item.product) continue;
     const product = await ProductModel.findOne({ _id: item.product, businessId });
     if (!product) continue;
-    product.stock += item.quantity;
-    product.cost = item.cost;
+
+    const currentStock = Math.max(0, Number(product.stock) || 0);
+    const currentCost = Math.max(0, Number(product.cost) || 0);
+    const incomingQty = Math.max(0, Number(item.quantity) || 0);
+    const incomingCost = Math.max(0, Number(item.cost) || 0);
+
+    // Rateio do extra para este item, com base no peso do subtotal.
+    const itemSubtotal = incomingQty * incomingCost;
+    const share = subtotal > 0 ? itemSubtotal / subtotal : 0;
+    const extraForItem = safeExtra * share;
+    const realUnitCost =
+      incomingQty > 0 ? incomingCost + extraForItem / incomingQty : incomingCost;
+
+    const newStock = currentStock + incomingQty;
+    const weightedCost =
+      newStock > 0
+        ? (currentStock * currentCost + incomingQty * realUnitCost) / newStock
+        : realUnitCost;
+
+    product.stock = newStock;
+    // Arredonda em 4 casas para evitar dízima vazando para a UI.
+    product.cost = Math.round(weightedCost * 10000) / 10000;
     await product.save();
   }
 }
@@ -403,8 +435,7 @@ app.use("/api", async (req, res, next) => {
 
 registerCustomerRoutes(app);
 registerProductRoutes(app);
-
- 
+registerPriceTableRoutes(app);
 
 registerSupplierRoutes(app);
 

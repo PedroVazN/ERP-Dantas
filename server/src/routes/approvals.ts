@@ -7,7 +7,11 @@ import { blockWriteInGeneralScope, getBusinessFilter, getScopeContext } from "..
 export function registerApprovalsRoutes(
   app: Express,
   deps: {
-    applyPurchaseStock: (businessId: string, items: Array<{ product?: Types.ObjectId; quantity: number; cost: number }>) => Promise<void>;
+    applyPurchaseStock: (
+      businessId: string,
+      items: Array<{ product?: Types.ObjectId; quantity: number; cost: number }>,
+      extraExpenses?: number
+    ) => Promise<void>;
     notifySystemWhatsApp: (message: string) => Promise<any>;
   }
 ) {

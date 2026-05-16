@@ -4,6 +4,7 @@ import type { AiPlan } from "../../aiTypes";
 
 import ClientesModule from "../../modules/ClientesModule";
 import ProdutosModule from "../../modules/ProdutosModule";
+import PrecosModule from "../../modules/PrecosModule";
 import VendasModule from "../../modules/VendasModule";
 import ComprasModule from "../../modules/ComprasModule";
 import FornecedoresModule from "../../modules/FornecedoresModule";
@@ -23,6 +24,7 @@ export type ActiveModuleRendererProps = {
     | "atualizacoes"
     | "clientes"
     | "produtos"
+    | "precos"
     | "vendas"
     | "compras"
     | "fornecedores"
@@ -92,10 +94,18 @@ export type ActiveModuleRendererProps = {
       paymentMethod: string;
     }>
   >;
-  submitSale: (event: FormEvent) => Promise<void> | void;
+  submitSale: (event: FormEvent, status?: "PAGO" | "PENDENTE") => Promise<void> | void;
   sales: Sale[];
   editSale: (sale: Sale) => void;
   deleteSale: (sale: Sale) => void;
+  updateSalePaymentStatus: (
+    saleId: string,
+    status: "PAGO" | "PENDENTE" | "CANCELADO"
+  ) => Promise<void> | void;
+  updateSaleDeliveryStatus: (
+    saleId: string,
+    deliveryStatus: "ENTREGUE" | "NAO_ENTREGUE"
+  ) => Promise<void> | void;
   pixModalOpen: boolean;
   setPixModalOpen: Dispatch<SetStateAction<boolean>>;
 
@@ -202,6 +212,8 @@ export type ActiveModuleRendererProps = {
   publicOrderLojaId: string | null;
   publicOrderLojaName: string;
   isGeneralWorkspace: boolean;
+
+  loadAllData: () => Promise<void> | void;
 };
 
 export default function ActiveModuleRenderer(props: ActiveModuleRendererProps) {
@@ -246,6 +258,17 @@ export default function ActiveModuleRenderer(props: ActiveModuleRendererProps) {
     );
   }
 
+  if (props.activeModule === "precos") {
+    return (
+      <PrecosModule
+        scopedPath={props.scopedPath}
+        formatBRL={props.formatBRL}
+        products={props.products}
+        loadAllData={props.loadAllData}
+      />
+    );
+  }
+
   if (props.activeModule === "vendas") {
     return (
       <VendasModule
@@ -257,6 +280,8 @@ export default function ActiveModuleRenderer(props: ActiveModuleRendererProps) {
         sales={props.sales}
         editSale={props.editSale}
         deleteSale={props.deleteSale}
+        updateSalePaymentStatus={props.updateSalePaymentStatus}
+        updateSaleDeliveryStatus={props.updateSaleDeliveryStatus}
         pixModalOpen={props.pixModalOpen}
         setPixModalOpen={props.setPixModalOpen}
         formatBRL={props.formatBRL}
@@ -281,6 +306,8 @@ export default function ActiveModuleRenderer(props: ActiveModuleRendererProps) {
         products={props.products}
         expenses={props.expenses}
         formatBRL={props.formatBRL}
+        scopedPath={props.scopedPath}
+        loadAllData={props.loadAllData}
       />
     );
   }

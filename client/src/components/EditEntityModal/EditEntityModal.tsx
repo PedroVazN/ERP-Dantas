@@ -307,23 +307,8 @@ export default function EditEntityModal(props: EditEntityModalProps) {
             </select>
           </div>
           <div className="form-field">
-            <label>Preço</label>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={props.editProductForm.price}
-              onChange={(event) =>
-                props.setEditProductForm((prev) => ({
-                  ...prev,
-                  price: Number(event.target.value),
-                }))
-              }
-              required
-            />
-          </div>
-          <div className="form-field">
-            <label>Custo</label>
+            <label>Custo padrão</label>
+            <small className="field-help">O preço de venda é definido no momento da venda.</small>
             <input
               type="number"
               min={0}

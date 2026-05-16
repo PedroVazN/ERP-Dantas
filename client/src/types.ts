@@ -85,6 +85,7 @@ export type Sale = {
   customer?: SaleCustomerRef | null;
   items?: SaleItem[];
   billingStatus?: "PENDENTE" | "FATURADO" | "CANCELADO";
+  deliveryStatus?: "ENTREGUE" | "NAO_ENTREGUE";
   invoice?: {
     number?: string;
     key?: string;
@@ -208,6 +209,30 @@ export type StockReportRow = {
 export type StockReportResponse = {
   months: number;
   rows: StockReportRow[];
+};
+
+export type SalesItemsReportRow = {
+  saleId: string;
+  saleNumber: string;
+  saleDate: string;
+  customerName: string;
+  paymentMethod: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  itemDescription: string;
+  quantity: number;
+  unitCost: number;
+  unitPrice: number;
+  totalCost: number;
+  totalRevenue: number;
+  profit: number;
+  marginPercent: number;
+};
+
+export type SalesItemsReportResponse = {
+  months: number;
+  rows: SalesItemsReportRow[];
 };
 
 export type BiTimeseriesPoint = {

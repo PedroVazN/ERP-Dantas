@@ -2,6 +2,8 @@ import type { Expense, Product, Purchase, Supplier } from "../types";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { useMemo, useState } from "react";
 
+import { API_URL, api } from "../api";
+
 type PurchaseFormState = {
   supplierId: string;
   productId: string;
@@ -30,6 +32,35 @@ export type ComprasModuleProps = {
   products: Product[];
   expenses: Expense[];
   formatBRL: (value: number) => string;
+  scopedPath: (path: string) => string;
+  loadAllData: () => Promise<void> | void;
+};
+
+type ImportItem = {
+  line: number;
+  productSku: string;
+  productId: string;
+  productName: string;
+  description: string;
+  quantity: number;
+  cost: number;
+  total: number;
+  errors: string[];
+  valid: boolean;
+};
+
+type ImportPreviewResponse = {
+  supplierName: string;
+  supplierId: string;
+  extraExpenses: number;
+  extraExpensesNote: string;
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  items: ImportItem[];
+  headerErrors: string[];
+  itemsSubtotal: number;
+  grandTotal: number;
 };
 
 type ApprovalStatus = "PENDENTE" | "APROVADA" | "REJEITADA";
@@ -42,6 +73,14 @@ export default function ComprasModule(props: ComprasModuleProps) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [lineDrafts, setLineDrafts] = useState<Record<string, { quantity: string; cost: string }>>({});
+
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importCommitting, setImportCommitting] = useState(false);
+  const [importPreview, setImportPreview] = useState<ImportPreviewResponse | null>(null);
+  const [importMessage, setImportMessage] = useState<
+    { kind: "success" | "error"; message: string } | null
+  >(null);
 
   const pageSize = 7;
   const todayIso = new Date().toISOString().slice(0, 10);
@@ -101,6 +140,31 @@ export default function ComprasModule(props: ComprasModuleProps) {
     [props.purchaseForm.items]
   );
   const orderGrandTotal = orderItemsSubtotal + (props.purchaseForm.extraExpenses || 0);
+
+  /**
+   * Calcula o rateio das despesas extras para cada item da ordem em
+   * função do peso de cada item no subtotal. Retorna o valor absoluto
+   * do rateio, o percentual sobre o subtotal e o custo unitário "real"
+   * (custo informado + rateio do frete/taxas / quantidade).
+   */
+  const itemsWithSharing = useMemo(() => {
+    const extra = Number(props.purchaseForm.extraExpenses) || 0;
+    const subtotal = orderItemsSubtotal;
+    return props.purchaseForm.items.map((item) => {
+      const itemTotal = item.quantity * item.cost;
+      const share = subtotal > 0 ? itemTotal / subtotal : 0;
+      const allocated = extra * share;
+      const realUnitCost =
+        item.quantity > 0 ? item.cost + allocated / item.quantity : item.cost;
+      return {
+        ...item,
+        sharePercent: share * 100,
+        allocatedExtra: allocated,
+        realUnitCost,
+        realTotal: itemTotal + allocated,
+      };
+    });
+  }, [props.purchaseForm.items, props.purchaseForm.extraExpenses, orderItemsSubtotal]);
 
   function getPurchaseBadgeClass(status: Purchase["status"]) {
     if (status === "APROVADA" || status === "RECEBIDA") return "status-chip success";
@@ -233,16 +297,25 @@ export default function ComprasModule(props: ComprasModuleProps) {
     const extra = typeof purchase.extraExpenses === "number" ? purchase.extraExpenses : 0;
     const note = (purchase.extraExpensesNote || "").trim();
     const rows = items
-      .map(
-        (it) => `
+      .map((it) => {
+        const itemTotal = it.total ?? it.quantity * it.cost;
+        const share = itemsSubtotal > 0 ? itemTotal / itemsSubtotal : 0;
+        const allocated = extra * share;
+        const realUnit = it.quantity > 0 ? it.cost + allocated / it.quantity : it.cost;
+        const realTotal = itemTotal + allocated;
+        return `
         <tr>
           <td>${it.description}</td>
           <td style="text-align:right">${it.quantity}</td>
           <td style="text-align:right">${props.formatBRL(it.cost)}</td>
-          <td style="text-align:right">${props.formatBRL(it.total)}</td>
+          <td style="text-align:right">${props.formatBRL(itemTotal)}</td>
+          <td style="text-align:right">${(share * 100).toFixed(1)}%</td>
+          <td style="text-align:right">${props.formatBRL(allocated)}</td>
+          <td style="text-align:right"><strong>${props.formatBRL(realUnit)}</strong></td>
+          <td style="text-align:right"><strong>${props.formatBRL(realTotal)}</strong></td>
         </tr>
-      `
-      )
+      `;
+      })
       .join("");
 
     const html = `<!DOCTYPE html>
@@ -299,11 +372,15 @@ export default function ComprasModule(props: ComprasModuleProps) {
                   <th>Item</th>
                   <th class="num">Qtd.</th>
                   <th class="num">Custo</th>
-                  <th class="num">Total</th>
+                  <th class="num">Subtotal</th>
+                  <th class="num">% OC</th>
+                  <th class="num">Rateio</th>
+                  <th class="num">Custo c/ rateio</th>
+                  <th class="num">Total c/ rateio</th>
                 </tr>
               </thead>
               <tbody>
-                ${rows || '<tr><td colspan="4">Sem itens no pedido.</td></tr>'}
+                ${rows || '<tr><td colspan="8">Sem itens no pedido.</td></tr>'}
               </tbody>
             </table>
             <div class="totals">
@@ -332,6 +409,107 @@ export default function ComprasModule(props: ComprasModuleProps) {
     if (!win) return;
     win.document.write(html);
     win.document.close();
+  }
+
+  async function downloadImportTemplate() {
+    setImportMessage(null);
+    try {
+      const response = await fetch(
+        `${API_URL}${props.scopedPath("/purchases/import/template")}`
+      );
+      if (!response.ok) {
+        throw new Error("Não foi possível baixar o modelo.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "modelo-ordem-compra.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setImportMessage({
+        kind: "error",
+        message: error instanceof Error ? error.message : "Falha ao baixar modelo.",
+      });
+    }
+  }
+
+  async function previewImportFile() {
+    if (!importFile) {
+      setImportMessage({ kind: "error", message: "Selecione um arquivo .xlsx para continuar." });
+      return;
+    }
+    setImportLoading(true);
+    setImportMessage(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", importFile);
+      const response = await api.postFormData<ImportPreviewResponse>(
+        props.scopedPath("/purchases/import/preview"),
+        formData
+      );
+      setImportPreview(response);
+    } catch (error) {
+      setImportPreview(null);
+      setImportMessage({
+        kind: "error",
+        message: error instanceof Error ? error.message : "Falha ao ler planilha.",
+      });
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
+  async function commitImport() {
+    if (!importPreview) return;
+    if (importPreview.headerErrors.length > 0) {
+      setImportMessage({
+        kind: "error",
+        message: "Corrija os erros do cabeçalho da planilha antes de confirmar.",
+      });
+      return;
+    }
+    const validItems = importPreview.items.filter((row) => row.valid && row.productId);
+    if (!validItems.length) {
+      setImportMessage({
+        kind: "error",
+        message: "Nenhuma linha válida para importar.",
+      });
+      return;
+    }
+    setImportCommitting(true);
+    setImportMessage(null);
+    try {
+      await api.post<Purchase>(props.scopedPath("/purchases/import/commit"), {
+        supplierId: importPreview.supplierId,
+        supplierName: importPreview.supplierName,
+        extraExpenses: importPreview.extraExpenses,
+        extraExpensesNote: importPreview.extraExpensesNote,
+        items: validItems.map((item) => ({
+          productId: item.productId,
+          description: item.description,
+          quantity: item.quantity,
+          cost: item.cost,
+        })),
+      });
+      setImportMessage({
+        kind: "success",
+        message: `Ordem de compra importada com sucesso. ${validItems.length} item(s) lançado(s).`,
+      });
+      setImportPreview(null);
+      setImportFile(null);
+      await props.loadAllData();
+    } catch (error) {
+      setImportMessage({
+        kind: "error",
+        message: error instanceof Error ? error.message : "Falha ao confirmar importação.",
+      });
+    } finally {
+      setImportCommitting(false);
+    }
   }
 
   return (
@@ -605,6 +783,121 @@ export default function ComprasModule(props: ComprasModuleProps) {
             </div>
           </>
         ) : (
+          <>
+          <section className="products-import-panel" style={{ marginBottom: 16 }}>
+            <div className="products-import-header">
+              <div>
+                <h3>Importar ordem de compra por Excel</h3>
+                <p className="theme-helper">
+                  Baixe o modelo, preencha o fornecedor (1ª linha) e os itens, e envie a planilha.
+                  Cada planilha corresponde a uma única ordem de compra. As <strong>despesas
+                  extras</strong> (frete/taxas) preenchidas na 1ª linha já entram no rateio
+                  automático por item.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="ghost-btn"
+                onClick={() => void downloadImportTemplate()}
+              >
+                Baixar modelo Excel
+              </button>
+            </div>
+
+            <div className="products-import-actions">
+              <input
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={(event) => {
+                  const file = event.target.files?.[0] || null;
+                  setImportFile(file);
+                  setImportPreview(null);
+                  setImportMessage(null);
+                }}
+              />
+              <button
+                type="button"
+                className="ghost-btn"
+                onClick={() => void previewImportFile()}
+                disabled={!importFile || importLoading}
+              >
+                {importLoading ? "Lendo planilha…" : "Validar planilha"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void commitImport()}
+                disabled={
+                  !importPreview ||
+                  importPreview.validRows === 0 ||
+                  importPreview.headerErrors.length > 0 ||
+                  importCommitting
+                }
+              >
+                {importCommitting ? "Importando…" : "Confirmar e lançar OC"}
+              </button>
+            </div>
+
+            {importMessage ? (
+              <p className={importMessage.kind === "success" ? "feedback" : "error"}>
+                {importMessage.message}
+              </p>
+            ) : null}
+
+            {importPreview ? (
+              <div className="products-import-preview">
+                <p className="theme-helper">
+                  Fornecedor: <strong>{importPreview.supplierName || "—"}</strong> · Linhas:{" "}
+                  {importPreview.totalRows} · Válidas: {importPreview.validRows} · Com erro:{" "}
+                  {importPreview.invalidRows} · Despesas extras:{" "}
+                  {props.formatBRL(importPreview.extraExpenses)} · Total estimado:{" "}
+                  <strong>{props.formatBRL(importPreview.grandTotal)}</strong>
+                </p>
+
+                {importPreview.headerErrors.length ? (
+                  <ul className="error" style={{ paddingLeft: 18 }}>
+                    {importPreview.headerErrors.map((message) => (
+                      <li key={message}>{message}</li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                <div className="table-scroll">
+                  <table className="responsive-table products-import-table">
+                    <thead>
+                      <tr>
+                        <th>Linha</th>
+                        <th>SKU</th>
+                        <th>Produto</th>
+                        <th>Qtd.</th>
+                        <th>Custo unit.</th>
+                        <th>Subtotal</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importPreview.items.map((row) => (
+                        <tr
+                          key={`${row.line}-${row.productSku}`}
+                          className={row.valid ? "" : "products-import-row-error"}
+                        >
+                          <td data-label="Linha">{row.line}</td>
+                          <td data-label="SKU">{row.productSku || "-"}</td>
+                          <td data-label="Produto">{row.productName || "—"}</td>
+                          <td data-label="Qtd.">{row.quantity}</td>
+                          <td data-label="Custo unit.">{props.formatBRL(row.cost)}</td>
+                          <td data-label="Subtotal">{props.formatBRL(row.total)}</td>
+                          <td data-label="Status">
+                            {row.valid ? "OK" : row.errors.join(" | ")}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+          </section>
+
           <form className="form-card order-form" onSubmit={props.submitPurchase}>
             <h3>Emitir nova ordem de compra</h3>
             <div className="order-toolbar">
@@ -750,25 +1043,44 @@ export default function ComprasModule(props: ComprasModuleProps) {
 
               <section className="compras-pane">
                 <h4>Itens da ordem</h4>
+                <p className="theme-helper">
+                  As colunas <strong>% OC</strong> e <strong>Rateio</strong> distribuem o valor das
+                  despesas extras proporcionalmente, e o <strong>Custo c/ rateio</strong> indica o
+                  custo unitário real (custo + rateio / quantidade).
+                </p>
                 <div className="table-scroll compras-order-table-wrap">
                   <table className="order-items-table responsive-table">
                     <thead>
                       <tr>
                         <th>Item</th>
-                        <th>Quantidade</th>
+                        <th>Qtd.</th>
                         <th>Custo (R$)</th>
-                        <th>Total</th>
+                        <th>Subtotal</th>
+                        <th>% OC</th>
+                        <th>Rateio (R$)</th>
+                        <th>Custo c/ rateio</th>
+                        <th>Total c/ rateio</th>
                         <th>Ação</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {props.purchaseForm.items.length ? (
-                        props.purchaseForm.items.map((item) => (
+                      {itemsWithSharing.length ? (
+                        itemsWithSharing.map((item) => (
                           <tr key={item.productId}>
                             <td data-label="Item">{item.description}</td>
                             <td data-label="Qtd.">{item.quantity}</td>
                             <td data-label="Custo">{props.formatBRL(item.cost)}</td>
-                            <td data-label="Total">{props.formatBRL(item.quantity * item.cost)}</td>
+                            <td data-label="Subtotal">
+                              {props.formatBRL(item.quantity * item.cost)}
+                            </td>
+                            <td data-label="% OC">{item.sharePercent.toFixed(1)}%</td>
+                            <td data-label="Rateio">{props.formatBRL(item.allocatedExtra)}</td>
+                            <td data-label="Custo c/ rateio">
+                              <strong>{props.formatBRL(item.realUnitCost)}</strong>
+                            </td>
+                            <td data-label="Total c/ rateio">
+                              <strong>{props.formatBRL(item.realTotal)}</strong>
+                            </td>
                             <td data-label="Ação">
                               <button
                                 type="button"
@@ -782,7 +1094,7 @@ export default function ComprasModule(props: ComprasModuleProps) {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={5} className="empty">
+                          <td colSpan={9} className="empty">
                             Nenhum item adicionado na ordem.
                           </td>
                         </tr>
@@ -816,6 +1128,7 @@ export default function ComprasModule(props: ComprasModuleProps) {
               </button>
             </div>
           </form>
+          </>
         )}
       </section>
     </section>

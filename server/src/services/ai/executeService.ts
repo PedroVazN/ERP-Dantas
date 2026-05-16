@@ -19,7 +19,8 @@ export async function executeAiPlan(
     purchaseApprovalThreshold: number;
     applyPurchaseStock: (
       businessId: string,
-      items: Array<{ product?: Types.ObjectId; quantity: number; cost: number }>
+      items: Array<{ product?: Types.ObjectId; quantity: number; cost: number }>,
+      extraExpenses?: number
     ) => Promise<void>;
     normalizeSaleItemsAndApplyStock: (
       businessId: string,

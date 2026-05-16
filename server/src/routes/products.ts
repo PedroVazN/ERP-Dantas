@@ -44,7 +44,6 @@ const PRODUCT_IMPORT_TEMPLATE_COLUMNS = [
   "sku",
   "codigo_produto",
   "descricao",
-  "preco_tabela",
   "custo",
   "estoque",
   "estoque_minimo",
@@ -59,7 +58,10 @@ function toPreviewRow(raw: Record<string, unknown>, line: number): ImportPreview
   const description = String(raw.descricao || "").trim();
   const supplierId = String(raw.fornecedor_id || "").trim();
   const supplierName = String(raw.fornecedor_nome || "").trim();
-  const price = parseNumber(raw.preco_tabela);
+  // `preco_tabela` é opcional: se ausente/vazio, mantém em 0. O preço é definido no momento da venda.
+  const rawPrice = raw.preco_tabela;
+  const hasPrice = rawPrice !== undefined && String(rawPrice).trim() !== "";
+  const price = hasPrice ? parseNumber(rawPrice) : 0;
   const cost = parseNumber(raw.custo);
   const stock = parseNumber(raw.estoque);
   const minStock = parseNumber(raw.estoque_minimo);
@@ -67,7 +69,7 @@ function toPreviewRow(raw: Record<string, unknown>, line: number): ImportPreview
 
   if (!name) errors.push("Nome é obrigatório.");
   if (!sku) errors.push("SKU é obrigatório.");
-  if (!Number.isFinite(price) || price < 0) errors.push("Preço de tabela inválido.");
+  if (hasPrice && (!Number.isFinite(price) || price < 0)) errors.push("Preço de tabela inválido.");
   if (!Number.isFinite(cost) || cost < 0) errors.push("Custo inválido.");
   if (!Number.isFinite(stock) || stock < 0) errors.push("Estoque inválido.");
   if (!Number.isFinite(minStock) || minStock < 0) errors.push("Estoque mínimo inválido.");
@@ -274,7 +276,6 @@ export function registerProductRoutes(app: Express) {
         "SAB-LAV-90",
         "00123",
         "Base vegetal",
-        12.9,
         6.2,
         100,
         10,

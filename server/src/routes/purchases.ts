@@ -1,8 +1,63 @@
 import type { Express, Request, Response } from "express";
 import { Types, isValidObjectId } from "mongoose";
+import * as XLSX from "xlsx";
 
-import { ExpenseModel, ProductModel, PurchaseModel } from "../models";
+import { ExpenseModel, ProductModel, PurchaseModel, SupplierModel } from "../models";
+import { upload } from "../app";
 import { blockWriteInGeneralScope, getBusinessFilter, getScopeContext } from "../middleware/scope";
+
+type PurchaseImportPreviewItem = {
+  line: number;
+  productSku: string;
+  productId: string;
+  productName: string;
+  description: string;
+  quantity: number;
+  cost: number;
+  total: number;
+  errors: string[];
+  valid: boolean;
+};
+
+type PurchaseImportPreview = {
+  supplierName: string;
+  supplierId: string;
+  extraExpenses: number;
+  extraExpensesNote: string;
+  totalRows: number;
+  validRows: number;
+  invalidRows: number;
+  items: PurchaseImportPreviewItem[];
+  headerErrors: string[];
+  itemsSubtotal: number;
+  grandTotal: number;
+};
+
+const PURCHASE_IMPORT_COLUMNS = [
+  "fornecedor_nome",
+  "produto_sku",
+  "quantidade",
+  "custo_unitario",
+  "despesas_extras",
+  "obs_despesas",
+];
+
+function normalizeHeader(value: unknown) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function parseNumber(value: unknown) {
+  if (typeof value === "number") return value;
+  const raw = String(value ?? "").trim();
+  if (!raw) return NaN;
+  const normalized = raw.replace(/\./g, "").replace(",", ".");
+  return Number(normalized);
+}
 
 function sumPurchaseItemsTotal(items: Array<{ total?: number }> | undefined): number {
   return (items || []).reduce((s, it) => s + (Number(it.total) || 0), 0);
@@ -41,7 +96,11 @@ async function syncLinkedPurchaseExpense(
 export function registerPurchaseRoutes(
   app: Express,
   deps: {
-    applyPurchaseStock: (businessId: string, items: any[]) => Promise<void>;
+    applyPurchaseStock: (
+      businessId: string,
+      items: any[],
+      extraExpenses?: number
+    ) => Promise<void>;
     notifySystemWhatsApp: (message: string) => Promise<any>;
   }
 ) {
@@ -212,7 +271,11 @@ export function registerPurchaseRoutes(
           );
         }
 
-        await deps.applyPurchaseStock(businessId, normalizedItems);
+        await deps.applyPurchaseStock(
+          businessId,
+          normalizedItems,
+          Number(purchase.extraExpenses) || 0
+        );
         purchase.stockApplied = true;
       }
 
@@ -291,7 +354,8 @@ export function registerPurchaseRoutes(
         try {
           await deps.applyPurchaseStock(
             businessId,
-            purchase.items as Array<{ product?: Types.ObjectId; quantity: number; cost: number }>
+            purchase.items as Array<{ product?: Types.ObjectId; quantity: number; cost: number }>,
+            Number(purchase.extraExpenses) || 0
           );
           purchase.stockApplied = true;
         } catch (error) {
@@ -375,7 +439,8 @@ export function registerPurchaseRoutes(
       if (purchase!.stockApplied) return;
       await deps.applyPurchaseStock(
         businessId,
-        purchase!.items as Array<{ product?: Types.ObjectId; quantity: number; cost: number }>
+        purchase!.items as Array<{ product?: Types.ObjectId; quantity: number; cost: number }>,
+        Number(purchase!.extraExpenses) || 0
       );
       purchase!.stockApplied = true;
     }
@@ -518,5 +583,337 @@ export function registerPurchaseRoutes(
     }
     res.json({ deleted: true });
   });
+
+  // -------------------------------------------------------------------------
+  // Importação de ordem de compra via planilha Excel
+  // -------------------------------------------------------------------------
+
+  app.get("/api/purchases/import/template", (_req: Request, res: Response) => {
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      PURCHASE_IMPORT_COLUMNS,
+      [
+        "Fornecedor Exemplo Ltda",
+        "SAB-LAV-90",
+        100,
+        6.2,
+        45.5,
+        "Frete + taxa de embalagem",
+      ],
+      ["Fornecedor Exemplo Ltda", "SAB-OLI-90", 50, 5.4, "", ""],
+    ]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "ordem_compra");
+    const fileBuffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="modelo-ordem-compra.xlsx"'
+    );
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.send(fileBuffer);
+  });
+
+  app.post(
+    "/api/purchases/import/preview",
+    upload.single("file"),
+    async (req: Request, res: Response) => {
+      if (blockWriteInGeneralScope(req, res)) {
+        return;
+      }
+      const { businessId } = getScopeContext(req);
+      const file = (req as unknown as { file?: { buffer?: Buffer } }).file;
+      if (!file?.buffer) {
+        return res.status(400).json({ message: "Anexe um arquivo Excel (.xlsx)." });
+      }
+
+      let workbook: XLSX.WorkBook;
+      try {
+        workbook = XLSX.read(file.buffer, { type: "buffer" });
+      } catch {
+        return res
+          .status(400)
+          .json({ message: "Arquivo inválido. Use uma planilha .xlsx válida." });
+      }
+
+      const firstSheet = workbook.SheetNames[0];
+      if (!firstSheet) {
+        return res.status(400).json({ message: "Planilha sem abas." });
+      }
+
+      const sheet = workbook.Sheets[firstSheet];
+      const matrix = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, {
+        header: 1,
+        defval: "",
+        blankrows: false,
+      });
+      if (!matrix.length) {
+        return res.status(400).json({ message: "Planilha vazia." });
+      }
+
+      const header = (matrix[0] || []).map(normalizeHeader);
+      const missingColumns = ["fornecedor_nome", "produto_sku", "quantidade", "custo_unitario"].filter(
+        (col) => !header.includes(col)
+      );
+      if (missingColumns.length > 0) {
+        return res.status(400).json({
+          message: `Colunas obrigatórias ausentes: ${missingColumns.join(", ")}`,
+          templateColumns: PURCHASE_IMPORT_COLUMNS,
+        });
+      }
+
+      const rawRows = matrix
+        .slice(1)
+        .map((row) => {
+          const mapped: Record<string, unknown> = {};
+          header.forEach((h, idx) => {
+            if (h) mapped[h] = row[idx];
+          });
+          return mapped;
+        })
+        .filter((row) =>
+          Object.values(row).some((value) => String(value ?? "").trim() !== "")
+        );
+
+      const headerErrors: string[] = [];
+      const supplierNameRaw = String(rawRows[0]?.fornecedor_nome ?? "").trim();
+      if (!supplierNameRaw) {
+        headerErrors.push("Informe o fornecedor na primeira linha (coluna fornecedor_nome).");
+      }
+
+      // Outras linhas com fornecedor diferente são reportadas como erro.
+      const inconsistentSupplier = rawRows.findIndex((row, idx) => {
+        if (idx === 0) return false;
+        const name = String(row.fornecedor_nome ?? "").trim();
+        return name !== "" && name !== supplierNameRaw;
+      });
+      if (inconsistentSupplier > 0) {
+        headerErrors.push(
+          `Cada planilha deve conter apenas uma ordem de compra. Fornecedor divergente na linha ${
+            inconsistentSupplier + 2
+          }.`
+        );
+      }
+
+      const extraExpensesParsed = parseNumber(rawRows[0]?.despesas_extras);
+      const extraExpenses =
+        Number.isFinite(extraExpensesParsed) && extraExpensesParsed >= 0
+          ? extraExpensesParsed
+          : 0;
+      if (rawRows[0]?.despesas_extras !== undefined &&
+          String(rawRows[0]?.despesas_extras ?? "").trim() !== "" &&
+          (!Number.isFinite(extraExpensesParsed) || extraExpensesParsed < 0)) {
+        headerErrors.push("Despesas extras inválidas na primeira linha.");
+      }
+      const extraExpensesNote = String(rawRows[0]?.obs_despesas ?? "").trim().slice(0, 500);
+
+      // Busca fornecedor pelo nome.
+      let matchedSupplier: { _id: string; name: string } | null = null;
+      if (supplierNameRaw) {
+        const supplier = await SupplierModel.findOne({
+          businessId,
+          name: { $regex: `^${supplierNameRaw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
+          status: "ATIVO",
+        })
+          .select("_id name")
+          .lean();
+        if (supplier) {
+          matchedSupplier = { _id: String(supplier._id), name: String(supplier.name) };
+        } else {
+          headerErrors.push(`Fornecedor "${supplierNameRaw}" não encontrado (ou inativo).`);
+        }
+      }
+
+      // Busca produtos por SKU.
+      const skusInPlanilha = rawRows
+        .map((row) => String(row.produto_sku ?? "").trim())
+        .filter((sku) => sku.length > 0);
+      const products = skusInPlanilha.length
+        ? await ProductModel.find({
+            businessId,
+            sku: { $in: skusInPlanilha },
+            active: true,
+          })
+            .select("_id sku name supplier")
+            .lean()
+        : [];
+      const bySku = new Map<string, { _id: string; sku: string; name: string; supplier?: string }>();
+      for (const product of products) {
+        const sku = String(product.sku || "").trim().toLowerCase();
+        if (!sku) continue;
+        bySku.set(sku, {
+          _id: String(product._id),
+          sku: String(product.sku || ""),
+          name: String(product.name || ""),
+          supplier: product.supplier ? String(product.supplier) : undefined,
+        });
+      }
+
+      const items: PurchaseImportPreviewItem[] = rawRows.map((row, idx) => {
+        const line = idx + 2;
+        const skuRaw = String(row.produto_sku ?? "").trim();
+        const sku = skuRaw.toLowerCase();
+        const quantity = parseNumber(row.quantidade);
+        const cost = parseNumber(row.custo_unitario);
+        const errors: string[] = [];
+
+        if (!skuRaw) errors.push("Coluna produto_sku é obrigatória.");
+        if (!Number.isFinite(quantity) || quantity <= 0)
+          errors.push("Quantidade inválida.");
+        if (!Number.isFinite(cost) || cost < 0)
+          errors.push("Custo unitário inválido.");
+
+        const matched = sku ? bySku.get(sku) : undefined;
+        if (skuRaw && !matched) {
+          errors.push("Produto não encontrado pelo SKU.");
+        } else if (
+          matched &&
+          matchedSupplier &&
+          matched.supplier &&
+          matched.supplier !== matchedSupplier._id
+        ) {
+          errors.push("Produto pertence a outro fornecedor.");
+        }
+
+        const qty = Number.isFinite(quantity) ? quantity : 0;
+        const unit = Number.isFinite(cost) ? cost : 0;
+        return {
+          line,
+          productSku: skuRaw,
+          productId: matched?._id || "",
+          productName: matched?.name || "",
+          description: matched?.name || skuRaw,
+          quantity: qty,
+          cost: unit,
+          total: qty * unit,
+          errors,
+          valid: errors.length === 0,
+        };
+      });
+
+      const validRows = items.filter((row) => row.valid).length;
+      const itemsSubtotal = items.reduce((sum, row) => sum + row.total, 0);
+      const grandTotal = itemsSubtotal + extraExpenses;
+
+      const response: PurchaseImportPreview = {
+        supplierName: matchedSupplier?.name || supplierNameRaw,
+        supplierId: matchedSupplier?._id || "",
+        extraExpenses,
+        extraExpensesNote,
+        totalRows: items.length,
+        validRows,
+        invalidRows: items.length - validRows,
+        items,
+        headerErrors,
+        itemsSubtotal,
+        grandTotal,
+      };
+      res.json(response);
+    }
+  );
+
+  app.post(
+    "/api/purchases/import/commit",
+    async (req: Request, res: Response) => {
+      if (blockWriteInGeneralScope(req, res)) {
+        return;
+      }
+      const { businessId } = getScopeContext(req);
+      const payload = req.body as Partial<{
+        supplierId: string;
+        supplierName: string;
+        extraExpenses: number;
+        extraExpensesNote: string;
+        items: Array<{
+          productId?: string;
+          description?: string;
+          quantity: number;
+          cost: number;
+        }>;
+      }>;
+
+      const supplierName = (payload.supplierName || "").trim();
+      if (!supplierName) {
+        return res
+          .status(400)
+          .json({ message: "Fornecedor não informado para a importação." });
+      }
+
+      const items = Array.isArray(payload.items) ? payload.items : [];
+      if (!items.length) {
+        return res.status(400).json({ message: "Nenhum item válido para importar." });
+      }
+
+      const normalizedItems: Array<{
+        product?: Types.ObjectId;
+        description: string;
+        quantity: number;
+        cost: number;
+        total: number;
+      }> = [];
+
+      for (const item of items) {
+        const quantity = Number(item.quantity);
+        const cost = Number(item.cost);
+        if (!Number.isFinite(quantity) || quantity <= 0) {
+          return res.status(400).json({ message: "Item com quantidade inválida." });
+        }
+        if (!Number.isFinite(cost) || cost < 0) {
+          return res.status(400).json({ message: "Item com custo inválido." });
+        }
+        normalizedItems.push({
+          product:
+            item.productId && isValidObjectId(item.productId)
+              ? new Types.ObjectId(item.productId)
+              : undefined,
+          description: (item.description || "").trim() || "Item importado",
+          quantity,
+          cost,
+          total: quantity * cost,
+        });
+      }
+
+      const itemsSum = normalizedItems.reduce((sum, item) => sum + item.total, 0);
+      const extraExpenses = Math.max(0, Number(payload.extraExpenses) || 0);
+      const extraExpensesNote = String(payload.extraExpensesNote || "")
+        .trim()
+        .slice(0, 500);
+      const totalAmount = itemsSum + extraExpenses;
+
+      const purchase = await PurchaseModel.create({
+        businessId,
+        supplier: supplierName,
+        items: normalizedItems,
+        status: "AGUARDANDO_APROVACAO",
+        approval: {
+          required: true,
+          status: "PENDENTE",
+          requestedBy: "Sistema",
+          requestedAt: new Date(),
+        },
+        stockApplied: false,
+        extraExpenses,
+        extraExpensesNote,
+        totalAmount,
+      });
+
+      await deps.notifySystemWhatsApp(
+        [
+          "Nova ordem de compra (importada por planilha) aguardando aprovação",
+          `ERP: ${businessId}`,
+          `Fornecedor: ${supplierName}`,
+          `Valor: ${new Intl.NumberFormat("pt-BR", {
+            style: "currency",
+            currency: "BRL",
+          }).format(totalAmount)}`,
+          `OC: ${String(purchase._id).slice(-6).toUpperCase()}`,
+        ].join("\n")
+      );
+
+      res.status(201).json(purchase);
+    }
+  );
 }
 

@@ -26,7 +26,7 @@ const productSchema = new mongoose.Schema(
     productCode: { type: String, trim: true }, // Código do produto
     description: { type: String, trim: true }, // Descrição do produto
     category: { type: String, trim: true, default: "SABONETE" },
-    price: { type: Number, required: true, min: 0 },
+    price: { type: Number, min: 0, default: 0 },
     cost: { type: Number, required: true, min: 0 },
     stock: { type: Number, required: true, min: 0, default: 0 },
     minStock: { type: Number, required: true, min: 0, default: 10 },
@@ -70,6 +70,11 @@ const saleSchema = new mongoose.Schema(
       type: String,
       enum: ["PENDENTE", "FATURADO", "CANCELADO"],
       default: "FATURADO",
+    },
+    deliveryStatus: {
+      type: String,
+      enum: ["ENTREGUE", "NAO_ENTREGUE"],
+      default: "NAO_ENTREGUE",
     },
     invoice: {
       number: { type: String, trim: true },

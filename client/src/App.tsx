@@ -46,6 +46,7 @@ type ModuleKey =
   | "atualizacoes"
   | "clientes"
   | "produtos"
+  | "precos"
   | "vendas"
   | "compras"
   | "fornecedores"
@@ -61,6 +62,7 @@ const moduleMeta: Record<ModuleKey, { label: string; short: string; helper: stri
   relatorios: { label: "Relatórios", short: "RL", helper: "Gráficos e evolução no tempo" },
   clientes: { label: "Clientes", short: "CL", helper: "Cadastro e relacionamento" },
   produtos: { label: "Produtos", short: "PR", helper: "Catalogo e estoque" },
+  precos: { label: "Tabela de Preço", short: "TP", helper: "Atualize preços de venda e custo médio" },
   vendas: { label: "Vendas", short: "VD", helper: "PDV e faturamento" },
   compras: { label: "Compras", short: "CP", helper: "Fornecedores e entradas" },
   fornecedores: { label: "Fornecedores", short: "FR", helper: "Cadastro de fornecedores" },
@@ -727,6 +729,8 @@ function App() {
           sales={sales}
           editSale={crudHandlers.editSale}
           deleteSale={crudHandlers.deleteSale}
+          updateSalePaymentStatus={crudHandlers.updateSalePaymentStatus}
+          updateSaleDeliveryStatus={crudHandlers.updateSaleDeliveryStatus}
           pixModalOpen={pixModalOpen}
           setPixModalOpen={setPixModalOpen}
 
@@ -787,6 +791,8 @@ function App() {
           publicOrderLojaId={workspaceId}
           publicOrderLojaName={selectedBusiness?.name ?? ""}
           isGeneralWorkspace={isGeneralWorkspace}
+
+          loadAllData={loadAllData}
         />
 
         <GlobalModalsRenderer

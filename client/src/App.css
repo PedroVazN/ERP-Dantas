@@ -2444,6 +2444,24 @@ th {
   background: color-mix(in srgb, var(--accent, #2563eb) 6%, transparent);
 }
 
+.reports-search-input {
+  min-width: 220px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border, #cbd5e1) 80%, transparent);
+  background: var(--surface, #fff);
+  color: var(--text, #0f172a);
+  font-size: 13px;
+}
+
+.reports-margin-positive {
+  color: var(--success, #059669);
+}
+
+.reports-margin-negative {
+  color: var(--danger, #dc2626);
+}
+
 .products-import-panel {
   margin-bottom: 18px;
   padding-bottom: 14px;
@@ -3121,4 +3139,45 @@ th {
     border-radius: 0 !important;
     padding: 0 !important;
   }
+}
+
+/* Aba Vendas: labels de status nos cards mobile (dropdowns clicaveis) */
+.vendas-card-status-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.vendas-card-status-label .status-chip-select {
+  width: 100%;
+  text-align: center;
+}
+
+/* Modal de margem do pedido */
+.vendas-margin-modal {
+  max-width: min(960px, 96vw);
+}
+
+.vendas-margin-table th,
+.vendas-margin-table td {
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.vendas-margin-total-row td {
+  border-top: 2px solid var(--border);
+  background: var(--panel-2);
+}
+
+.vendas-margin-positive {
+  color: #15803d;
+}
+
+.vendas-margin-negative {
+  color: #b91c1c;
 }

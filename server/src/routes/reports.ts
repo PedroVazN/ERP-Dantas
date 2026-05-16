@@ -1,7 +1,119 @@
 import type { Express, Request, Response } from "express";
+import type { PipelineStage } from "mongoose";
+import * as XLSX from "xlsx";
 
 import { ExpenseModel, ProductModel, PurchaseModel, SaleModel } from "../models";
 import { getBusinessFilter } from "../middleware/scope";
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  DINHEIRO: "Dinheiro",
+  PIX: "PIX",
+  CARTAO: "Cartão",
+  BOLETO: "Boleto",
+  TRANSFERENCIA: "Transferência",
+};
+
+type SalesItemReportRow = {
+  saleId: string;
+  saleNumber: string;
+  saleDate: string;
+  customerName: string;
+  paymentMethod: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  itemDescription: string;
+  quantity: number;
+  unitCost: number;
+  unitPrice: number;
+  totalCost: number;
+  totalRevenue: number;
+  profit: number;
+  marginPercent: number;
+};
+
+async function buildSalesItemsReport(
+  businessFilter: Record<string, unknown>,
+  startAnchor: Date | null
+): Promise<SalesItemReportRow[]> {
+  const matchStage: Record<string, unknown> = {
+    ...businessFilter,
+    status: { $ne: "CANCELADO" },
+  };
+  if (startAnchor) {
+    matchStage.createdAt = { $gte: startAnchor };
+  }
+
+  const pipeline: PipelineStage[] = [
+    { $match: matchStage },
+    { $unwind: "$items" },
+    {
+      $lookup: {
+        from: "products",
+        localField: "items.product",
+        foreignField: "_id",
+        as: "prod",
+      },
+    },
+    { $unwind: { path: "$prod", preserveNullAndEmptyArrays: true } },
+    {
+      $lookup: {
+        from: "customers",
+        localField: "customer",
+        foreignField: "_id",
+        as: "cust",
+      },
+    },
+    { $unwind: { path: "$cust", preserveNullAndEmptyArrays: true } },
+    { $sort: { createdAt: -1 } },
+  ];
+
+  const rawRows = await SaleModel.aggregate(pipeline);
+
+  return rawRows.map((raw: any): SalesItemReportRow => {
+    const quantity = Number(raw.items?.quantity ?? 0) || 0;
+    const unitPrice = Number(raw.items?.unitPrice ?? 0) || 0;
+    const unitCost = Number(raw.prod?.cost ?? 0) || 0;
+    const totalRevenue = quantity * unitPrice;
+    const totalCost = quantity * unitCost;
+    const profit = totalRevenue - totalCost;
+    const marginPercent = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
+    const saleIdStr = String(raw._id || "");
+    const rawDate = raw.saleDate || raw.createdAt;
+    const paymentRaw = String(raw.paymentMethod || "-");
+
+    return {
+      saleId: saleIdStr,
+      saleNumber: `OV-${saleIdStr.slice(-4).toUpperCase()}`,
+      saleDate: rawDate ? new Date(rawDate).toISOString() : "",
+      customerName: String(raw.cust?.name || "").trim() || "Consumidor",
+      paymentMethod: PAYMENT_METHOD_LABELS[paymentRaw] || paymentRaw,
+      productId: raw.prod?._id ? String(raw.prod._id) : "",
+      productName: String(raw.prod?.name || raw.items?.name || "Produto"),
+      productSku: String(raw.prod?.sku || ""),
+      itemDescription: String(raw.items?.name || raw.prod?.name || "Item"),
+      quantity,
+      unitCost,
+      unitPrice,
+      totalCost,
+      totalRevenue,
+      profit,
+      marginPercent,
+    };
+  });
+}
+
+function getMonthsFromQuery(req: Request): number {
+  const monthsRaw = Number(req.query.months ?? 12);
+  return Math.min(Math.max(Number.isFinite(monthsRaw) ? monthsRaw : 12, 1), 36);
+}
+
+function resolveStartAnchor(months: number): Date {
+  const now = new Date();
+  const startAnchor = new Date(now.getFullYear(), now.getMonth() - (months - 1), 1);
+  startAnchor.setHours(0, 0, 0, 0);
+  return startAnchor;
+}
 
 export function registerReportsRoutes(
   app: Express,
@@ -201,4 +313,77 @@ export function registerReportsRoutes(
 
     res.json({ months: monthCount, rows });
   });
+
+  app.get("/api/reports/sales-items", async (req: Request, res: Response) => {
+    const businessFilter = getBusinessFilter(req);
+    const months = getMonthsFromQuery(req);
+    const startAnchor = resolveStartAnchor(months);
+
+    const rows = await buildSalesItemsReport(businessFilter, startAnchor);
+
+    res.json({ months, rows });
+  });
+
+  app.get(
+    "/api/reports/sales-items/export",
+    async (req: Request, res: Response) => {
+      const businessFilter = getBusinessFilter(req);
+      const months = getMonthsFromQuery(req);
+      const startAnchor = resolveStartAnchor(months);
+
+      const rows = await buildSalesItemsReport(businessFilter, startAnchor);
+
+      const headers = [
+        "OV",
+        "Data do pedido",
+        "Cliente",
+        "Condição de pagamento",
+        "Produto",
+        "SKU",
+        "Item",
+        "Quantidade",
+        "Custo unitário (R$)",
+        "Preço unitário vendido (R$)",
+        "Custo total (R$)",
+        "Receita total (R$)",
+        "Margem (R$)",
+        "Margem (%)",
+      ];
+
+      const body = rows.map((row) => [
+        row.saleNumber,
+        row.saleDate
+          ? new Date(row.saleDate).toLocaleDateString("pt-BR")
+          : "",
+        row.customerName,
+        row.paymentMethod,
+        row.productName,
+        row.productSku,
+        row.itemDescription,
+        row.quantity,
+        Number(row.unitCost.toFixed(4)),
+        Number(row.unitPrice.toFixed(4)),
+        Number(row.totalCost.toFixed(2)),
+        Number(row.totalRevenue.toFixed(2)),
+        Number(row.profit.toFixed(2)),
+        Number(row.marginPercent.toFixed(2)),
+      ]);
+
+      const worksheet = XLSX.utils.aoa_to_sheet([headers, ...body]);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "vendas_itens");
+
+      const fileBuffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="relatorio-vendas-itens-${months}m.xlsx"`
+      );
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+      res.send(fileBuffer);
+    }
+  );
 }

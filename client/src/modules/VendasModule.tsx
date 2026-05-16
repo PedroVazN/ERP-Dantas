@@ -1,6 +1,6 @@
 import type { Customer, Product, Sale, SaleItem } from "../types";
 import { saleCustomerLabel } from "../utils/saleCustomerLabel";
-import type { Dispatch, FormEvent, SetStateAction } from "react";
+import type { Dispatch, FormEvent, SetStateAction, SyntheticEvent } from "react";
 import { useMemo, useRef, useState } from "react";
 
 type SaleFormState = {
@@ -13,7 +13,7 @@ type SaleFormState = {
 };
 
 export type VendasModuleProps = {
-  submitSale: (event: FormEvent) => Promise<void> | void;
+  submitSale: (event: FormEvent, status?: "PAGO" | "PENDENTE") => Promise<void> | void;
   saleForm: SaleFormState;
   setSaleForm: Dispatch<SetStateAction<SaleFormState>>;
   customers: Customer[];
@@ -21,6 +21,14 @@ export type VendasModuleProps = {
   sales: Sale[];
   editSale: (sale: Sale) => void;
   deleteSale: (sale: Sale) => void;
+  updateSalePaymentStatus: (
+    saleId: string,
+    status: "PAGO" | "PENDENTE" | "CANCELADO"
+  ) => Promise<void> | void;
+  updateSaleDeliveryStatus: (
+    saleId: string,
+    deliveryStatus: "ENTREGUE" | "NAO_ENTREGUE"
+  ) => Promise<void> | void;
   pixModalOpen: boolean;
   setPixModalOpen: Dispatch<SetStateAction<boolean>>;
   formatBRL: (value: number) => string;
@@ -32,10 +40,16 @@ export default function VendasModule(props: VendasModuleProps) {
   const [paymentFilter, setPaymentFilter] = useState("TODOS");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [lineDrafts, setLineDrafts] = useState<Record<string, { quantity: string; unitPrice: string }>>({});
   const [receiptSale, setReceiptSale] = useState<Sale | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
   const activeCustomers = useMemo(() => props.customers.filter((c) => c.status === "ATIVO"), [props.customers]);
+
+  const [pickerProductId, setPickerProductId] = useState("");
+  const [pickerQuantity, setPickerQuantity] = useState<string>("1");
+  const [pickerUnitPrice, setPickerUnitPrice] = useState<string>("");
+  const [marginDraftOpen, setMarginDraftOpen] = useState(false);
+  const [marginSale, setMarginSale] = useState<Sale | null>(null);
+  const [submittingStatus, setSubmittingStatus] = useState<"PAGO" | "PENDENTE" | null>(null);
 
   function printReceipt() {
     const content = receiptRef.current;
@@ -425,28 +439,95 @@ export default function VendasModule(props: VendasModuleProps) {
     return "status-chip neutral";
   }
 
+  function getDeliveryStatusClass(status?: Sale["deliveryStatus"]) {
+    if (status === "ENTREGUE") return "status-chip success";
+    return "status-chip warning";
+  }
+
+  function getProductById(productId: string) {
+    return props.products.find((p) => p._id === productId);
+  }
+
+  type MarginRow = {
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    cost: number;
+    revenue: number;
+    totalCost: number;
+    profit: number;
+    marginPercent: number;
+  };
+
+  function computeMarginRowsFromDraft(): MarginRow[] {
+    return props.saleForm.items.map((it) => {
+      const product = getProductById(it.productId);
+      const cost = Number(product?.cost ?? 0);
+      const quantity = Number(it.quantity) || 0;
+      const unitPrice = Number(it.unitPrice) || 0;
+      const revenue = unitPrice * quantity;
+      const totalCost = cost * quantity;
+      const profit = revenue - totalCost;
+      const marginPercent = revenue > 0 ? (profit / revenue) * 100 : 0;
+      return {
+        name: product?.name || "Produto",
+        quantity,
+        unitPrice,
+        cost,
+        revenue,
+        totalCost,
+        profit,
+        marginPercent,
+      };
+    });
+  }
+
+  function computeMarginRowsFromSale(sale: Sale): MarginRow[] {
+    return (sale.items ?? []).map((it) => {
+      const productRef = it.product;
+      const productId =
+        typeof productRef === "string"
+          ? productRef
+          : productRef && typeof productRef === "object"
+            ? productRef._id
+            : "";
+      const product = productId ? getProductById(productId) : undefined;
+      const cost = Number(product?.cost ?? 0);
+      const quantity = Number(it.quantity) || 0;
+      const unitPrice = Number(it.unitPrice) || 0;
+      const revenue = unitPrice * quantity;
+      const totalCost = cost * quantity;
+      const profit = revenue - totalCost;
+      const marginPercent = revenue > 0 ? (profit / revenue) * 100 : 0;
+      return {
+        name: it.name || product?.name || "Produto",
+        quantity,
+        unitPrice,
+        cost,
+        revenue,
+        totalCost,
+        profit,
+        marginPercent,
+      };
+    });
+  }
+
   function resetToList() {
     setScreen("lista");
     setPage(1);
   }
 
-  function updateLineDraft(productId: string, field: "quantity" | "unitPrice", value: string) {
-    setLineDrafts((prev) => ({
-      ...prev,
-      [productId]: {
-        quantity: prev[productId]?.quantity || "",
-        unitPrice: prev[productId]?.unitPrice || "",
-        [field]: value,
-      },
-    }));
-  }
-
-  function addSaleFromLine(product: Product) {
-    const quantity = Number(lineDrafts[product._id]?.quantity || 0);
-    const draftUnitPrice = Number(lineDrafts[product._id]?.unitPrice || product.price);
+  function addItemFromPicker() {
+    if (!pickerProductId) return;
+    const product = getProductById(pickerProductId);
+    if (!product) return;
+    const quantity = Number(pickerQuantity);
     if (!Number.isFinite(quantity) || quantity <= 0) return;
 
-    const unitPrice = Number.isFinite(draftUnitPrice) && draftUnitPrice > 0 ? draftUnitPrice : product.price;
+    const draftPrice = Number(pickerUnitPrice);
+    const fallbackPrice = Number(product.price) > 0 ? Number(product.price) : 0;
+    const unitPrice =
+      Number.isFinite(draftPrice) && draftPrice > 0 ? draftPrice : fallbackPrice;
     if (!Number.isFinite(unitPrice) || unitPrice <= 0) return;
 
     props.setSaleForm((prev) => {
@@ -460,19 +541,28 @@ export default function VendasModule(props: VendasModuleProps) {
           unitPrice,
         };
       } else {
-        nextItems.push({
-          productId: product._id,
-          quantity,
-          unitPrice,
-        });
+        nextItems.push({ productId: product._id, quantity, unitPrice });
       }
       return { ...prev, items: nextItems };
     });
 
-    setLineDrafts((prev) => ({
-      ...prev,
-      [product._id]: { quantity: "", unitPrice: "" },
-    }));
+    setPickerProductId("");
+    setPickerQuantity("1");
+    setPickerUnitPrice("");
+  }
+
+  async function finalizeSale(
+    event: SyntheticEvent,
+    status: "PAGO" | "PENDENTE"
+  ) {
+    event.preventDefault();
+    if (!props.saleForm.items.length) return;
+    setSubmittingStatus(status);
+    try {
+      await props.submitSale(event as FormEvent, status);
+    } finally {
+      setSubmittingStatus(null);
+    }
   }
 
   function normalizePhone(phone: string) {
@@ -633,6 +723,7 @@ export default function VendasModule(props: VendasModuleProps) {
                     <th>Valor</th>
                     <th>Pagamento</th>
                     <th>Status</th>
+                    <th>Entrega</th>
                     <th>Faturamento</th>
                     <th>NF-e</th>
                     <th>Ações</th>
@@ -640,52 +731,95 @@ export default function VendasModule(props: VendasModuleProps) {
                 </thead>
                 <tbody>
                   {paginatedSales.length ? (
-                    paginatedSales.map((item) => (
-                      <tr key={item._id}>
-                        <td>OV-{String(item._id).slice(-4).toUpperCase()}</td>
-                        <td>{saleCustomerLabel(item)}</td>
-                        <td>{new Date(item.createdAt).toLocaleDateString("pt-BR")}</td>
-                        <td>{props.formatBRL(item.totalAmount)}</td>
-                        <td>{item.paymentMethod}</td>
-                        <td>
-                          <span className={getSaleStatusClass(item.status)}>{item.status.replaceAll("_", " ")}</span>
-                        </td>
-                        <td>
-                          <span className={getBillingStatusClass(item.billingStatus)}>
-                            {(item.billingStatus || "N/A").replaceAll("_", " ")}
-                          </span>
-                        </td>
-                        <td>{item.invoice?.number || "Gerando..."}</td>
-                        <td>
-                          <div className="table-actions">
-                            <button
-                              type="button"
-                              className="ghost-btn"
-                              title="Ver cupom"
-                              onClick={() => setReceiptSale(item)}
+                    paginatedSales.map((item) => {
+                      const isCancelled = item.status === "CANCELADO";
+                      return (
+                        <tr key={item._id}>
+                          <td>OV-{String(item._id).slice(-4).toUpperCase()}</td>
+                          <td>{saleCustomerLabel(item)}</td>
+                          <td>{new Date(item.createdAt).toLocaleDateString("pt-BR")}</td>
+                          <td>{props.formatBRL(item.totalAmount)}</td>
+                          <td>{item.paymentMethod}</td>
+                          <td>
+                            <select
+                              className={`status-chip-select ${getSaleStatusClass(item.status)}`}
+                              value={item.status}
+                              disabled={isCancelled}
+                              title="Clique para alterar o status de pagamento"
+                              onChange={(event) =>
+                                void props.updateSalePaymentStatus(
+                                  item._id,
+                                  event.target.value as "PAGO" | "PENDENTE" | "CANCELADO"
+                                )
+                              }
                             >
-                              Cupom
-                            </button>
-                            <button type="button" className="ghost-btn" onClick={() => generateSaleProposalPdf(item)}>
-                              PDF comprovante
-                            </button>
-                            <button type="button" className="ghost-btn" onClick={() => props.editSale(item)}>
-                              Editar
-                            </button>
-                            <button
-                              type="button"
-                              className="ghost-btn danger"
-                              onClick={() => props.deleteSale(item)}
+                              <option value="PAGO">PAGO</option>
+                              <option value="PENDENTE">PENDENTE</option>
+                              {isCancelled ? <option value="CANCELADO">CANCELADO</option> : null}
+                            </select>
+                          </td>
+                          <td>
+                            <select
+                              className={`status-chip-select ${getDeliveryStatusClass(item.deliveryStatus)}`}
+                              value={item.deliveryStatus || "NAO_ENTREGUE"}
+                              disabled={isCancelled}
+                              title="Clique para alterar o status de entrega"
+                              onChange={(event) =>
+                                void props.updateSaleDeliveryStatus(
+                                  item._id,
+                                  event.target.value as "ENTREGUE" | "NAO_ENTREGUE"
+                                )
+                              }
                             >
-                              Excluir
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                              <option value="NAO_ENTREGUE">NÃO ENTREGUE</option>
+                              <option value="ENTREGUE">ENTREGUE</option>
+                            </select>
+                          </td>
+                          <td>
+                            <span className={getBillingStatusClass(item.billingStatus)}>
+                              {(item.billingStatus || "N/A").replaceAll("_", " ")}
+                            </span>
+                          </td>
+                          <td>{item.invoice?.number || "Gerando..."}</td>
+                          <td>
+                            <div className="table-actions">
+                              <button
+                                type="button"
+                                className="ghost-btn"
+                                title="Ver cupom"
+                                onClick={() => setReceiptSale(item)}
+                              >
+                                Cupom
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost-btn"
+                                title="Ver margem do pedido"
+                                onClick={() => setMarginSale(item)}
+                              >
+                                Margem
+                              </button>
+                              <button type="button" className="ghost-btn" onClick={() => generateSaleProposalPdf(item)}>
+                                PDF comprovante
+                              </button>
+                              <button type="button" className="ghost-btn" onClick={() => props.editSale(item)}>
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost-btn danger"
+                                onClick={() => props.deleteSale(item)}
+                              >
+                                Excluir
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
-                      <td colSpan={9} className="empty">
+                      <td colSpan={10} className="empty">
                         Nenhuma ordem encontrada com os filtros atuais.
                       </td>
                     </tr>
@@ -696,40 +830,80 @@ export default function VendasModule(props: VendasModuleProps) {
 
             <div className="vendas-list-cards">
               {paginatedSales.length ? (
-                paginatedSales.map((item) => (
-                  <article className="vendas-card" key={item._id}>
-                    <div className="vendas-card-head">
-                      <strong>OV-{String(item._id).slice(-4).toUpperCase()}</strong>
-                      <span>{new Date(item.createdAt).toLocaleDateString("pt-BR")}</span>
-                    </div>
-                    <p className="vendas-card-customer">{saleCustomerLabel(item)}</p>
-                    <div className="vendas-card-metrics">
-                      <span>{props.formatBRL(item.totalAmount)}</span>
-                      <span>{item.paymentMethod}</span>
-                    </div>
-                    <div className="vendas-card-statuses">
-                      <span className={getSaleStatusClass(item.status)}>{item.status.replaceAll("_", " ")}</span>
-                      <span className={getBillingStatusClass(item.billingStatus)}>
-                        {(item.billingStatus || "N/A").replaceAll("_", " ")}
-                      </span>
-                    </div>
-                    <small>NF-e: {item.invoice?.number || "Gerando..."}</small>
-                    <div className="table-actions">
-                      <button type="button" className="ghost-btn" onClick={() => setReceiptSale(item)}>
-                        Cupom
-                      </button>
-                      <button type="button" className="ghost-btn" onClick={() => generateSaleProposalPdf(item)}>
-                        PDF comprovante
-                      </button>
-                      <button type="button" className="ghost-btn" onClick={() => props.editSale(item)}>
-                        Editar
-                      </button>
-                      <button type="button" className="ghost-btn danger" onClick={() => props.deleteSale(item)}>
-                        Excluir
-                      </button>
-                    </div>
-                  </article>
-                ))
+                paginatedSales.map((item) => {
+                  const isCancelled = item.status === "CANCELADO";
+                  return (
+                    <article className="vendas-card" key={item._id}>
+                      <div className="vendas-card-head">
+                        <strong>OV-{String(item._id).slice(-4).toUpperCase()}</strong>
+                        <span>{new Date(item.createdAt).toLocaleDateString("pt-BR")}</span>
+                      </div>
+                      <p className="vendas-card-customer">{saleCustomerLabel(item)}</p>
+                      <div className="vendas-card-metrics">
+                        <span>{props.formatBRL(item.totalAmount)}</span>
+                        <span>{item.paymentMethod}</span>
+                      </div>
+                      <div className="vendas-card-statuses">
+                        <label className="vendas-card-status-label">
+                          Pagto.
+                          <select
+                            className={`status-chip-select ${getSaleStatusClass(item.status)}`}
+                            value={item.status}
+                            disabled={isCancelled}
+                            onChange={(event) =>
+                              void props.updateSalePaymentStatus(
+                                item._id,
+                                event.target.value as "PAGO" | "PENDENTE" | "CANCELADO"
+                              )
+                            }
+                          >
+                            <option value="PAGO">PAGO</option>
+                            <option value="PENDENTE">PENDENTE</option>
+                            {isCancelled ? <option value="CANCELADO">CANCELADO</option> : null}
+                          </select>
+                        </label>
+                        <label className="vendas-card-status-label">
+                          Entrega
+                          <select
+                            className={`status-chip-select ${getDeliveryStatusClass(item.deliveryStatus)}`}
+                            value={item.deliveryStatus || "NAO_ENTREGUE"}
+                            disabled={isCancelled}
+                            onChange={(event) =>
+                              void props.updateSaleDeliveryStatus(
+                                item._id,
+                                event.target.value as "ENTREGUE" | "NAO_ENTREGUE"
+                              )
+                            }
+                          >
+                            <option value="NAO_ENTREGUE">NÃO ENTREGUE</option>
+                            <option value="ENTREGUE">ENTREGUE</option>
+                          </select>
+                        </label>
+                        <span className={getBillingStatusClass(item.billingStatus)}>
+                          {(item.billingStatus || "N/A").replaceAll("_", " ")}
+                        </span>
+                      </div>
+                      <small>NF-e: {item.invoice?.number || "Gerando..."}</small>
+                      <div className="table-actions">
+                        <button type="button" className="ghost-btn" onClick={() => setReceiptSale(item)}>
+                          Cupom
+                        </button>
+                        <button type="button" className="ghost-btn" onClick={() => setMarginSale(item)}>
+                          Margem
+                        </button>
+                        <button type="button" className="ghost-btn" onClick={() => generateSaleProposalPdf(item)}>
+                          PDF comprovante
+                        </button>
+                        <button type="button" className="ghost-btn" onClick={() => props.editSale(item)}>
+                          Editar
+                        </button>
+                        <button type="button" className="ghost-btn danger" onClick={() => props.deleteSale(item)}>
+                          Excluir
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })
               ) : (
                 <p className="empty">Nenhuma ordem encontrada com os filtros atuais.</p>
               )}
@@ -758,7 +932,7 @@ export default function VendasModule(props: VendasModuleProps) {
             </div>
           </>
         ) : (
-          <form className="form-card order-form" onSubmit={props.submitSale}>
+          <form className="form-card order-form" onSubmit={(event) => event.preventDefault()}>
             <h3>Emitir nova ordem de venda</h3>
             <div className="order-toolbar">
               <div className="form-field">
@@ -827,61 +1001,69 @@ export default function VendasModule(props: VendasModuleProps) {
 
             <div className="sales-create-panes">
               <section className="sales-pane">
-                <h4>Produtos disponíveis</h4>
-                <div className="table-scroll vendas-order-table-wrap">
-                  <table className="order-items-table responsive-table">
-                    <thead>
-                      <tr>
-                        <th>Produto</th>
-                        <th>Estoque</th>
-                        <th>Preço (R$)</th>
-                        <th>Preço customizado (R$)</th>
-                        <th>Quantidade</th>
-                        <th>Ação</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {props.products.length ? (
-                        props.products.map((item) => (
-                          <tr key={item._id}>
-                            <td data-label="Produto">{item.name}</td>
-                            <td data-label="Estoque">{item.stock}</td>
-                            <td data-label="Preço">{props.formatBRL(item.price)}</td>
-                            <td data-label="Preço custom. (R$)">
-                              <input
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                placeholder={item.price.toFixed(2)}
-                                value={lineDrafts[item._id]?.unitPrice ?? item.price.toFixed(2)}
-                                onChange={(event) => updateLineDraft(item._id, "unitPrice", event.target.value)}
-                              />
-                            </td>
-                            <td data-label="Quantidade">
-                              <input
-                                type="number"
-                                min={1}
-                                placeholder="Qtd."
-                                value={lineDrafts[item._id]?.quantity || ""}
-                                onChange={(event) => updateLineDraft(item._id, "quantity", event.target.value)}
-                              />
-                            </td>
-                            <td data-label="Ação">
-                              <button type="button" className="vendas-add-line-btn" onClick={() => addSaleFromLine(item)}>
-                                Adicionar
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={6} className="empty">
-                            Nenhum produto disponível para venda.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                <h4>Adicionar produto</h4>
+                <p className="theme-helper">
+                  Selecione um produto na lista, informe quantidade e preço unitário e clique em
+                  Adicionar. Repita para incluir vários itens.
+                </p>
+                <div className="order-toolbar">
+                  <div className="form-field" style={{ minWidth: 220 }}>
+                    <label>Produto</label>
+                    <select
+                      value={pickerProductId}
+                      onChange={(event) => {
+                        const id = event.target.value;
+                        setPickerProductId(id);
+                        const product = getProductById(id);
+                        if (product && Number(product.price) > 0) {
+                          setPickerUnitPrice(Number(product.price).toFixed(2));
+                        } else {
+                          setPickerUnitPrice("");
+                        }
+                      }}
+                    >
+                      <option value="">Selecione um produto…</option>
+                      {props.products.map((item) => (
+                        <option key={item._id} value={item._id}>
+                          {item.name}
+                          {item.sku ? ` — ${item.sku}` : ""}
+                          {` · estoque ${item.stock}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-field" style={{ maxWidth: 130 }}>
+                    <label>Quantidade</label>
+                    <input
+                      type="number"
+                      min={1}
+                      step="1"
+                      value={pickerQuantity}
+                      onChange={(event) => setPickerQuantity(event.target.value)}
+                      placeholder="ex.: 1"
+                    />
+                  </div>
+                  <div className="form-field" style={{ maxWidth: 170 }}>
+                    <label>Preço unitário (R$)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={pickerUnitPrice}
+                      onChange={(event) => setPickerUnitPrice(event.target.value)}
+                      placeholder="ex.: 12,90"
+                    />
+                  </div>
+                  <div className="form-field" style={{ alignSelf: "flex-end", maxWidth: 180 }}>
+                    <button
+                      type="button"
+                      className="vendas-add-line-btn"
+                      onClick={addItemFromPicker}
+                      disabled={!pickerProductId}
+                    >
+                      Adicionar item
+                    </button>
+                  </div>
                 </div>
               </section>
 
@@ -931,8 +1113,28 @@ export default function VendasModule(props: VendasModuleProps) {
             </div>
 
             <div className="table-actions vendas-order-actions">
-              <button type="submit" disabled={!props.saleForm.items.length}>
-                Finalizar venda
+              <button
+                type="button"
+                disabled={!props.saleForm.items.length || submittingStatus !== null}
+                onClick={(event) => void finalizeSale(event, "PAGO")}
+              >
+                {submittingStatus === "PAGO" ? "Finalizando…" : "Finalizar como pago"}
+              </button>
+              <button
+                type="button"
+                disabled={!props.saleForm.items.length || submittingStatus !== null}
+                onClick={(event) => void finalizeSale(event, "PENDENTE")}
+              >
+                {submittingStatus === "PENDENTE" ? "Finalizando…" : "Finalizar como pendente"}
+              </button>
+              <button
+                type="button"
+                className="ghost-btn"
+                disabled={!props.saleForm.items.length}
+                onClick={() => setMarginDraftOpen(true)}
+                title="Ver margem dos itens e total do pedido"
+              >
+                Ver margem
               </button>
               <button
                 type="button"
@@ -1029,6 +1231,24 @@ export default function VendasModule(props: VendasModuleProps) {
         </div>
       ) : null}
 
+      {marginDraftOpen ? (
+        <MarginModal
+          title="Margem do pedido em rascunho"
+          rows={computeMarginRowsFromDraft()}
+          formatBRL={props.formatBRL}
+          onClose={() => setMarginDraftOpen(false)}
+        />
+      ) : null}
+
+      {marginSale ? (
+        <MarginModal
+          title={`Margem da venda OV-${String(marginSale._id).slice(-4).toUpperCase()}`}
+          rows={computeMarginRowsFromSale(marginSale)}
+          formatBRL={props.formatBRL}
+          onClose={() => setMarginSale(null)}
+        />
+      ) : null}
+
       {props.pixModalOpen ? (
         <div className="pix-modal-overlay" onClick={() => props.setPixModalOpen(false)}>
           <div className="pix-modal" onClick={(event) => event.stopPropagation()}>
@@ -1043,6 +1263,114 @@ export default function VendasModule(props: VendasModuleProps) {
         </div>
       ) : null}
     </section>
+  );
+}
+
+type MarginModalRow = {
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  cost: number;
+  revenue: number;
+  totalCost: number;
+  profit: number;
+  marginPercent: number;
+};
+
+function MarginModal(props: {
+  title: string;
+  rows: MarginModalRow[];
+  formatBRL: (value: number) => string;
+  onClose: () => void;
+}) {
+  const totalRevenue = props.rows.reduce((acc, row) => acc + row.revenue, 0);
+  const totalCost = props.rows.reduce((acc, row) => acc + row.totalCost, 0);
+  const totalProfit = totalRevenue - totalCost;
+  const totalMarginPercent = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+
+  return (
+    <div className="receipt-overlay" onClick={props.onClose}>
+      <div className="receipt-modal vendas-margin-modal" onClick={(event) => event.stopPropagation()}>
+        <div>
+          <h2>{props.title}</h2>
+          <p className="theme-helper">
+            Margem calculada com base no custo padrão atual de cada produto. Para vendas antigas,
+            ajustes em custo posteriores ao registro são refletidos aqui.
+          </p>
+
+          {props.rows.length === 0 ? (
+            <p className="empty">Nenhum item para calcular margem.</p>
+          ) : (
+            <div className="table-scroll">
+              <table className="responsive-table vendas-margin-table">
+                <thead>
+                  <tr>
+                    <th>Produto</th>
+                    <th>Qtd</th>
+                    <th>Custo unit.</th>
+                    <th>Preço unit.</th>
+                    <th>Receita</th>
+                    <th>Custo total</th>
+                    <th>Margem (R$)</th>
+                    <th>Margem (%)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {props.rows.map((row, index) => (
+                    <tr key={`${row.name}-${index}`}>
+                      <td data-label="Produto">{row.name}</td>
+                      <td data-label="Qtd">{row.quantity}</td>
+                      <td data-label="Custo unit.">{props.formatBRL(row.cost)}</td>
+                      <td data-label="Preço unit.">{props.formatBRL(row.unitPrice)}</td>
+                      <td data-label="Receita">{props.formatBRL(row.revenue)}</td>
+                      <td data-label="Custo total">{props.formatBRL(row.totalCost)}</td>
+                      <td data-label="Margem (R$)">
+                        <strong className={row.profit >= 0 ? "vendas-margin-positive" : "vendas-margin-negative"}>
+                          {props.formatBRL(row.profit)}
+                        </strong>
+                      </td>
+                      <td data-label="Margem (%)">
+                        <strong className={row.marginPercent >= 0 ? "vendas-margin-positive" : "vendas-margin-negative"}>
+                          {row.marginPercent.toFixed(1)}%
+                        </strong>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="vendas-margin-total-row">
+                    <td colSpan={4}>
+                      <strong>Total do pedido</strong>
+                    </td>
+                    <td>
+                      <strong>{props.formatBRL(totalRevenue)}</strong>
+                    </td>
+                    <td>
+                      <strong>{props.formatBRL(totalCost)}</strong>
+                    </td>
+                    <td>
+                      <strong className={totalProfit >= 0 ? "vendas-margin-positive" : "vendas-margin-negative"}>
+                        {props.formatBRL(totalProfit)}
+                      </strong>
+                    </td>
+                    <td>
+                      <strong className={totalMarginPercent >= 0 ? "vendas-margin-positive" : "vendas-margin-negative"}>
+                        {totalMarginPercent.toFixed(1)}%
+                      </strong>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </div>
+        <div className="receipt-actions">
+          <button type="button" className="ghost-btn" onClick={props.onClose}>
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

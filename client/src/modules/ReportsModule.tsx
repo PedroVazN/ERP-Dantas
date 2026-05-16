@@ -11,8 +11,12 @@ import {
   YAxis,
 } from "recharts";
 
-import { api } from "../api";
-import type { MonthlyReportResponse, StockReportResponse } from "../types";
+import { API_URL, api } from "../api";
+import type {
+  MonthlyReportResponse,
+  SalesItemsReportResponse,
+  StockReportResponse,
+} from "../types";
 
 export type ReportsModuleProps = {
   scopedPath: (path: string) => string;
@@ -23,25 +27,32 @@ export default function ReportsModule(props: ReportsModuleProps) {
   const [months, setMonths] = useState(12);
   const [data, setData] = useState<MonthlyReportResponse | null>(null);
   const [stockData, setStockData] = useState<StockReportResponse | null>(null);
+  const [salesItemsData, setSalesItemsData] = useState<SalesItemsReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [salesItemsSearch, setSalesItemsSearch] = useState("");
+  const [exportingSalesItems, setExportingSalesItems] = useState(false);
+  const [exportError, setExportError] = useState("");
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
       const q = `?months=${months}`;
-      const [res, stockRes] = await Promise.all([
+      const [res, stockRes, salesItemsRes] = await Promise.all([
         api.get<MonthlyReportResponse>(props.scopedPath(`/reports/monthly-series${q}`)),
         api.get<StockReportResponse>(props.scopedPath(`/reports/stock-table${q}`)),
+        api.get<SalesItemsReportResponse>(props.scopedPath(`/reports/sales-items${q}`)),
       ]);
       setData(res);
       setStockData(stockRes);
+      setSalesItemsData(salesItemsRes);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro ao carregar relatórios";
       setError(message);
       setData(null);
       setStockData(null);
+      setSalesItemsData(null);
     } finally {
       setLoading(false);
     }
@@ -53,6 +64,63 @@ export default function ReportsModule(props: ReportsModuleProps) {
 
   const series = data?.series ?? [];
   const stockRows = stockData?.rows ?? [];
+  const salesItemsRows = salesItemsData?.rows ?? [];
+
+  const filteredSalesItemsRows = salesItemsRows.filter((row) => {
+    const term = salesItemsSearch.trim().toLowerCase();
+    if (!term) return true;
+    return [
+      row.saleNumber,
+      row.customerName,
+      row.productName,
+      row.itemDescription,
+      row.paymentMethod,
+      row.productSku,
+    ]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(term));
+  });
+
+  const salesItemsTotals = filteredSalesItemsRows.reduce(
+    (acc, row) => {
+      acc.revenue += row.totalRevenue;
+      acc.cost += row.totalCost;
+      acc.profit += row.profit;
+      acc.quantity += row.quantity;
+      return acc;
+    },
+    { revenue: 0, cost: 0, profit: 0, quantity: 0 }
+  );
+  const salesItemsTotalMargin =
+    salesItemsTotals.revenue > 0
+      ? (salesItemsTotals.profit / salesItemsTotals.revenue) * 100
+      : 0;
+
+  async function exportSalesItemsExcel() {
+    setExportError("");
+    setExportingSalesItems(true);
+    try {
+      const response = await fetch(
+        `${API_URL}${props.scopedPath(`/reports/sales-items/export?months=${months}`)}`
+      );
+      if (!response.ok) {
+        throw new Error("Não foi possível gerar o arquivo Excel.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `relatorio-vendas-itens-${months}m.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Falha ao baixar Excel.");
+    } finally {
+      setExportingSalesItems(false);
+    }
+  }
 
   return (
     <section className="dashboard-shell reports-module">
@@ -208,6 +276,114 @@ export default function ReportsModule(props: ReportsModuleProps) {
             </div>
           ) : (
             <p className="empty feedback">Nenhum produto encontrado para montar o relatório de estoque.</p>
+          )}
+        </article>
+      ) : null}
+
+      {!loading && !error ? (
+        <article className="table-card animated reports-stock-card">
+          <div className="reports-stock-header">
+            <div>
+              <h3>Vendas por item (últimos {months} meses)</h3>
+              <p className="theme-helper">
+                Uma linha por item de cada ordem de venda — com cliente, condição de pagamento,
+                custo, preço vendido, margem (R$) e margem (%). Pode ser exportado para Excel.
+              </p>
+            </div>
+            <div className="reports-module-toolbar">
+              <input
+                type="search"
+                className="reports-search-input"
+                placeholder="Buscar por OV, cliente, produto, SKU ou pagamento"
+                value={salesItemsSearch}
+                onChange={(event) => setSalesItemsSearch(event.target.value)}
+              />
+              <button
+                type="button"
+                className="ghost-btn"
+                onClick={() => void exportSalesItemsExcel()}
+                disabled={exportingSalesItems || filteredSalesItemsRows.length === 0}
+                title="Baixar Excel completo do período"
+              >
+                {exportingSalesItems ? "Gerando…" : "Exportar Excel"}
+              </button>
+            </div>
+          </div>
+
+          {exportError ? <p className="error">{exportError}</p> : null}
+
+          {filteredSalesItemsRows.length > 0 ? (
+            <>
+              <p className="theme-helper" style={{ marginTop: 0 }}>
+                {filteredSalesItemsRows.length} linha(s) · Receita:{" "}
+                <strong>{props.formatBRL(salesItemsTotals.revenue)}</strong> · Custo:{" "}
+                <strong>{props.formatBRL(salesItemsTotals.cost)}</strong> · Margem:{" "}
+                <strong>{props.formatBRL(salesItemsTotals.profit)}</strong> (
+                {salesItemsTotalMargin.toFixed(1)}%)
+              </p>
+              <div className="reports-stock-table-wrap">
+                <table className="reports-stock-table">
+                  <thead>
+                    <tr>
+                      <th>OV</th>
+                      <th>Data</th>
+                      <th>Cliente</th>
+                      <th>Pagamento</th>
+                      <th>Produto</th>
+                      <th>Item</th>
+                      <th>Qtd.</th>
+                      <th>Custo unit.</th>
+                      <th>Preço unit.</th>
+                      <th>Receita</th>
+                      <th>Margem (R$)</th>
+                      <th>Margem (%)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredSalesItemsRows.map((row, index) => (
+                      <tr key={`${row.saleId}-${row.productId}-${index}`}>
+                        <td>{row.saleNumber}</td>
+                        <td>
+                          {row.saleDate
+                            ? new Date(row.saleDate).toLocaleDateString("pt-BR")
+                            : "-"}
+                        </td>
+                        <td>{row.customerName}</td>
+                        <td>{row.paymentMethod}</td>
+                        <td>{row.productName}</td>
+                        <td>{row.itemDescription}</td>
+                        <td>{row.quantity}</td>
+                        <td>{props.formatBRL(row.unitCost)}</td>
+                        <td>{props.formatBRL(row.unitPrice)}</td>
+                        <td>{props.formatBRL(row.totalRevenue)}</td>
+                        <td
+                          className={
+                            row.profit >= 0
+                              ? "reports-margin-positive"
+                              : "reports-margin-negative"
+                          }
+                        >
+                          <strong>{props.formatBRL(row.profit)}</strong>
+                        </td>
+                        <td
+                          className={
+                            row.marginPercent >= 0
+                              ? "reports-margin-positive"
+                              : "reports-margin-negative"
+                          }
+                        >
+                          <strong>{row.marginPercent.toFixed(1)}%</strong>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="empty feedback">
+              Nenhum item encontrado{salesItemsSearch ? " com o filtro atual" : " no período"}.
+            </p>
           )}
         </article>
       ) : null}

@@ -14,7 +14,8 @@ export function registerAiRoutes(
     autoApprovePurchasesForAi: boolean;
     applyPurchaseStock: (
       businessId: string,
-      items: Array<{ product?: any; quantity: number; cost: number }>
+      items: Array<{ product?: any; quantity: number; cost: number }>,
+      extraExpenses?: number
     ) => Promise<void>;
     normalizeSaleItemsAndApplyStock: (...args: any[]) => Promise<any>;
     generateInvoicePayload: (...args: any[]) => any;

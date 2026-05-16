@@ -157,10 +157,6 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
   <div class="info">
     <h3>${safeName}</h3>
     ${desc}
-    <div class="meta-row">
-      <span class="price">${props.formatBRL(p.price)}</span>
-      <span class="buy-icon">🛒</span>
-    </div>
     <div class="stock-line">
       <span class="${stockClass}">Estoque: ${p.stock} un.</span>
     </div>
@@ -410,23 +406,8 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
           </select>
         </div>
         <div className="form-field">
-          <label>Preço de venda</label>
-          <small className="field-help">Quanto você cobra do cliente (R$).</small>
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            placeholder="ex.: 12,90"
-            value={props.productForm.price}
-            onChange={(event) =>
-              props.setProductForm({ ...props.productForm, price: Number(event.target.value) })
-            }
-            required
-          />
-        </div>
-        <div className="form-field">
-          <label>Custo</label>
-          <small className="field-help">Quanto custa para produzir/comprar (R$).</small>
+          <label>Custo padrão</label>
+          <small className="field-help">Quanto custa para produzir/comprar (R$). O preço de venda é definido no momento da venda.</small>
           <input
             type="number"
             min={0}
@@ -537,8 +518,7 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
                       <th>Produto</th>
                       <th>SKU</th>
                       <th>Código</th>
-                      <th>Preço</th>
-                      <th>Custo</th>
+                      <th>Custo padrão</th>
                       <th>Estoque</th>
                       <th>Estoque mín.</th>
                       <th>Status</th>
@@ -551,8 +531,7 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
                         <td data-label="Produto">{row.name}</td>
                         <td data-label="SKU">{row.sku}</td>
                         <td data-label="Código">{row.productCode || "-"}</td>
-                        <td data-label="Preço">{props.formatBRL(row.price)}</td>
-                        <td data-label="Custo">{props.formatBRL(row.cost)}</td>
+                        <td data-label="Custo padrão">{props.formatBRL(row.cost)}</td>
                         <td data-label="Estoque">{row.stock}</td>
                         <td data-label="Estoque mín.">{row.minStock}</td>
                         <td data-label="Status">
@@ -604,8 +583,7 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
                     <th>SKU</th>
                     <th>Código</th>
                     <th>Descrição</th>
-                    <th>Preço</th>
-                    <th>Custo</th>
+                    <th>Custo padrão</th>
                     <th>Estoque</th>
                     <th>Foto</th>
                     <th>Ações</th>
@@ -618,8 +596,7 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
                       <td data-label="SKU">{item.sku}</td>
                       <td data-label="Código">{item.productCode || "-"}</td>
                       <td data-label="Descrição">{item.description || "-"}</td>
-                      <td data-label="Preço">{props.formatBRL(item.price)}</td>
-                      <td data-label="Custo">{props.formatBRL(item.cost)}</td>
+                      <td data-label="Custo padrão">{props.formatBRL(item.cost)}</td>
                       <td data-label="Estoque">{item.stock}</td>
                       <td data-label="Foto">
                         {item.hasPhoto ? (
@@ -719,7 +696,6 @@ export default function ProdutosModule(props: ProdutosModuleProps) {
 
                       <div className="catalog-card-footer">
                         <div className="catalog-pricing">
-                          <span className="catalog-price">{props.formatBRL(item.price)}</span>
                           <span className="catalog-stock-badge">
                             {item.stock} un.
                           </span>

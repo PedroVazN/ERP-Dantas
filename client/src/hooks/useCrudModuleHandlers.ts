@@ -276,7 +276,10 @@ export function useCrudModuleHandlers(deps: {
     await loadAllData();
   }
 
-  async function submitSale(event: FormEvent) {
+  async function submitSale(
+    event: FormEvent,
+    status: "PAGO" | "PENDENTE" = "PAGO"
+  ) {
     event.preventDefault();
     if (isGeneralWorkspace) {
       setError("No ERP Geral voce visualiza consolidado. Para lancar, selecione um ERP especifico.");
@@ -353,7 +356,7 @@ export function useCrudModuleHandlers(deps: {
         ...(customerIdToUse ? { customer: customerIdToUse } : {}),
         items: normalizedItems,
         paymentMethod: saleForm.paymentMethod,
-        status: "PAGO",
+        status,
         createdBy: "Admin",
       });
       setSaleForm({
@@ -765,6 +768,30 @@ export function useCrudModuleHandlers(deps: {
     await loadAllData();
   }
 
+  async function updateSalePaymentStatus(
+    saleId: string,
+    status: "PAGO" | "PENDENTE" | "CANCELADO"
+  ) {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar vendas.");
+      return;
+    }
+    await api.patch<Sale>(scopedPath(`/sales/${saleId}`), { status });
+    await loadAllData();
+  }
+
+  async function updateSaleDeliveryStatus(
+    saleId: string,
+    deliveryStatus: "ENTREGUE" | "NAO_ENTREGUE"
+  ) {
+    if (isGeneralWorkspace) {
+      setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar vendas.");
+      return;
+    }
+    await api.patch<Sale>(scopedPath(`/sales/${saleId}`), { deliveryStatus });
+    await loadAllData();
+  }
+
   return {
     submitCustomer,
     submitProduct,
@@ -794,6 +821,8 @@ export function useCrudModuleHandlers(deps: {
     updatePurchaseWorkflow,
     reviewExpense,
     updateExpensePaymentStatus,
+    updateSalePaymentStatus,
+    updateSaleDeliveryStatus,
   };
 }
 

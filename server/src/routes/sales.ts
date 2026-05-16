@@ -107,6 +107,7 @@ export function registerSalesRoutes(
     const payload = req.body as Partial<{
       status: "PAGO" | "PENDENTE" | "CANCELADO";
       paymentMethod: "DINHEIRO" | "PIX" | "CARTAO" | "BOLETO" | "TRANSFERENCIA";
+      deliveryStatus: "ENTREGUE" | "NAO_ENTREGUE";
       customer: string | null;
       items: Array<{ product: string; quantity: number; unitPrice: number }>;
     }>;
@@ -212,6 +213,7 @@ export function registerSalesRoutes(
       }
       sale.status = "CANCELADO";
       sale.billingStatus = "CANCELADO";
+      sale.deliveryStatus = "NAO_ENTREGUE";
       if (sale.invoice) {
         sale.invoice.status = "CANCELADA";
       }
@@ -222,6 +224,13 @@ export function registerSalesRoutes(
 
     if (nextPayment) {
       sale.paymentMethod = nextPayment;
+    }
+
+    if (
+      sale.status !== "CANCELADO" &&
+      (payload.deliveryStatus === "ENTREGUE" || payload.deliveryStatus === "NAO_ENTREGUE")
+    ) {
+      sale.deliveryStatus = payload.deliveryStatus;
     }
 
     await sale.save();
