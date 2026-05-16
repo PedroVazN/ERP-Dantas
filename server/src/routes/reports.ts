@@ -70,37 +70,51 @@ async function buildSalesItemsReport(
 
   const rawRows = await SaleModel.aggregate(pipeline);
 
-  return rawRows.map((raw: any): SalesItemReportRow => {
-    const quantity = Number(raw.items?.quantity ?? 0) || 0;
-    const unitPrice = Number(raw.items?.unitPrice ?? 0) || 0;
-    const unitCost = Number(raw.prod?.cost ?? 0) || 0;
-    const totalRevenue = quantity * unitPrice;
-    const totalCost = quantity * unitCost;
-    const profit = totalRevenue - totalCost;
-    const marginPercent = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
-    const saleIdStr = String(raw._id || "");
-    const rawDate = raw.saleDate || raw.createdAt;
-    const paymentRaw = String(raw.paymentMethod || "-");
+  return rawRows
+    .filter((raw: any) => raw && raw.items)
+    .map((raw: any): SalesItemReportRow => {
+      const item = raw.items || {};
+      const prod = raw.prod || {};
+      const cust = raw.cust || {};
 
-    return {
-      saleId: saleIdStr,
-      saleNumber: `OV-${saleIdStr.slice(-4).toUpperCase()}`,
-      saleDate: rawDate ? new Date(rawDate).toISOString() : "",
-      customerName: String(raw.cust?.name || "").trim() || "Consumidor",
-      paymentMethod: PAYMENT_METHOD_LABELS[paymentRaw] || paymentRaw,
-      productId: raw.prod?._id ? String(raw.prod._id) : "",
-      productName: String(raw.prod?.name || raw.items?.name || "Produto"),
-      productSku: String(raw.prod?.sku || ""),
-      itemDescription: String(raw.items?.name || raw.prod?.name || "Item"),
-      quantity,
-      unitCost,
-      unitPrice,
-      totalCost,
-      totalRevenue,
-      profit,
-      marginPercent,
-    };
-  });
+      const quantity = Number(item.quantity ?? 0) || 0;
+      const unitPrice = Number(item.unitPrice ?? 0) || 0;
+      const unitCost = Number(prod.cost ?? 0) || 0;
+      const totalRevenue = quantity * unitPrice;
+      const totalCost = quantity * unitCost;
+      const profit = totalRevenue - totalCost;
+      const marginPercent = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
+      const saleIdStr = raw._id ? String(raw._id) : "";
+      const rawDate = raw.saleDate || raw.createdAt;
+      const paymentRaw = String(raw.paymentMethod || "-");
+
+      let saleDateIso = "";
+      if (rawDate) {
+        const d = new Date(rawDate);
+        if (!Number.isNaN(d.getTime())) {
+          saleDateIso = d.toISOString();
+        }
+      }
+
+      return {
+        saleId: saleIdStr,
+        saleNumber: saleIdStr ? `OV-${saleIdStr.slice(-4).toUpperCase()}` : "OV-?",
+        saleDate: saleDateIso,
+        customerName: String(cust.name || "").trim() || "Consumidor",
+        paymentMethod: PAYMENT_METHOD_LABELS[paymentRaw] || paymentRaw,
+        productId: prod._id ? String(prod._id) : "",
+        productName: String(prod.name || item.name || "Produto"),
+        productSku: String(prod.sku || ""),
+        itemDescription: String(item.name || prod.name || "Item"),
+        quantity,
+        unitCost,
+        unitPrice,
+        totalCost,
+        totalRevenue,
+        profit,
+        marginPercent,
+      };
+    });
 }
 
 function getMonthsFromQuery(req: Request): number {
@@ -315,75 +329,91 @@ export function registerReportsRoutes(
   });
 
   app.get("/api/reports/sales-items", async (req: Request, res: Response) => {
-    const businessFilter = getBusinessFilter(req);
-    const months = getMonthsFromQuery(req);
-    const startAnchor = resolveStartAnchor(months);
-
-    const rows = await buildSalesItemsReport(businessFilter, startAnchor);
-
-    res.json({ months, rows });
-  });
-
-  app.get(
-    "/api/reports/sales-items/export",
-    async (req: Request, res: Response) => {
+    try {
       const businessFilter = getBusinessFilter(req);
       const months = getMonthsFromQuery(req);
       const startAnchor = resolveStartAnchor(months);
 
       const rows = await buildSalesItemsReport(businessFilter, startAnchor);
 
-      const headers = [
-        "OV",
-        "Data do pedido",
-        "Cliente",
-        "Condição de pagamento",
-        "Produto",
-        "SKU",
-        "Item",
-        "Quantidade",
-        "Custo unitário (R$)",
-        "Preço unitário vendido (R$)",
-        "Custo total (R$)",
-        "Receita total (R$)",
-        "Margem (R$)",
-        "Margem (%)",
-      ];
+      res.json({ months, rows });
+    } catch (err) {
+      console.error("[/api/reports/sales-items]", err);
+      const message =
+        err instanceof Error ? err.message : "Erro ao montar relatório de vendas por item.";
+      res.status(500).json({ message });
+    }
+  });
 
-      const body = rows.map((row) => [
-        row.saleNumber,
-        row.saleDate
-          ? new Date(row.saleDate).toLocaleDateString("pt-BR")
-          : "",
-        row.customerName,
-        row.paymentMethod,
-        row.productName,
-        row.productSku,
-        row.itemDescription,
-        row.quantity,
-        Number(row.unitCost.toFixed(4)),
-        Number(row.unitPrice.toFixed(4)),
-        Number(row.totalCost.toFixed(2)),
-        Number(row.totalRevenue.toFixed(2)),
-        Number(row.profit.toFixed(2)),
-        Number(row.marginPercent.toFixed(2)),
-      ]);
+  app.get(
+    "/api/reports/sales-items/export",
+    async (req: Request, res: Response) => {
+      try {
+        const businessFilter = getBusinessFilter(req);
+        const months = getMonthsFromQuery(req);
+        const startAnchor = resolveStartAnchor(months);
 
-      const worksheet = XLSX.utils.aoa_to_sheet([headers, ...body]);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "vendas_itens");
+        const rows = await buildSalesItemsReport(businessFilter, startAnchor);
 
-      const fileBuffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+        const headers = [
+          "OV",
+          "Data do pedido",
+          "Cliente",
+          "Condição de pagamento",
+          "Produto",
+          "SKU",
+          "Item",
+          "Quantidade",
+          "Custo unitário (R$)",
+          "Preço unitário vendido (R$)",
+          "Custo total (R$)",
+          "Receita total (R$)",
+          "Margem (R$)",
+          "Margem (%)",
+        ];
 
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="relatorio-vendas-itens-${months}m.xlsx"`
-      );
-      res.setHeader(
-        "Content-Type",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-      );
-      res.send(fileBuffer);
+        const body = rows.map((row) => [
+          row.saleNumber,
+          row.saleDate
+            ? new Date(row.saleDate).toLocaleDateString("pt-BR")
+            : "",
+          row.customerName,
+          row.paymentMethod,
+          row.productName,
+          row.productSku,
+          row.itemDescription,
+          row.quantity,
+          Number(row.unitCost.toFixed(4)),
+          Number(row.unitPrice.toFixed(4)),
+          Number(row.totalCost.toFixed(2)),
+          Number(row.totalRevenue.toFixed(2)),
+          Number(row.profit.toFixed(2)),
+          Number(row.marginPercent.toFixed(2)),
+        ]);
+
+        const worksheet = XLSX.utils.aoa_to_sheet([headers, ...body]);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "vendas_itens");
+
+        const fileBuffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="relatorio-vendas-itens-${months}m.xlsx"`
+        );
+        res.setHeader(
+          "Content-Type",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        );
+        res.send(fileBuffer);
+      } catch (err) {
+        console.error("[/api/reports/sales-items/export]", err);
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Erro ao gerar Excel do relatório de vendas por item.";
+        res.status(500).json({ message });
+      }
     }
   );
 }
