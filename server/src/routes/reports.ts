@@ -46,6 +46,16 @@ async function buildSalesItemsReport(
 
   const pipeline: PipelineStage[] = [
     { $match: matchStage },
+    { $sort: { createdAt: -1 } },
+    {
+      $lookup: {
+        from: "customers",
+        localField: "customer",
+        foreignField: "_id",
+        as: "cust",
+      },
+    },
+    { $unwind: { path: "$cust", preserveNullAndEmptyArrays: true } },
     { $unwind: "$items" },
     {
       $lookup: {
@@ -56,19 +66,9 @@ async function buildSalesItemsReport(
       },
     },
     { $unwind: { path: "$prod", preserveNullAndEmptyArrays: true } },
-    {
-      $lookup: {
-        from: "customers",
-        localField: "customer",
-        foreignField: "_id",
-        as: "cust",
-      },
-    },
-    { $unwind: { path: "$cust", preserveNullAndEmptyArrays: true } },
-    { $sort: { createdAt: -1 } },
   ];
 
-  const rawRows = await SaleModel.aggregate(pipeline);
+  const rawRows = await SaleModel.aggregate(pipeline).allowDiskUse(true);
 
   return rawRows
     .filter((raw: any) => raw && raw.items)
