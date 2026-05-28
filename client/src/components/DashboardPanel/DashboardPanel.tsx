@@ -64,7 +64,7 @@ export default function DashboardPanel(props: DashboardPanelProps) {
         <div>
           <h3>Painel executivo</h3>
           <p className="theme-helper">
-            Visão consolidada de performance, risco e crescimento em uma única tela.
+            Visão estratégica de receita, margem, risco e crescimento em tempo real.
           </p>
         </div>
         <div className="dashboard-hero-metrics">
@@ -80,7 +80,7 @@ export default function DashboardPanel(props: DashboardPanelProps) {
         <div className="dashboard-balance-head">
           <div>
             <h3>Balanço geral</h3>
-            <p className="theme-helper">Indicadores principais do mês selecionado (comparáveis ao filtro do BI).</p>
+            <p className="theme-helper">Indicadores centrais para decisão no período selecionado.</p>
           </div>
           <label className="dashboard-month-select">
             <span>Mês</span>
@@ -211,7 +211,7 @@ export default function DashboardPanel(props: DashboardPanelProps) {
 
       <section className="module-grid animated bi-grid">
         <article className="table-card">
-          <h3>Relatório visual: receita x custo x lucro (6 meses)</h3>
+          <h3>Radar executivo: receita x custo x lucro (6 meses)</h3>
           <p className="theme-helper">
             Atualização em tempo real a cada 15s{" "}
             {props.biRefreshing ? "(sincronizando...)" : `(última: ${new Date(biInsights.updatedAt).toLocaleTimeString("pt-BR")})`}
@@ -295,7 +295,7 @@ export default function DashboardPanel(props: DashboardPanelProps) {
         </article>
 
         <article className="table-card">
-          <h3>Análise preditiva para decisão</h3>
+          <h3>Cenário preditivo para decisão</h3>
           <div className="prediction-grid">
             <div className="prediction-card">
               <span>Receita projetada</span>
@@ -310,7 +310,7 @@ export default function DashboardPanel(props: DashboardPanelProps) {
               <strong>{props.formatBRL(biInsights.forecast.nextProfit)}</strong>
             </div>
           </div>
-          <p className="theme-helper">Projeção baseada na tendência dos últimos meses.</p>
+          <p className="theme-helper">Projeção orientada pelas tendências recentes da operação.</p>
           <h4 className="bi-subtitle">Risco de ruptura de estoque</h4>
           {biInsights.forecast.stockRisk.length === 0 ? (
             <p className="empty">Sem risco imediato detectado com base no giro recente.</p>
@@ -381,9 +381,9 @@ export default function DashboardPanel(props: DashboardPanelProps) {
       </section>
 
       <section className="promo-card animated">
-        <h3>ERP pronto para crescer com seu negócio</h3>
+        <h3>ERP preparado para escalar sua operação</h3>
         <p>
-          Expanda com fiscal, múltiplas lojas, permissões por perfil e painéis analíticos avançados sem trocar de plataforma.
+          Evolua com fiscal, múltiplas unidades, permissões por perfil e analytics avançado sem trocar de plataforma.
         </p>
         <button className="ghost-btn" onClick={() => props.selectModule("clientes")}>
           Explorar módulos

@@ -2631,6 +2631,225 @@ th {
   font-weight: 700;
 }
 
+/* Fase 2: refinamento visual por tela (premium) */
+.dashboard-shell > .table-card,
+.vendas-module > .table-card,
+.compras-module > .table-card,
+.despesas-module > .table-card,
+.conta-corrente-page > .table-card {
+  border-radius: 18px;
+}
+
+.dashboard-kpi-grid .kpi-card,
+.finance-summary-grid .kpi-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.dashboard-kpi-grid .kpi-card::before,
+.finance-summary-grid .kpi-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 30%, #ffffff));
+  opacity: 0.7;
+}
+
+.vendas-module .order-header,
+.compras-module .order-header,
+.despesas-module .order-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.vendas-module .order-toolbar,
+.compras-module .order-toolbar,
+.despesas-module .form-grid {
+  background: color-mix(in srgb, var(--surface-muted) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 14px;
+  padding: 10px;
+}
+
+.vendas-module .table-scroll,
+.compras-module .table-scroll,
+.despesas-module .table-scroll,
+.conta-corrente-page .table-scroll {
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 14px;
+}
+
+.vendas-module tbody tr:hover,
+.compras-module tbody tr:hover,
+.despesas-module tbody tr:hover,
+.conta-corrente-page tbody tr:hover {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+.vendas-module .prediction-card strong,
+.compras-module .prediction-card strong,
+.despesas-module .prediction-card strong {
+  font-size: clamp(1.05rem, 1.4vw, 1.26rem);
+}
+
+.despesas-module .despesas-hero-card .prediction-grid {
+  margin-top: 12px;
+}
+
+.despesas-module .despesas-form-card {
+  border-color: color-mix(in srgb, var(--info) 28%, var(--border));
+}
+
+.despesas-module .despesas-table-card {
+  border-color: color-mix(in srgb, var(--warning) 24%, var(--border));
+}
+
+.despesas-module .status-chip {
+  min-width: 84px;
+  justify-content: center;
+}
+
+.conta-corrente-page .finance-table td,
+.conta-corrente-page .finance-table th {
+  font-size: 13px;
+}
+
+.conta-corrente-page .finance-table .status-chip {
+  min-width: 102px;
+  justify-content: center;
+}
+
+.conta-corrente-page .finance-table td[data-label="Saldo acumulado"] {
+  font-size: 13px;
+  letter-spacing: -0.01em;
+}
+
+/* Fase 3: microinteracoes e estados premium */
+.table-card,
+.form-card,
+.kpi-card,
+.promo-card {
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.24s ease, border-color 0.2s ease;
+}
+
+.table-card:hover,
+.form-card:hover,
+.kpi-card:hover,
+.promo-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--border));
+  box-shadow: 0 20px 38px color-mix(in srgb, var(--shadow-soft) 80%, transparent);
+}
+
+button,
+.ghost-btn,
+.status-chip-select,
+.nav-button,
+.quick-card {
+  transition: transform 0.16s ease, box-shadow 0.18s ease, filter 0.18s ease, border-color 0.18s ease;
+}
+
+button:hover:not(:disabled),
+.ghost-btn:hover:not(:disabled),
+.status-chip-select:hover:not(:disabled),
+.nav-button:hover:not(:disabled),
+.quick-card:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+button:active:not(:disabled),
+.ghost-btn:active:not(:disabled),
+.status-chip-select:active:not(:disabled),
+.nav-button:active:not(:disabled),
+.quick-card:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.feedback,
+.error {
+  border-radius: 12px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+}
+
+.feedback {
+  color: color-mix(in srgb, var(--info) 70%, var(--title));
+  background: color-mix(in srgb, var(--info) 10%, transparent);
+  border-color: color-mix(in srgb, var(--info) 26%, var(--border));
+}
+
+.error {
+  color: color-mix(in srgb, var(--danger) 82%, var(--title));
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 28%, var(--border));
+}
+
+.empty {
+  border: 1px dashed color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-muted) 60%, transparent);
+  font-weight: 500;
+}
+
+.dashboard-shell .empty,
+.vendas-module .empty,
+.compras-module .empty,
+.despesas-module .empty,
+.conta-corrente-page .empty {
+  margin: 4px 0;
+}
+
+.status-chip {
+  position: relative;
+  overflow: hidden;
+}
+
+.status-chip::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid color-mix(in srgb, #ffffff 22%, transparent);
+  pointer-events: none;
+}
+
+.animated {
+  animation: fadeUpPremium 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fadeUpPremium {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated,
+  .table-card,
+  .form-card,
+  .kpi-card,
+  .promo-card,
+  button,
+  .ghost-btn,
+  .status-chip-select,
+  .nav-button,
+  .quick-card {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
 @media (max-width: 1100px) {
   .finance-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2646,6 +2865,21 @@ th {
   .finance-filters,
   .finance-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-shell > .table-card,
+  .vendas-module > .table-card,
+  .compras-module > .table-card,
+  .despesas-module > .table-card,
+  .conta-corrente-page > .table-card {
+    border-radius: 14px;
+  }
+
+  .vendas-module .order-toolbar,
+  .compras-module .order-toolbar,
+  .despesas-module .form-grid {
+    padding: 8px;
+    border-radius: 12px;
   }
 }
 

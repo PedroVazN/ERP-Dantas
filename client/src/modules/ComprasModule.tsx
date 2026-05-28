@@ -535,7 +535,7 @@ export default function ComprasModule(props: ComprasModuleProps) {
           </div>
         </div>
         <p className="theme-helper">
-          Workflow de compra: adiciona estoque e gera despesa após aprovação/recebimento.
+          Esteira de suprimentos: controla aprovacao, recebimento e impacto financeiro da compra.
         </p>
         <div className="prediction-grid" style={{ marginBottom: 12 }}>
           <div className="prediction-card">

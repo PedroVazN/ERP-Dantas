@@ -646,7 +646,7 @@ export default function VendasModule(props: VendasModuleProps) {
           </div>
         </div>
         <p className="theme-helper">
-          Workflow de venda: reduz estoque e gera receita, com faturamento/NF-e.
+          Esteira comercial: converte pedidos em receita, baixa estoque e acompanha faturamento.
         </p>
         <div className="prediction-grid" style={{ marginBottom: 12 }}>
           <div className="prediction-card">
@@ -1003,8 +1003,8 @@ export default function VendasModule(props: VendasModuleProps) {
               <section className="sales-pane">
                 <h4>Adicionar produto</h4>
                 <p className="theme-helper">
-                  Selecione um produto na lista, informe quantidade e preço unitário e clique em
-                  Adicionar. Repita para incluir vários itens.
+                  Selecione o produto, ajuste quantidade e preço unitário e adicione na ordem.
+                  Repita para montar o pedido completo.
                 </p>
                 <div className="order-toolbar">
                   <div className="form-field" style={{ minWidth: 220 }}>

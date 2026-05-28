@@ -31,8 +31,7 @@ export default function ContaCorrentePage(props: ContaCorrentePageProps) {
         <div>
           <h2>Conta Corrente</h2>
           <p className="theme-helper">
-            Espelho bancário da operação: acompanhe saldo, entradas, saídas e saldo acumulado por
-            lançamento.
+            Visão executiva do caixa: acompanhe entradas, saídas e saldo acumulado por lançamento.
           </p>
         </div>
       </header>

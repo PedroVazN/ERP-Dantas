@@ -1,4 +1,5 @@
 import type { Dispatch, FormEvent, SetStateAction } from "react";
+import { useMemo } from "react";
 import type { Expense } from "../types";
 
 type ExpenseFormState = {
@@ -24,9 +25,51 @@ export type DespesasModuleProps = {
 };
 
 export default function DespesasModule(props: DespesasModuleProps) {
+  const despesasPagas = useMemo(
+    () => props.expenses.filter((expense) => expense.status === "PAGO"),
+    [props.expenses]
+  );
+  const despesasPendentes = useMemo(
+    () => props.expenses.filter((expense) => expense.status === "PENDENTE"),
+    [props.expenses]
+  );
+  const totalPago = useMemo(
+    () => despesasPagas.reduce((acc, expense) => acc + expense.amount, 0),
+    [despesasPagas]
+  );
+  const totalPendente = useMemo(
+    () => despesasPendentes.reduce((acc, expense) => acc + expense.amount, 0),
+    [despesasPendentes]
+  );
+
   return (
     <section className="module-grid animated despesas-module">
-      <form className="form-card" onSubmit={props.submitExpense}>
+      <section className="table-card despesas-hero-card" style={{ gridColumn: "1 / -1" }}>
+        <div className="order-header">
+          <h3>Despesas operacionais</h3>
+        </div>
+        <p className="theme-helper">
+          Controle tático de custos para proteger margem, caixa e previsibilidade mensal.
+        </p>
+        <div className="prediction-grid">
+          <div className="prediction-card">
+            <span>Total pago no período</span>
+            <strong>{props.formatBRL(totalPago)}</strong>
+          </div>
+          <div className="prediction-card">
+            <span>Despesas pendentes</span>
+            <strong>
+              {despesasPendentes.length} ({props.formatBRL(totalPendente)})
+            </strong>
+          </div>
+          <div className="prediction-card">
+            <span>Lançamentos registrados</span>
+            <strong>{props.expenses.length}</strong>
+          </div>
+        </div>
+      </section>
+
+      <form className="form-card despesas-form-card" onSubmit={props.submitExpense}>
         <h3>Lançar despesa operacional</h3>
         <div className="form-grid">
           <div className="form-field">
@@ -101,9 +144,9 @@ export default function DespesasModule(props: DespesasModuleProps) {
         <button type="submit">Lançar despesa</button>
       </form>
 
-      <section className="table-card" style={{ gridColumn: "1 / -1" }}>
+      <section className="table-card despesas-table-card" style={{ gridColumn: "1 / -1" }}>
         <h3>Despesas lançadas</h3>
-        <div className="table-scroll">
+        <div className="table-scroll despesas-list-table">
           <table className="responsive-table">
             <thead>
               <tr>
@@ -129,7 +172,11 @@ export default function DespesasModule(props: DespesasModuleProps) {
                       {new Date(expense.paymentDate || expense.dueDate).toLocaleDateString("pt-BR")}
                     </td>
                     <td data-label="Valor">{props.formatBRL(expense.amount)}</td>
-                    <td data-label="Status">{expense.status}</td>
+                    <td data-label="Status">
+                      <span className={`status-chip ${expense.status === "PAGO" ? "success" : "warning"}`}>
+                        {expense.status}
+                      </span>
+                    </td>
                     <td data-label="Ações">
                       <div className="table-actions">
                         <button
