@@ -26,7 +26,6 @@ export type FinanceiroModuleProps = {
   formatBRL: (value: number) => string;
   sales: Sale[];
   purchases: Purchase[];
-  expenses: Expense[];
 };
 
 export default function FinanceiroModule(props: FinanceiroModuleProps) {
