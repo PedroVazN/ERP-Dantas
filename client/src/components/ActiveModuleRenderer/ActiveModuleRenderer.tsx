@@ -193,21 +193,6 @@ export type ActiveModuleRendererProps = {
       dueDate: string;
     }>
   >;
-  if (props.activeModule === "despesas") {
-    return (
-      <DespesasModule
-        submitExpense={props.submitExpense}
-        expenseForm={props.expenseForm}
-        setExpenseForm={props.setExpenseForm}
-        expenses={props.expenses}
-        updateExpensePaymentStatus={props.updateExpensePaymentStatus}
-        editExpense={props.editExpense}
-        deleteExpense={props.deleteExpense}
-        formatBRL={props.formatBRL}
-      />
-    );
-  }
-
   submitExpense: (event: FormEvent) => Promise<void> | void;
   expenses: Expense[];
   reviewExpense: (expenseId: string, action: "aprovar" | "rejeitar" | "pagar") => void;
@@ -345,6 +330,21 @@ export default function ActiveModuleRenderer(props: ActiveModuleRendererProps) {
         formatBRL={props.formatBRL}
         scopedPath={props.scopedPath}
         loadAllData={props.loadAllData}
+      />
+    );
+  }
+
+  if (props.activeModule === "despesas") {
+    return (
+      <DespesasModule
+        submitExpense={props.submitExpense}
+        expenseForm={props.expenseForm}
+        setExpenseForm={props.setExpenseForm}
+        expenses={props.expenses}
+        updateExpensePaymentStatus={props.updateExpensePaymentStatus}
+        editExpense={props.editExpense}
+        deleteExpense={props.deleteExpense}
+        formatBRL={props.formatBRL}
       />
     );
   }
