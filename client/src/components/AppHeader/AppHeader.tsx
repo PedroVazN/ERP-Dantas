@@ -73,7 +73,7 @@ export default function AppHeader(props: AppHeaderProps) {
       ) : null}
 
       <header className="content-header">
-        <div>
+        <div className="content-header-main">
           <h2>{activeMeta?.label}</h2>
           <p>
             {props.currentDate} -{" "}
@@ -82,7 +82,9 @@ export default function AppHeader(props: AppHeaderProps) {
               : `ERP Especial: ${props.selectedBusiness?.name || props.workspaceId}`}
           </p>
           {!props.isGeneralWorkspace && props.pendingApprovalsCount > 0 ? (
-            <p>{props.pendingApprovalsCount} item(ns) aguardando aprovacao automatizada.</p>
+            <p className="content-header-alert">
+              {props.pendingApprovalsCount} item(ns) aguardando aprovação automatizada.
+            </p>
           ) : null}
         </div>
         <div className="header-actions">

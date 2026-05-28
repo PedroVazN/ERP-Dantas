@@ -16,6 +16,14 @@
   --border: #dde5f1;
   --accent: #0f6fff;
   --accent-2: #00a6ff;
+  --success: #0f9f6f;
+  --warning: #c98510;
+  --danger: #d12f3f;
+  --info: #1d7dea;
+  --surface: #ffffff;
+  --surface-muted: #f7f9fc;
+  --surface-elevated: #ffffff;
+  --text-soft: #7b8798;
 
   --sidebar-bg: #102946;
   --sidebar-border: #1f3f63;
@@ -34,7 +42,7 @@
   --shadow-soft: rgba(16, 24, 40, 0.08);
   --shadow-strong: rgba(0, 0, 0, 0.25);
 
-  font-family: Inter, "Segoe UI", Roboto, sans-serif;
+  font-family: "Inter", "Segoe UI", "SF Pro Display", Roboto, sans-serif;
   color: var(--text);
   background: var(--bg);
 }
@@ -49,6 +57,14 @@
   --border: #243a5a;
   --accent: #4d8dff;
   --accent-2: #22d3ee;
+  --success: #22c58b;
+  --warning: #f5b642;
+  --danger: #ef6572;
+  --info: #5aa8ff;
+  --surface: #101a28;
+  --surface-muted: #0f223a;
+  --surface-elevated: #162235;
+  --text-soft: #95a6c0;
 
   --sidebar-bg: #081424;
   --sidebar-border: #16304a;
@@ -78,6 +94,14 @@
   --border: #bde8f4;
   --accent: #0ea5e9;
   --accent-2: #14b8a6;
+  --success: #0e9f73;
+  --warning: #ca880a;
+  --danger: #d4454f;
+  --info: #1f89cf;
+  --surface: #f4fdff;
+  --surface-muted: #e9faff;
+  --surface-elevated: #ffffff;
+  --text-soft: #4a8898;
 
   --sidebar-bg: #0a4f6b;
   --sidebar-border: #0c6488;
@@ -107,6 +131,14 @@
   --border: #b9e7d6;
   --accent: #02735e;
   --accent-2: #038c3e;
+  --success: #038c3e;
+  --warning: #be7a05;
+  --danger: #d03f44;
+  --info: #0b7f8d;
+  --surface: #f8fffd;
+  --surface-muted: #edf8f4;
+  --surface-elevated: #ffffff;
+  --text-soft: #46767b;
 
   --sidebar-bg: #034159;
   --sidebar-border: #025951;
@@ -136,6 +168,14 @@
   --border: #e3cbe8;
   --accent: #b775bf;
   --accent-2: #d29cd9;
+  --success: #3ba777;
+  --warning: #c58a28;
+  --danger: #d1456a;
+  --info: #7c69dc;
+  --surface: #fff9ff;
+  --surface-muted: #f7edf9;
+  --surface-elevated: #ffffff;
+  --text-soft: #866f8f;
 
   --sidebar-bg: #1b0a26;
   --sidebar-border: #3a184d;
@@ -165,6 +205,14 @@
   --border: #d8cfbf;
   --accent: #b8b68f;
   --accent-2: #d0c0a7;
+  --success: #5f9a6f;
+  --warning: #b58b3e;
+  --danger: #bf5c66;
+  --info: #6a8ead;
+  --surface: #fdfbf6;
+  --surface-muted: #f4eee2;
+  --surface-elevated: #ffffff;
+  --text-soft: #8c8374;
 
   --sidebar-bg: #8f8b63;
   --sidebar-border: #a4a07a;

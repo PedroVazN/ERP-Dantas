@@ -106,10 +106,15 @@
   min-height: 100vh;
   min-width: 0;
   max-width: 100%;
+  background:
+    radial-gradient(circle at 0% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 35%),
+    radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--accent-2) 8%, transparent), transparent 40%),
+    var(--bg);
 }
 
 .sidebar {
-  background: var(--sidebar-bg);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--sidebar-bg) 96%, #ffffff) 0%, var(--sidebar-bg) 100%);
   border-right: 1px solid var(--sidebar-border);
   padding: 24px 18px;
   color: var(--sidebar-text);
@@ -265,23 +270,48 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 18px;
+  padding: 16px 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  background: color-mix(in srgb, var(--surface-elevated) 92%, transparent);
+  box-shadow: var(--elev-1);
 }
 
 .header-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.content-header-main {
+  display: grid;
+  gap: 4px;
+}
+
+.content-header-alert {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 6px !important;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px !important;
+  color: color-mix(in srgb, var(--warning) 85%, #5d3608) !important;
+  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 30%, var(--border));
 }
 
 .content-header h2 {
   margin: 0;
-  font-size: 28px;
+  font-size: clamp(1.35rem, 2vw, 1.9rem);
   color: var(--title);
+  letter-spacing: -0.03em;
 }
 
 .content-header p {
   margin: 4px 0 0;
-  color: var(--muted);
-  font-size: 13px;
+  color: var(--text-soft);
+  font-size: 12px;
   text-transform: capitalize;
 }
 
@@ -322,11 +352,11 @@
 .table-card,
 .kpi-card,
 .promo-card {
-  background: var(--panel);
+  background: color-mix(in srgb, var(--surface-elevated) 94%, transparent);
   border: 1px solid var(--border);
   border-radius: 18px;
-  padding: 16px;
-  box-shadow: 0 8px 28px var(--shadow-soft);
+  padding: 18px;
+  box-shadow: 0 16px 34px color-mix(in srgb, var(--shadow-soft) 75%, transparent);
 }
 
 .form-card {
@@ -404,8 +434,9 @@
 .kpi-card strong {
   display: block;
   margin-top: 10px;
-  font-size: 27px;
+  font-size: clamp(1.4rem, 2.2vw, 2rem);
   color: var(--title);
+  letter-spacing: -0.03em;
 }
 
 .kpi-card span {
@@ -595,7 +626,7 @@ select,
 textarea,
 button {
   font: inherit;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid var(--border);
   background: var(--panel-2);
   color: var(--text);
@@ -604,13 +635,14 @@ button {
 
 button {
   cursor: pointer;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 92%, #fff), var(--accent-2));
   color: #fff;
   border-color: transparent;
+  font-weight: 600;
 }
 
 .ghost-btn {
-  background: transparent;
+  background: color-mix(in srgb, var(--surface-muted) 65%, transparent);
   color: var(--title);
   border-color: var(--border);
 }
@@ -791,6 +823,8 @@ th {
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
 
 .responsive-table {
@@ -862,21 +896,21 @@ th {
 }
 
 .status-chip.success {
-  background: color-mix(in srgb, #22c55e 22%, transparent);
-  color: #15803d;
-  border: 1px solid color-mix(in srgb, #22c55e 35%, var(--border));
+  background: color-mix(in srgb, var(--success) 18%, transparent);
+  color: color-mix(in srgb, var(--success) 80%, #0b3d2d);
+  border: 1px solid color-mix(in srgb, var(--success) 35%, var(--border));
 }
 
 .status-chip.warning {
-  background: color-mix(in srgb, #f59e0b 20%, transparent);
-  color: #b45309;
-  border: 1px solid color-mix(in srgb, #f59e0b 35%, var(--border));
+  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  color: color-mix(in srgb, var(--warning) 86%, #57370a);
+  border: 1px solid color-mix(in srgb, var(--warning) 36%, var(--border));
 }
 
 .status-chip.danger {
-  background: color-mix(in srgb, #ef4444 16%, transparent);
-  color: #b91c1c;
-  border: 1px solid color-mix(in srgb, #ef4444 35%, var(--border));
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: color-mix(in srgb, var(--danger) 88%, #5e1f27);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
 }
 
 .status-chip.neutral {
@@ -1056,12 +1090,12 @@ th {
   align-items: flex-start;
   min-width: 0;
   max-width: 100%;
-  background:
-    linear-gradient(
-      115deg,
-      color-mix(in srgb, var(--panel) 88%, transparent),
-      color-mix(in srgb, var(--panel-2) 78%, transparent)
-    );
+  background: linear-gradient(
+    130deg,
+    color-mix(in srgb, var(--accent) 10%, var(--surface-elevated)) 0%,
+    color-mix(in srgb, var(--surface-elevated) 96%, transparent) 60%,
+    color-mix(in srgb, var(--accent-2) 9%, var(--surface-elevated)) 100%
+  );
 }
 
 .dashboard-hero h3 {
@@ -1087,7 +1121,7 @@ th {
   padding: 6px 10px;
   border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
   border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 7%, var(--panel));
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-muted));
   font-size: 12px;
   color: var(--title);
   font-weight: 600;
@@ -1095,6 +1129,11 @@ th {
 
 .dashboard-kpi-grid .kpi-card {
   border-top: 3px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-elevated) 92%, transparent),
+    color-mix(in srgb, var(--surface-muted) 55%, transparent)
+  );
 }
 
 .dashboard-kpi-grid .kpi-card strong {
@@ -2318,8 +2357,44 @@ th {
 .dashboard-balance-card {
   padding: 14px 16px;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--accent, #2563eb) 8%, transparent);
+  background: color-mix(in srgb, var(--accent, #2563eb) 9%, var(--surface-muted));
   border: 1px solid color-mix(in srgb, var(--accent, #2563eb) 22%, transparent);
+}
+
+.vendas-module .order-header h3,
+.compras-module .order-header h3,
+.finance-header h2,
+.dashboard-shell h3 {
+  letter-spacing: -0.02em;
+}
+
+.vendas-module .prediction-card,
+.compras-module .prediction-card,
+.conta-corrente-page .prediction-card {
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--surface-muted) 82%, transparent),
+    color-mix(in srgb, var(--accent) 6%, var(--surface-elevated))
+  );
+}
+
+.finance-summary-grid .kpi-card,
+.finance-kpi {
+  background: linear-gradient(
+    140deg,
+    color-mix(in srgb, var(--surface-elevated) 92%, transparent),
+    color-mix(in srgb, var(--surface-muted) 50%, transparent)
+  );
+}
+
+.despesas-module .form-card,
+.despesas-module .table-card {
+  border-color: color-mix(in srgb, var(--accent) 20%, var(--border));
+}
+
+.conta-corrente-table td:last-child {
+  font-size: 13px;
+  letter-spacing: -0.01em;
 }
 
 .dashboard-balance-card h4 {

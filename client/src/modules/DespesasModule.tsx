@@ -25,7 +25,7 @@ export type DespesasModuleProps = {
 
 export default function DespesasModule(props: DespesasModuleProps) {
   return (
-    <section className="module-grid animated">
+    <section className="module-grid animated despesas-module">
       <form className="form-card" onSubmit={props.submitExpense}>
         <h3>Lançar despesa operacional</h3>
         <div className="form-grid">
