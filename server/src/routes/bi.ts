@@ -119,7 +119,7 @@ export function registerBiInsightsRoutes(
           $match: {
             ...businessFilter,
             status: { $in: ["PAGO", "PENDENTE", "AGUARDANDO_APROVACAO"] },
-            dueDate: { $gte: monthStart, $lt: nextMonthStart },
+            paymentDate: { $gte: monthStart, $lt: nextMonthStart },
           },
         },
         { $group: { _id: null, total: { $sum: "$amount" } } },
@@ -129,7 +129,7 @@ export function registerBiInsightsRoutes(
           $match: {
             ...businessFilter,
             status: { $in: ["PAGO", "PENDENTE", "AGUARDANDO_APROVACAO"] },
-            dueDate: { $gte: previousMonthStart, $lt: previousMonthEnd },
+            paymentDate: { $gte: previousMonthStart, $lt: previousMonthEnd },
           },
         },
         { $group: { _id: null, total: { $sum: "$amount" } } },
@@ -154,12 +154,12 @@ export function registerBiInsightsRoutes(
           $match: {
             ...businessFilter,
             status: { $in: ["PAGO", "PENDENTE", "AGUARDANDO_APROVACAO"] },
-            dueDate: { $gte: new Date(baseDate.getFullYear(), baseDate.getMonth() - 5, 1) },
+            paymentDate: { $gte: new Date(baseDate.getFullYear(), baseDate.getMonth() - 5, 1) },
           },
         },
         {
           $group: {
-            _id: { $dateToString: { format: "%Y-%m", date: "$dueDate" } },
+            _id: { $dateToString: { format: "%Y-%m", date: "$paymentDate" } },
             total: { $sum: "$amount" },
           },
         },
@@ -182,7 +182,7 @@ export function registerBiInsightsRoutes(
           $match: {
             ...businessFilter,
             status: { $in: ["PAGO", "PENDENTE", "AGUARDANDO_APROVACAO"] },
-            dueDate: { $gte: monthStart, $lt: nextMonthStart },
+            paymentDate: { $gte: monthStart, $lt: nextMonthStart },
           },
         },
         { $group: { _id: "$category", total: { $sum: "$amount" } } },

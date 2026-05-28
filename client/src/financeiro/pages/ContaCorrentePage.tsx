@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Purchase, Sale } from "../../types";
+import type { Expense, Purchase, Sale } from "../../types";
 import FinanceFilters from "../components/FinanceFilters";
 import FinanceSummary from "../components/FinanceSummary";
 import { useFinanceiro } from "../hooks/useFinanceiro";
@@ -7,10 +7,11 @@ import { useFinanceiro } from "../hooks/useFinanceiro";
 type ContaCorrentePageProps = {
   sales: Sale[];
   purchases: Purchase[];
+  expenses: Expense[];
 };
 
 export default function ContaCorrentePage(props: ContaCorrentePageProps) {
-  const financeiro = useFinanceiro({ sales: props.sales, purchases: props.purchases });
+  const financeiro = useFinanceiro({ sales: props.sales, purchases: props.purchases, expenses: props.expenses });
 
   const statementRows = useMemo(() => {
     const oldestFirst = [...financeiro.movimentacoes].sort(
@@ -94,6 +95,8 @@ export default function ContaCorrentePage(props: ContaCorrentePageProps) {
                           ? "Venda"
                           : mov.origem === "compra"
                             ? "Compra"
+                            : mov.origem === "despesa"
+                              ? "Despesa"
                             : mov.origem === "manual"
                               ? "Manual"
                               : "Estorno"}

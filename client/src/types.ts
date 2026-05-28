@@ -127,6 +127,9 @@ export type Expense = {
   /** Presente quando a despesa foi gerada por uma ordem de compra aprovada. */
   purchaseId?: string;
   description: string;
+  supplier?: string;
+  purchaseChannel?: string;
+  paymentMethod?: string;
   category: string;
   amount: number;
   status: "PAGO" | "PENDENTE" | "AGUARDANDO_APROVACAO" | "REJEITADO";
@@ -167,10 +170,28 @@ export type EconomicIndicators = {
 };
 
 export type Dashboard = {
+  /** Faturamento do mês: soma apenas dos pedidos pagos. */
   revenue: number;
+  /** Despesas gerais do mês (despesas operacionais, sem despesas de compras). */
   expenses: number;
+  /** Margem bruta em valor do mês. */
   profit: number;
+  /** Número de pedidos do mês (exceto cancelados). */
   salesCount: number;
+  /** Pedidos em análise: lançados e ainda não pagos. */
+  pendingOrdersCount: number;
+  /** Projeção de faturamento: pagos + pendentes. */
+  projectedRevenue: number;
+  /** Número de clientes únicos atendidos no mês. */
+  customersServed: number;
+  /** Margem bruta em valor. */
+  grossMarginValue: number;
+  /** Margem bruta em percentual. */
+  grossMarginPercent: number;
+  /** Margem líquida: faturamento pago - despesas gerais do mês. */
+  netMarginValue: number;
+  /** Despesas gerais do mês (espelho de expenses para o dashboard). */
+  operationalExpenses: number;
   purchaseCount: number;
   /** Soma das ordens de compra não canceladas no período (mesmo filtro de mês da API). */
   purchasesTotal: number;

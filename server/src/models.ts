@@ -136,6 +136,9 @@ const expenseSchema = new mongoose.Schema(
     /** Quando a despesa veio de uma ordem de compra aprovada (para sincronizar valor ao editar itens). */
     purchaseId: { type: mongoose.Schema.Types.ObjectId, ref: "Purchase", default: null, index: true },
     description: { type: String, required: true, trim: true },
+    supplier: { type: String, trim: true, default: "" },
+    purchaseChannel: { type: String, trim: true, default: "" },
+    paymentMethod: { type: String, trim: true, default: "" },
     category: { type: String, required: true, trim: true },
     amount: { type: Number, required: true, min: 0 },
     dueDate: { type: Date, required: true },

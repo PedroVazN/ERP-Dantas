@@ -49,6 +49,7 @@ type ModuleKey =
   | "precos"
   | "vendas"
   | "compras"
+  | "despesas"
   | "fornecedores"
   | "financeiro"
   | "contaCorrente"
@@ -65,6 +66,7 @@ const moduleMeta: Record<ModuleKey, { label: string; short: string; helper: stri
   precos: { label: "Tabela de Preço", short: "TP", helper: "Atualize preços de venda e custo médio" },
   vendas: { label: "Vendas", short: "VD", helper: "PDV e faturamento" },
   compras: { label: "Compras", short: "CP", helper: "Fornecedores e entradas" },
+  despesas: { label: "Despesas", short: "DP", helper: "Lançamentos operacionais do mês" },
   fornecedores: { label: "Fornecedores", short: "FR", helper: "Cadastro de fornecedores" },
   financeiro: { label: "Financeiro", short: "FN", helper: "Contas e despesas" },
   contaCorrente: { label: "Conta Corrente", short: "CC", helper: "Extrato e saldo em conta" },
@@ -240,9 +242,13 @@ function App() {
     items: [] as Array<{ productId: string; description: string; quantity: number; cost: number }>,
   });
   const [editExpenseForm, setEditExpenseForm] = useState({
+    supplier: "",
+    purchaseChannel: "",
+    paymentMethod: "PIX",
     description: "",
     category: "OPERACIONAL",
     amount: 0,
+    paymentDate: new Date().toISOString().slice(0, 10),
     dueDate: new Date().toISOString().slice(0, 10),
     status: "PENDENTE" as Expense["status"],
   });
@@ -285,9 +291,13 @@ function App() {
     paymentCondition: "PIX" as "BOLETO" | "PIX" | "DINHEIRO" | "CREDITO",
   });
   const [expenseForm, setExpenseForm] = useState({
+    supplier: "",
+    purchaseChannel: "",
+    paymentMethod: "PIX",
     description: "",
     category: "OPERACIONAL",
     amount: 0,
+    paymentDate: new Date().toISOString().slice(0, 10),
     dueDate: new Date().toISOString().slice(0, 10),
   });
   const [checklistForm, setChecklistForm] = useState({

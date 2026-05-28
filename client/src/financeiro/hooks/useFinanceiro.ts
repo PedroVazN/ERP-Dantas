@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
-import type { Purchase, Sale } from "../../types";
+import type { Expense, Purchase, Sale } from "../../types";
 import { financeiroService } from "../services/financeiroService";
 import type { FinanceFiltersState, Movimentacao, MovimentacaoInput } from "../types/movimentacao";
 
@@ -92,14 +92,16 @@ function isCompraCancelada(purchase: Purchase) {
   return purchase.status === "CANCELADA";
 }
 
-export function useFinanceiro(params: { sales: Sale[]; purchases: Purchase[] }) {
+export function useFinanceiro(params: { sales: Sale[]; purchases: Purchase[]; expenses: Expense[] }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const saleStateById = useRef<Map<string, { paid: boolean; cancelled: boolean }>>(new Map());
   const purchaseStateById = useRef<Map<string, { paid: boolean; cancelled: boolean }>>(new Map());
   const salesSyncRunning = useRef(false);
   const purchasesSyncRunning = useRef(false);
+  const expensesSyncRunning = useRef(false);
   const createdEntradaVendaIds = useRef<Set<string>>(new Set());
   const createdSaidaCompraIds = useRef<Set<string>>(new Set());
+  const createdSaidaDespesaIds = useRef<Set<string>>(new Set());
 
   function dedupeMovimentacoes(items: Movimentacao[]) {
     const seenAuto = new Set<string>();
@@ -309,6 +311,42 @@ export function useFinanceiro(params: { sales: Sale[]; purchases: Purchase[] }) 
     }
     void syncPurchases();
   }, [params.purchases]);
+
+  // Integração automática: despesas pagas entram como saída na conta corrente.
+  useEffect(() => {
+    async function syncExpenses() {
+      if (expensesSyncRunning.current) return;
+      expensesSyncRunning.current = true;
+      try {
+        for (const expense of params.expenses) {
+          if (expense.status !== "PAGO") continue;
+          const key = `despesa:${expense._id}`;
+          if (createdSaidaDespesaIds.current.has(key)) continue;
+          const existing = state.movimentacoes.find(
+            (m) => m.origem === "despesa" && m.referenciaId === expense._id && m.tipo === "saida"
+          );
+          if (existing) {
+            createdSaidaDespesaIds.current.add(key);
+            continue;
+          }
+          createdSaidaDespesaIds.current.add(key);
+          const created = await financeiroService.criarMovimentacao({
+            data: expense.paymentDate || expense.dueDate || new Date().toISOString(),
+            tipo: "saida",
+            valor: Number(expense.amount) || 0,
+            descricao: expense.description || "Despesa operacional",
+            categoria: expense.category || "OPERACIONAL",
+            origem: "despesa",
+            referenciaId: expense._id,
+          });
+          dispatch({ type: "prependMovimentacao", payload: created });
+        }
+      } finally {
+        expensesSyncRunning.current = false;
+      }
+    }
+    void syncExpenses();
+  }, [params.expenses]);
 
   const sortedMovimentacoes = useMemo(
     () =>

@@ -40,7 +40,16 @@ export default function DashboardPanel(props: DashboardPanelProps) {
   const monthOptions = useMemo(() => buildMonthSelectOptions(36), []);
   const purchasesTotal = dashboard.purchasesTotal ?? 0;
   const estoqueContabil = props.products.reduce((acc, item) => acc + item.cost * item.stock, 0);
-  const potencialFaturamento = props.products.reduce((acc, item) => acc + item.price * item.stock, 0);
+  const estoqueVenda = props.products.reduce((acc, item) => acc + item.price * item.stock, 0);
+  const faturamentoMes = dashboard.revenue ?? 0;
+  const pedidosEmAnalise = dashboard.pendingOrdersCount ?? 0;
+  const projecaoFaturamento = dashboard.projectedRevenue ?? 0;
+  const numeroPedidosMes = dashboard.salesCount ?? 0;
+  const clientesAtendidos = dashboard.customersServed ?? 0;
+  const margemBrutaValor = dashboard.grossMarginValue ?? dashboard.profit ?? 0;
+  const margemBrutaPercentual = dashboard.grossMarginPercent ?? 0;
+  const margemLiquida = dashboard.netMarginValue ?? 0;
+  const despesasGeraisMes = dashboard.operationalExpenses ?? dashboard.expenses ?? 0;
   const balancoMensal = biInsights.kpis.revenue - biInsights.kpis.expenses;
   const lowStockSuggestions = dashboard.lowStock.map((item) => {
     const gapToMin = Math.max(item.minStock - item.stock, 0);
@@ -116,47 +125,70 @@ export default function DashboardPanel(props: DashboardPanelProps) {
 
       <section className="kpi-grid dashboard-kpi-grid">
         <article className="kpi-card animated delay-1">
-          <h3>Faturamento</h3>
-          <strong>{props.formatBRL(dashboard.revenue)}</strong>
-          <span>Receita total em vendas</span>
+          <h3>Faturamento do mês</h3>
+          <strong>{props.formatBRL(faturamentoMes)}</strong>
+          <span>Apenas pedidos pagos entram neste total</span>
         </article>
         <article className="kpi-card animated delay-2">
-          <h3>Despesas</h3>
-          <strong>{props.formatBRL(dashboard.expenses)}</strong>
-          <span>Custos operacionais lançados</span>
+          <h3>Pedidos em análise</h3>
+          <strong>{pedidosEmAnalise}</strong>
+          <span>Pedidos lançados e ainda não pagos</span>
         </article>
         <article className="kpi-card animated delay-3">
-          <h3>Lucro bruto</h3>
-          <strong>{props.formatBRL(dashboard.profit)}</strong>
-          <span>Receita − custo dos itens vendidos</span>
+          <h3>Projeção de faturamento</h3>
+          <strong>{props.formatBRL(projecaoFaturamento)}</strong>
+          <span>Pedidos pagos + pedidos pendentes</span>
         </article>
         <article className="kpi-card animated delay-4">
-          <h3>Estoque contabil</h3>
+          <h3>Número de pedidos no mês</h3>
+          <strong>{numeroPedidosMes}</strong>
+          <span>Quantidade de pedidos não cancelados</span>
+        </article>
+      </section>
+
+      <section className="kpi-grid dashboard-kpi-grid">
+        <article className="kpi-card animated delay-1">
+          <h3>Clientes atendidos</h3>
+          <strong>{clientesAtendidos}</strong>
+          <span>Cliente repetido conta apenas uma vez</span>
+        </article>
+        <article className="kpi-card animated delay-2">
+          <h3>Estoque contábil</h3>
           <strong>{props.formatBRL(estoqueContabil)}</strong>
           <span>Valor de custo do estoque</span>
+        </article>
+        <article className="kpi-card animated delay-3">
+          <h3>Estoque de venda</h3>
+          <strong>{props.formatBRL(estoqueVenda)}</strong>
+          <span>Valor do estoque no preço de venda</span>
+        </article>
+        <article className="kpi-card animated delay-4">
+          <h3>Margem bruta (R$)</h3>
+          <strong>{props.formatBRL(margemBrutaValor)}</strong>
+          <span>Margem bruta em valor no mês</span>
         </article>
       </section>
 
       <section className="kpi-grid kpi-grid-bi dashboard-kpi-grid">
         <article className="kpi-card animated delay-1">
-          <h3>Margem bruta</h3>
-          <strong>{biInsights.kpis.margin.toFixed(1)}%</strong>
-          <span>Lucro bruto ÷ receita do mês</span>
+          <h3>Margem bruta (%)</h3>
+          <strong>{props.formatPct(margemBrutaPercentual)}</strong>
+          <span>Percentual da margem bruta do mês</span>
         </article>
         <article className="kpi-card animated delay-2">
+          <h3>Margem líquida</h3>
+          <strong>{props.formatBRL(margemLiquida)}</strong>
+          <span>Faturamento pago - despesas gerais do mês</span>
+        </article>
+        <article className="kpi-card animated delay-3">
+          <h3>Despesas gerais do mês</h3>
+          <strong>{props.formatBRL(despesasGeraisMes)}</strong>
+          <span>Somente despesas operacionais do período</span>
+        </article>
+        <article className="kpi-card animated delay-4">
           <h3>Balanço</h3>
           <strong>{props.formatBRL(balancoMensal)}</strong>
           <span>Vendas - despesas (mês)</span>
-        </article>
-        <article className="kpi-card animated delay-3">
-          <h3>Potencial de faturamento</h3>
-          <strong>{props.formatBRL(potencialFaturamento)}</strong>
-          <span>Estoque x preco de venda da lista</span>
-        </article>
-        <article className="kpi-card animated delay-4">
-          <h3>Ticket médio</h3>
-          <strong>{props.formatBRL(biInsights.kpis.averageTicket)}</strong>
-          <span>{biInsights.kpis.salesCount} vendas no mês corrente</span>
         </article>
       </section>
 

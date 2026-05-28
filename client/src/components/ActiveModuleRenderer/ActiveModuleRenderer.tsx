@@ -7,6 +7,7 @@ import ProdutosModule from "../../modules/ProdutosModule";
 import PrecosModule from "../../modules/PrecosModule";
 import VendasModule from "../../modules/VendasModule";
 import ComprasModule from "../../modules/ComprasModule";
+import DespesasModule from "../../modules/DespesasModule";
 import FornecedoresModule from "../../modules/FornecedoresModule";
 import FinanceiroModule from "../../modules/FinanceiroModule";
 import ContaCorrenteModule from "../../modules/ContaCorrenteModule";
@@ -27,6 +28,7 @@ export type ActiveModuleRendererProps = {
     | "precos"
     | "vendas"
     | "compras"
+    | "despesas"
     | "fornecedores"
     | "financeiro"
     | "contaCorrente"
@@ -169,8 +171,43 @@ export type ActiveModuleRendererProps = {
 
   // Financeiro
   economicIndicators: EconomicIndicators | null;
-  expenseForm: { description: string; category: string; amount: number; dueDate: string };
-  setExpenseForm: Dispatch<SetStateAction<{ description: string; category: string; amount: number; dueDate: string }>>;
+  expenseForm: {
+    supplier: string;
+    purchaseChannel: string;
+    paymentMethod: string;
+    description: string;
+    category: string;
+    amount: number;
+    paymentDate: string;
+    dueDate: string;
+  };
+  setExpenseForm: Dispatch<
+    SetStateAction<{
+      supplier: string;
+      purchaseChannel: string;
+      paymentMethod: string;
+      description: string;
+      category: string;
+      amount: number;
+      paymentDate: string;
+      dueDate: string;
+    }>
+  >;
+  if (props.activeModule === "despesas") {
+    return (
+      <DespesasModule
+        submitExpense={props.submitExpense}
+        expenseForm={props.expenseForm}
+        setExpenseForm={props.setExpenseForm}
+        expenses={props.expenses}
+        updateExpensePaymentStatus={props.updateExpensePaymentStatus}
+        editExpense={props.editExpense}
+        deleteExpense={props.deleteExpense}
+        formatBRL={props.formatBRL}
+      />
+    );
+  }
+
   submitExpense: (event: FormEvent) => Promise<void> | void;
   expenses: Expense[];
   reviewExpense: (expenseId: string, action: "aprovar" | "rejeitar" | "pagar") => void;
@@ -345,7 +382,7 @@ export default function ActiveModuleRenderer(props: ActiveModuleRendererProps) {
   }
 
   if (props.activeModule === "contaCorrente") {
-    return <ContaCorrenteModule sales={props.sales} purchases={props.purchases} />;
+    return <ContaCorrenteModule sales={props.sales} purchases={props.purchases} expenses={props.expenses} />;
   }
 
   if (props.activeModule === "checklist") {

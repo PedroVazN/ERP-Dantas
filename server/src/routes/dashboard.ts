@@ -21,12 +21,27 @@ export function registerDashboardRoutes(app: Express) {
     }
 
     const saleDateFilter = dateStart && dateEnd ? { createdAt: { $gte: dateStart, $lt: dateEnd } } : {};
-    const expenseDateFilter = dateStart && dateEnd ? { dueDate: { $gte: dateStart, $lt: dateEnd } } : {};
+    const expenseDateFilter = dateStart && dateEnd ? { paymentDate: { $gte: dateStart, $lt: dateEnd } } : {};
 
-    const [revenueAgg, expenseAgg, cogsAgg, lowStock, salesCount, purchaseCount, purchasesTotalAgg] =
+    const [
+      revenuePaidAgg,
+      revenuePendingAgg,
+      operationalExpenseAgg,
+      cogsPaidAgg,
+      lowStock,
+      salesCount,
+      customersServedAgg,
+      pendingOrdersCount,
+      purchaseCount,
+      purchasesTotalAgg,
+    ] =
       await Promise.all([
       SaleModel.aggregate([
-        { $match: { ...businessFilter, status: { $ne: "CANCELADO" }, ...saleDateFilter } },
+        { $match: { ...businessFilter, status: "PAGO", ...saleDateFilter } },
+        { $group: { _id: null, total: { $sum: "$totalAmount" } } },
+      ]),
+      SaleModel.aggregate([
+        { $match: { ...businessFilter, status: "PENDENTE", ...saleDateFilter } },
         { $group: { _id: null, total: { $sum: "$totalAmount" } } },
       ]),
       ExpenseModel.aggregate([
@@ -34,14 +49,16 @@ export function registerDashboardRoutes(app: Express) {
           $match: {
             ...businessFilter,
             status: { $in: ["PAGO", "PENDENTE", "AGUARDANDO_APROVACAO"] },
+            // Despesas gerais: não considerar despesas atreladas a compras.
+            purchaseId: null,
             ...expenseDateFilter,
           },
         },
         { $group: { _id: null, total: { $sum: "$amount" } } },
       ]),
-      // CPV: custo real dos itens vendidos via lookup no cadastro de produtos
+      // CPV dos pedidos pagos: custo real dos itens vendidos via lookup no cadastro de produtos.
       SaleModel.aggregate([
-        { $match: { ...businessFilter, status: { $ne: "CANCELADO" }, ...saleDateFilter } },
+        { $match: { ...businessFilter, status: "PAGO", ...saleDateFilter } },
         { $unwind: "$items" },
         {
           $lookup: {
@@ -68,7 +85,13 @@ export function registerDashboardRoutes(app: Express) {
       })
         .sort({ stock: 1 })
         .limit(10),
-      SaleModel.countDocuments({ ...businessFilter, ...saleDateFilter }),
+      SaleModel.countDocuments({ ...businessFilter, status: { $ne: "CANCELADO" }, ...saleDateFilter }),
+      SaleModel.aggregate([
+        { $match: { ...businessFilter, status: { $ne: "CANCELADO" }, customer: { $ne: null }, ...saleDateFilter } },
+        { $group: { _id: "$customer" } },
+        { $count: "total" },
+      ]),
+      SaleModel.countDocuments({ ...businessFilter, status: "PENDENTE", ...saleDateFilter }),
       PurchaseModel.countDocuments({ ...businessFilter, ...(saleDateFilter as object) }),
       PurchaseModel.aggregate([
         {
@@ -82,18 +105,29 @@ export function registerDashboardRoutes(app: Express) {
       ]),
     ]);
 
-    const revenue = revenueAgg[0]?.total || 0;
-    const expenses = expenseAgg[0]?.total || 0;
-    const cogs = cogsAgg[0]?.cogs || 0;
-    // Lucro bruto = receita - CPV (custo dos produtos efetivamente vendidos)
-    const profit = revenue - cogs;
+    const revenuePaid = revenuePaidAgg[0]?.total || 0;
+    const revenuePending = revenuePendingAgg[0]?.total || 0;
+    const projectedRevenue = revenuePaid + revenuePending;
+    const operationalExpenses = operationalExpenseAgg[0]?.total || 0;
+    const cogsPaid = cogsPaidAgg[0]?.cogs || 0;
+    const grossMarginValue = revenuePaid - cogsPaid;
+    const grossMarginPercent = revenuePaid > 0 ? (grossMarginValue / revenuePaid) * 100 : 0;
+    const netMarginValue = revenuePaid - operationalExpenses;
+    const customersServed = customersServedAgg[0]?.total || 0;
     const purchasesTotal = purchasesTotalAgg[0]?.total || 0;
 
     res.json({
-      revenue,
-      expenses,
-      profit,
+      revenue: revenuePaid,
+      expenses: operationalExpenses,
+      profit: grossMarginValue,
       salesCount,
+      pendingOrdersCount,
+      projectedRevenue,
+      customersServed,
+      grossMarginValue,
+      grossMarginPercent,
+      netMarginValue,
+      operationalExpenses,
       purchaseCount,
       purchasesTotal,
       lowStock,

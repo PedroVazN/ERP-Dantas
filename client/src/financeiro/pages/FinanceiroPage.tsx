@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Purchase, Sale } from "../../types";
+import type { Expense, Purchase, Sale } from "../../types";
 import FinanceFilters from "../components/FinanceFilters";
 import FinanceForm from "../components/FinanceForm";
 import FinanceSummary from "../components/FinanceSummary";
@@ -10,10 +10,11 @@ import type { Movimentacao } from "../types/movimentacao";
 type FinanceiroPageProps = {
   sales: Sale[];
   purchases: Purchase[];
+  expenses: Expense[];
 };
 
 export default function FinanceiroPage(props: FinanceiroPageProps) {
-  const financeiro = useFinanceiro({ sales: props.sales, purchases: props.purchases });
+  const financeiro = useFinanceiro({ sales: props.sales, purchases: props.purchases, expenses: props.expenses });
 
   const editingMov = useMemo(
     () => financeiro.movimentacoes.find((m) => m.id === financeiro.editingId) || null,

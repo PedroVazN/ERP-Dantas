@@ -73,9 +73,13 @@ export type EditPurchaseFormState = {
 };
 
 export type EditExpenseFormState = {
+  supplier: string;
+  purchaseChannel: string;
+  paymentMethod: string;
   description: string;
   category: string;
   amount: number;
+  paymentDate: string;
   dueDate: string;
   status: Expense["status"];
 };
@@ -1050,7 +1054,49 @@ export default function EditEntityModal(props: EditEntityModalProps) {
       {props.editModalKind === "expense" ? (
         <>
           <div className="form-field">
-            <label>Descrição</label>
+            <label>Fornecedor</label>
+            <input
+              value={props.editExpenseForm.supplier}
+              onChange={(event) =>
+                props.setEditExpenseForm((prev) => ({
+                  ...prev,
+                  supplier: event.target.value,
+                }))
+              }
+            />
+          </div>
+          <div className="form-field">
+            <label>Meio de compra</label>
+            <input
+              value={props.editExpenseForm.purchaseChannel}
+              onChange={(event) =>
+                props.setEditExpenseForm((prev) => ({
+                  ...prev,
+                  purchaseChannel: event.target.value,
+                }))
+              }
+            />
+          </div>
+          <div className="form-field">
+            <label>Meio de pagamento</label>
+            <select
+              value={props.editExpenseForm.paymentMethod}
+              onChange={(event) =>
+                props.setEditExpenseForm((prev) => ({
+                  ...prev,
+                  paymentMethod: event.target.value,
+                }))
+              }
+            >
+              <option value="PIX">PIX</option>
+              <option value="BOLETO">BOLETO</option>
+              <option value="CARTAO">CARTÃO</option>
+              <option value="TRANSFERENCIA">TRANSFERÊNCIA</option>
+              <option value="DINHEIRO">DINHEIRO</option>
+            </select>
+          </div>
+          <div className="form-field">
+            <label>Descritivo</label>
             <input
               value={props.editExpenseForm.description}
               onChange={(event) =>
@@ -1076,7 +1122,7 @@ export default function EditEntityModal(props: EditEntityModalProps) {
             />
           </div>
           <div className="form-field">
-            <label>Valor</label>
+            <label>Valor total</label>
             <input
               type="number"
               min={0}
@@ -1092,7 +1138,21 @@ export default function EditEntityModal(props: EditEntityModalProps) {
             />
           </div>
           <div className="form-field">
-            <label>Vencimento</label>
+            <label>Data de pagamento</label>
+            <input
+              type="date"
+              value={props.editExpenseForm.paymentDate}
+              onChange={(event) =>
+                props.setEditExpenseForm((prev) => ({
+                  ...prev,
+                  paymentDate: event.target.value,
+                }))
+              }
+              required
+            />
+          </div>
+          <div className="form-field">
+            <label>Data de vencimento</label>
             <input
               type="date"
               value={props.editExpenseForm.dueDate}
@@ -1140,9 +1200,13 @@ export default function EditEntityModal(props: EditEntityModalProps) {
                   return;
                 }
                 await api.patch<Expense>(props.scopedPath(`/expenses/${props.editingId}`), {
+                  supplier: props.editExpenseForm.supplier.trim(),
+                  purchaseChannel: props.editExpenseForm.purchaseChannel.trim(),
+                  paymentMethod: props.editExpenseForm.paymentMethod,
                   description: props.editExpenseForm.description.trim(),
                   category: props.editExpenseForm.category.trim(),
                   amount: props.editExpenseForm.amount,
+                  paymentDate: props.editExpenseForm.paymentDate,
                   dueDate: props.editExpenseForm.dueDate,
                   status: props.editExpenseForm.status,
                 });

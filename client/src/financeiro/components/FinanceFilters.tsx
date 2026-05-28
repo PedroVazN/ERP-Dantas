@@ -11,6 +11,7 @@ const origemOptions: Array<{ value: "todas" | MovimentacaoOrigem; label: string 
   { value: "manual", label: "Manual" },
   { value: "venda", label: "Venda" },
   { value: "compra", label: "Compra" },
+  { value: "despesa", label: "Despesa" },
   { value: "estorno", label: "Estorno" },
 ];
 

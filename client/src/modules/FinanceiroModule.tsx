@@ -3,9 +3,13 @@ import type { Dispatch, FormEvent, SetStateAction } from "react";
 import FinanceiroPage from "../financeiro/pages/FinanceiroPage";
 
 type ExpenseFormState = {
+  supplier: string;
+  purchaseChannel: string;
+  paymentMethod: string;
   description: string;
   category: string;
   amount: number;
+  paymentDate: string;
   dueDate: string;
 };
 
@@ -22,9 +26,10 @@ export type FinanceiroModuleProps = {
   formatBRL: (value: number) => string;
   sales: Sale[];
   purchases: Purchase[];
+  expenses: Expense[];
 };
 
 export default function FinanceiroModule(props: FinanceiroModuleProps) {
-  return <FinanceiroPage sales={props.sales} purchases={props.purchases} />;
+  return <FinanceiroPage sales={props.sales} purchases={props.purchases} expenses={props.expenses} />;
 }
 

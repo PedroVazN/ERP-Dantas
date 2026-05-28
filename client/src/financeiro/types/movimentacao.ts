@@ -1,5 +1,5 @@
 export type MovimentacaoTipo = "entrada" | "saida";
-export type MovimentacaoOrigem = "manual" | "venda" | "compra" | "estorno";
+export type MovimentacaoOrigem = "manual" | "venda" | "compra" | "despesa" | "estorno";
 export type FinancePeriodo = "hoje" | "semana" | "mes" | "todos";
 
 export interface Movimentacao {

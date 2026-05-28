@@ -124,8 +124,28 @@ export function useCrudModuleHandlers(deps: {
     }>
   >;
 
-  expenseForm: { description: string; category: string; amount: number; dueDate: string };
-  setExpenseForm: Dispatch<SetStateAction<{ description: string; category: string; amount: number; dueDate: string }>>;
+  expenseForm: {
+    supplier: string;
+    purchaseChannel: string;
+    paymentMethod: string;
+    description: string;
+    category: string;
+    amount: number;
+    paymentDate: string;
+    dueDate: string;
+  };
+  setExpenseForm: Dispatch<
+    SetStateAction<{
+      supplier: string;
+      purchaseChannel: string;
+      paymentMethod: string;
+      description: string;
+      category: string;
+      amount: number;
+      paymentDate: string;
+      dueDate: string;
+    }>
+  >;
 
   checklistForm: { title: string; notes: string };
   setChecklistForm: Dispatch<SetStateAction<{ title: string; notes: string }>>;
@@ -177,9 +197,13 @@ export function useCrudModuleHandlers(deps: {
   >;
   setEditExpenseForm: Dispatch<
     SetStateAction<{
+      supplier: string;
+      purchaseChannel: string;
+      paymentMethod: string;
       description: string;
       category: string;
       amount: number;
+      paymentDate: string;
       dueDate: string;
       status: Expense["status"];
     }>
@@ -449,9 +473,13 @@ export function useCrudModuleHandlers(deps: {
 
     await api.post<Expense>(scopedPath("/expenses"), { ...expenseForm });
     setExpenseForm({
+      supplier: "",
+      purchaseChannel: "",
+      paymentMethod: "PIX",
       description: "",
       category: "OPERACIONAL",
       amount: 0,
+      paymentDate: new Date().toISOString().slice(0, 10),
       dueDate: new Date().toISOString().slice(0, 10),
     });
     await loadAllData();
@@ -681,9 +709,13 @@ export function useCrudModuleHandlers(deps: {
       return;
     }
     setEditExpenseForm({
+      supplier: item.supplier || "",
+      purchaseChannel: item.purchaseChannel || "",
+      paymentMethod: item.paymentMethod || "PIX",
       description: item.description,
       category: item.category,
       amount: item.amount,
+      paymentDate: (item.paymentDate || item.dueDate).slice(0, 10),
       dueDate: item.dueDate.slice(0, 10),
       status: item.status,
     });
@@ -764,7 +796,10 @@ export function useCrudModuleHandlers(deps: {
       setError("No ERP Geral voce visualiza consolidado. Selecione um ERP especifico para editar despesas.");
       return;
     }
-    await api.patch<Expense>(scopedPath(`/expenses/${expenseId}`), { status });
+    await api.patch<Expense>(scopedPath(`/expenses/${expenseId}`), {
+      status,
+      ...(status === "PAGO" ? { paymentDate: new Date().toISOString() } : {}),
+    });
     await loadAllData();
   }
 
